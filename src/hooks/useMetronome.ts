@@ -78,32 +78,19 @@ export function useMetronome(settings: MetronomeSettings) {
     return baseBpm + (targetBpm - baseBpm) * progress;
   }, [settings]);
 
-  // Schedule next beat
+  // Process beat
   const scheduleNextBeat = useCallback(() => {
-    const audioContext = audioContextRef.current;
-    if (!audioContext) return;
-
-    const currentTime = audioContext.currentTime;
-    
-    if (nextBeatTimeRef.current <= currentTime) {
-      nextBeatTimeRef.current = currentTime + 0.1; // Start soon
-    }
-
     const currentBpm = calculateCurrentBpm(
       (beatCountRef.current % 4) + 1,
       measureCountRef.current,
       progressiveRoundRef.current
     );
 
-    const beatLength = 60 / currentBpm;
     const currentBeat = (beatCountRef.current % 4) + 1;
     const isDownbeat = currentBeat === 1;
 
-    // Schedule the click
-    const clickTime = nextBeatTimeRef.current;
-    setTimeout(() => {
-      playClick(isDownbeat);
-    }, (clickTime - currentTime) * 1000);
+    // Play the click sound
+    playClick(isDownbeat);
 
     // Update state
     setState(prev => ({
@@ -134,33 +121,36 @@ export function useMetronome(settings: MetronomeSettings) {
         }
       }
     }
-
-    nextBeatTimeRef.current += beatLength;
   }, [calculateCurrentBpm, playClick, settings]);
 
-  // Main metronome loop
+  // Main metronome loop using setInterval instead of requestAnimationFrame
   useEffect(() => {
     if (state.isPlaying) {
-      const scheduleLoop = () => {
-        scheduleNextBeat();
-        intervalRef.current = requestAnimationFrame(scheduleLoop);
-      };
+      const currentBpm = calculateCurrentBpm(
+        (beatCountRef.current % 4) + 1,
+        measureCountRef.current,
+        progressiveRoundRef.current
+      );
       
-      intervalRef.current = requestAnimationFrame(scheduleLoop);
+      const beatLength = (60 / currentBpm) * 1000; // Convert to milliseconds
+      
+      intervalRef.current = window.setInterval(() => {
+        scheduleNextBeat();
+      }, beatLength);
     } else {
       if (intervalRef.current) {
-        cancelAnimationFrame(intervalRef.current);
+        clearInterval(intervalRef.current);
         intervalRef.current = null;
       }
     }
 
     return () => {
       if (intervalRef.current) {
-        cancelAnimationFrame(intervalRef.current);
+        clearInterval(intervalRef.current);
         intervalRef.current = null;
       }
     };
-  }, [state.isPlaying, scheduleNextBeat]);
+  }, [state.isPlaying, calculateCurrentBpm, scheduleNextBeat]);
 
   const start = useCallback(() => {
     initAudioContext();
@@ -172,6 +162,12 @@ export function useMetronome(settings: MetronomeSettings) {
   }, []);
 
   const stop = useCallback(() => {
+    // Clear the interval first
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    
     setState(prev => ({
       ...prev,
       isPlaying: false,

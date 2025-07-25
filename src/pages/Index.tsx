@@ -26,9 +26,7 @@ const Index = () => {
 
   const handleCurrentBpmChange = (bpm: number) => {
     setCurrentBpm(bpm);
-    if (mode === 'regular') {
-      metronome.stop();
-    }
+    // Don't stop the metronome when BPM changes
   };
 
   return (
@@ -57,6 +55,8 @@ const Index = () => {
                 currentBeat={metronome.state.currentBeat}
                 isPlaying={metronome.state.isPlaying}
                 currentBpm={metronome.state.currentBpm}
+                onBpmChange={mode === 'regular' ? handleCurrentBpmChange : undefined}
+                canEdit={mode === 'regular'}
               />
             </div>
           </div>

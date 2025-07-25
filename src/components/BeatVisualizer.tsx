@@ -1,23 +1,108 @@
 import { cn } from "@/lib/utils";
+import { useEffect, useRef, useState } from "react";
 
 interface BeatVisualizerProps {
   currentBeat: number;
   isPlaying: boolean;
   currentBpm: number;
+  onBpmChange?: (bpm: number) => void;
+  canEdit?: boolean;
 }
 
-export function BeatVisualizer({ currentBeat, isPlaying, currentBpm }: BeatVisualizerProps) {
+export function BeatVisualizer({ currentBeat, isPlaying, currentBpm, onBpmChange, canEdit = false }: BeatVisualizerProps) {
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStartY, setDragStartY] = useState(0);
+  const [dragStartBpm, setDragStartBpm] = useState(0);
+  const bpmRef = useRef<HTMLDivElement>(null);
+
+  const changeBpm = (delta: number) => {
+    if (!onBpmChange || !canEdit) return;
+    const newBpm = Math.max(40, Math.min(300, Math.round(currentBpm + delta)));
+    onBpmChange(newBpm);
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!canEdit || !onBpmChange) return;
+    e.preventDefault();
+    setIsDragging(true);
+    setDragStartY(e.clientY);
+    setDragStartBpm(currentBpm);
+    document.body.style.cursor = 'ns-resize';
+  };
+
+  const handleMouseMove = (e: MouseEvent) => {
+    if (!isDragging || !onBpmChange || !canEdit) return;
+    const deltaY = dragStartY - e.clientY; // Invert so up increases BPM
+    const deltaBpm = Math.round(deltaY / 2); // 2 pixels per BPM
+    const newBpm = Math.max(40, Math.min(300, dragStartBpm + deltaBpm));
+    onBpmChange(newBpm);
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+    document.body.style.cursor = '';
+  };
+
+  const handleWheel = (e: React.WheelEvent) => {
+    if (!canEdit || !onBpmChange) return;
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -1 : 1; // Invert scroll direction
+    changeBpm(delta);
+  };
+
+  useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [isDragging, dragStartY, dragStartBpm, onBpmChange, canEdit]);
+
+  // Keyboard controls
+  useEffect(() => {
+    if (!canEdit || !onBpmChange) return;
+    
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target !== document.body) return; // Only when no input is focused
+      
+      switch (e.key) {
+        case 'ArrowUp':
+          e.preventDefault();
+          changeBpm(1);
+          break;
+        case 'ArrowDown':
+          e.preventDefault();
+          changeBpm(-1);
+          break;
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [currentBpm, onBpmChange, canEdit]);
   return (
     <div className="flex flex-col items-center space-y-6">
       {/* BPM Display */}
       <div className="text-center">
-        <div className={cn(
-          "text-6xl md:text-8xl font-bold transition-all duration-200",
-          isPlaying && "animate-tempo-glow"
-        )}>
+        <div 
+          ref={bpmRef}
+          className={cn(
+            "text-6xl md:text-8xl font-bold transition-all duration-200 select-none",
+            isPlaying && "animate-tempo-glow",
+            canEdit && "cursor-ns-resize hover:scale-105",
+            isDragging && "scale-105"
+          )}
+          onMouseDown={handleMouseDown}
+          onWheel={handleWheel}
+        >
           {Math.round(currentBpm)}
         </div>
-        <div className="text-lg text-muted-foreground mt-2">BPM</div>
+        <div className="text-lg text-muted-foreground mt-2">
+          BPM {canEdit && "(↑↓ arrows, click & drag, or scroll)"}
+        </div>
       </div>
 
       {/* Beat Indicators */}

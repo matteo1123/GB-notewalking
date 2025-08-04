@@ -61,22 +61,23 @@ const Index = () => {
     };
 
     let isDragging = false;
-    let dragStartY = 0;
-    let dragStartBpm = 0;
+    let lastMouseY = 0;
 
     const handleMouseDown = (e: MouseEvent) => {
       isDragging = true;
-      dragStartY = e.clientY;
-      dragStartBpm = currentBpm;
+      lastMouseY = e.clientY;
       document.body.style.cursor = 'ns-resize';
     };
 
     const handleMouseMove = (e: MouseEvent) => {
       if (!isDragging) return;
-      const deltaY = dragStartY - e.clientY;
-      const deltaBpm = Math.round(deltaY * 5);
-      const newBpm = Math.max(40, Math.min(300, dragStartBpm + deltaBpm));
-      handleCurrentBpmChange(newBpm);
+      const deltaY = lastMouseY - e.clientY;
+      lastMouseY = e.clientY;
+      
+      if (Math.abs(deltaY) > 2) { // Only update if movement is significant enough
+        const direction = deltaY > 0 ? 1 : -1;
+        changeBpm(direction);
+      }
     };
 
     const handleMouseUp = () => {

@@ -74,9 +74,10 @@ const Index = () => {
       const deltaY = lastMouseY - e.clientY;
       lastMouseY = e.clientY;
       
-      if (Math.abs(deltaY) > 2) { // Only update if movement is significant enough
-        const direction = deltaY > 0 ? 1 : -1;
-        changeBpm(direction);
+      // Make every pixel count for smooth continuous adjustment
+      if (Math.abs(deltaY) > 0) {
+        const bpmChange = deltaY * 0.5; // 2 pixels = 1 BPM change
+        changeBpm(bpmChange);
       }
     };
 

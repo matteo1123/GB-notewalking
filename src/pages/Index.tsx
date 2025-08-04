@@ -121,13 +121,13 @@ const Index = () => {
           {/* Beat Visualizer - Takes up more space */}
           <div className="lg:col-span-2">
             <div className="h-full flex items-center justify-center p-8">
-              <BeatVisualizer
-                currentBeat={metronome.state.currentBeat}
-                isPlaying={metronome.state.isPlaying}
-                currentBpm={metronome.state.currentBpm}
-                onBpmChange={mode === 'regular' ? handleCurrentBpmChange : undefined}
-                canEdit={mode === 'regular'}
-              />
+            <BeatVisualizer
+              currentBeat={metronome.state.currentBeat}
+              isPlaying={metronome.state.isPlaying}
+              currentBpm={mode === 'regular' ? currentBpm : metronome.state.currentBpm}
+              onBpmChange={mode === 'regular' ? handleCurrentBpmChange : undefined}
+              canEdit={mode === 'regular'}
+            />
             </div>
           </div>
 

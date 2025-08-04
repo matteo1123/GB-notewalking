@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { BeatVisualizer } from '@/components/BeatVisualizer';
 import { MetronomeControls, MetronomeMode } from '@/components/MetronomeControls';
 import { ProgressIndicator } from '@/components/ProgressIndicator';
@@ -29,8 +29,78 @@ const Index = () => {
     // Don't stop the metronome when BPM changes
   };
 
+  const changeBpm = (delta: number) => {
+    if (mode !== 'regular') return;
+    const newBpm = Math.max(40, Math.min(300, Math.round(currentBpm + delta)));
+    handleCurrentBpmChange(newBpm);
+  };
+
+  // Global BPM adjustment controls
+  useEffect(() => {
+    if (mode !== 'regular') return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target !== document.body && !(e.target as HTMLElement).classList.contains('bpm-control-area')) return;
+      
+      switch (e.key) {
+        case 'ArrowUp':
+          e.preventDefault();
+          changeBpm(1);
+          break;
+        case 'ArrowDown':
+          e.preventDefault();
+          changeBpm(-1);
+          break;
+      }
+    };
+
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? -1 : 1;
+      changeBpm(delta);
+    };
+
+    let isDragging = false;
+    let dragStartY = 0;
+    let dragStartBpm = 0;
+
+    const handleMouseDown = (e: MouseEvent) => {
+      isDragging = true;
+      dragStartY = e.clientY;
+      dragStartBpm = currentBpm;
+      document.body.style.cursor = 'ns-resize';
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDragging) return;
+      const deltaY = dragStartY - e.clientY;
+      const deltaBpm = Math.round(deltaY / 2);
+      const newBpm = Math.max(40, Math.min(300, dragStartBpm + deltaBpm));
+      handleCurrentBpmChange(newBpm);
+    };
+
+    const handleMouseUp = () => {
+      isDragging = false;
+      document.body.style.cursor = '';
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('wheel', handleWheel, { passive: false });
+    document.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('wheel', handleWheel);
+      document.removeEventListener('mousedown', handleMouseDown);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [mode, currentBpm]);
+
   return (
-    <div className="min-h-screen bg-background p-4">
+    <div className="min-h-screen bg-background p-4 bpm-control-area">
       <div className="max-w-4xl mx-auto space-y-8">
         {/* Header */}
         <div className="text-center space-y-2">

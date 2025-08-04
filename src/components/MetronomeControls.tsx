@@ -57,20 +57,8 @@ export function MetronomeControls({
         </div>
 
         {/* BPM Controls */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {mode === 'regular' ? (
-            <div className="space-y-2 md:col-span-2">
-              <Label className="text-sm font-medium">BPM</Label>
-              <Input
-                type="number"
-                value={currentBpm}
-                onChange={(e) => onCurrentBpmChange(Number(e.target.value))}
-                min={40}
-                max={300}
-                className="text-center"
-              />
-            </div>
-          ) : (
+        {mode !== 'regular' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <>
               <div className="space-y-2">
                 <Label className="text-sm font-medium">Start BPM</Label>
@@ -95,8 +83,8 @@ export function MetronomeControls({
                 />
               </div>
             </>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Measures Control (for speed trainer and progressive modes) */}
         {mode !== 'regular' && (

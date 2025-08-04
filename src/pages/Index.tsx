@@ -74,7 +74,7 @@ const Index = () => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!isDragging) return;
       const deltaY = dragStartY - e.clientY;
-      const deltaBpm = Math.round(deltaY / 2);
+      const deltaBpm = Math.round(deltaY * 5);
       const newBpm = Math.max(40, Math.min(300, dragStartBpm + deltaBpm));
       handleCurrentBpmChange(newBpm);
     };

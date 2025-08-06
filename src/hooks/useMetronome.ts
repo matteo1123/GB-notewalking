@@ -65,9 +65,8 @@ export function useMetronome(settings: MetronomeSettings) {
       return settings.startBpm;
     }
 
-    const totalBeats = settings.measures * 4;
-    const currentBeatNumber = (measure - 1) * 4 + beat;
-    const progress = Math.min(currentBeatNumber / totalBeats, 1);
+    // Progress based on measures, not individual beats for smoother progression
+    const progress = Math.min((measure - 1) / settings.measures, 1);
 
     let baseBpm = settings.startBpm;
     if (settings.mode === 'progressive') {

@@ -14,7 +14,7 @@ const Index = () => {
 
   const metronome = useMetronome({
     mode,
-    startBpm: mode === 'regular' ? currentBpm : startBpm,
+    startBpm: currentBpm,
     endBpm,
     measures,
   });
@@ -30,14 +30,12 @@ const Index = () => {
   };
 
   const changeBpm = (delta: number) => {
-    if (mode !== 'regular') return;
     const newBpm = Math.max(40, Math.min(300, Math.round(currentBpm + delta)));
     handleCurrentBpmChange(newBpm);
   };
 
   // Global BPM adjustment controls
   useEffect(() => {
-    if (mode !== 'regular') return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target !== document.body && !(e.target as HTMLElement).classList.contains('bpm-control-area')) return;
@@ -139,13 +137,11 @@ const Index = () => {
               mode={mode}
               isPlaying={metronome.state.isPlaying}
               currentBpm={mode === 'regular' ? currentBpm : metronome.state.currentBpm}
-              startBpm={startBpm}
               endBpm={endBpm}
               measures={measures}
               onModeChange={handleModeChange}
               onPlayPause={metronome.togglePlayPause}
               onStop={metronome.stop}
-              onStartBpmChange={setStartBpm}
               onEndBpmChange={setEndBpm}
               onMeasuresChange={setMeasures}
               onCurrentBpmChange={handleCurrentBpmChange}

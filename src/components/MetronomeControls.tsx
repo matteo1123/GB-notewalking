@@ -11,13 +11,11 @@ interface MetronomeControlsProps {
   mode: MetronomeMode;
   isPlaying: boolean;
   currentBpm: number;
-  startBpm: number;
   endBpm: number;
   measures: number;
   onModeChange: (mode: MetronomeMode) => void;
   onPlayPause: () => void;
   onStop: () => void;
-  onStartBpmChange: (bpm: number) => void;
   onEndBpmChange: (bpm: number) => void;
   onMeasuresChange: (measures: number) => void;
   onCurrentBpmChange: (bpm: number) => void;
@@ -27,13 +25,11 @@ export function MetronomeControls({
   mode,
   isPlaying,
   currentBpm,
-  startBpm,
   endBpm,
   measures,
   onModeChange,
   onPlayPause,
   onStop,
-  onStartBpmChange,
   onEndBpmChange,
   onMeasuresChange,
   onCurrentBpmChange,
@@ -58,31 +54,16 @@ export function MetronomeControls({
 
         {/* BPM Controls */}
         {mode !== 'regular' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <>
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Start BPM</Label>
-                <Input
-                  type="number"
-                  value={startBpm}
-                  onChange={(e) => onStartBpmChange(Number(e.target.value))}
-                  min={40}
-                  max={300}
-                  className="text-center"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">End BPM</Label>
-                <Input
-                  type="number"
-                  value={endBpm}
-                  onChange={(e) => onEndBpmChange(Number(e.target.value))}
-                  min={40}
-                  max={300}
-                  className="text-center"
-                />
-              </div>
-            </>
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">End BPM</Label>
+            <Input
+              type="number"
+              value={endBpm}
+              onChange={(e) => onEndBpmChange(Number(e.target.value))}
+              min={40}
+              max={300}
+              className="text-center"
+            />
           </div>
         )}
 

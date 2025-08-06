@@ -10,6 +10,7 @@ const Index = () => {
   const [startBpm, setStartBpm] = useState(80);
   const [endBpm, setEndBpm] = useState(120);
   const [measures, setMeasures] = useState(8);
+  const [measuresPerBpmChange, setMeasuresPerBpmChange] = useState(4);
   const [currentBpm, setCurrentBpm] = useState(80);
 
   const metronome = useMetronome({
@@ -17,6 +18,7 @@ const Index = () => {
     startBpm: currentBpm,
     endBpm,
     measures,
+    measuresPerBpmChange,
   });
 
   const handleModeChange = (newMode: MetronomeMode) => {
@@ -26,7 +28,9 @@ const Index = () => {
 
   const handleCurrentBpmChange = (bpm: number) => {
     setCurrentBpm(bpm);
-    // Don't stop the metronome when BPM changes
+    if (metronome.state.isPlaying && mode !== 'regular') {
+      metronome.stop();
+    }
   };
 
   const changeBpm = (delta: number) => {
@@ -69,11 +73,12 @@ const Index = () => {
 
     const handleMouseMove = (e: MouseEvent) => {
       if (!isDragging) return;
+      e.preventDefault();
       const deltaY = lastMouseY - e.clientY;
       lastMouseY = e.clientY;
       
       // Make every pixel count for smooth continuous adjustment
-      if (Math.abs(deltaY) > 0) {
+      if (Math.abs(deltaY) >= 1) {
         const bpmChange = deltaY * 0.5; // 2 pixels = 1 BPM change
         changeBpm(bpmChange);
       }
@@ -125,8 +130,8 @@ const Index = () => {
               currentBeat={metronome.state.currentBeat}
               isPlaying={metronome.state.isPlaying}
               currentBpm={mode === 'regular' ? currentBpm : metronome.state.currentBpm}
-              onBpmChange={mode === 'regular' ? handleCurrentBpmChange : undefined}
-              canEdit={mode === 'regular'}
+              onBpmChange={handleCurrentBpmChange}
+              canEdit={true}
             />
             </div>
           </div>
@@ -139,11 +144,13 @@ const Index = () => {
               currentBpm={mode === 'regular' ? currentBpm : metronome.state.currentBpm}
               endBpm={endBpm}
               measures={measures}
+              measuresPerBpmChange={measuresPerBpmChange}
               onModeChange={handleModeChange}
               onPlayPause={metronome.togglePlayPause}
               onStop={metronome.stop}
               onEndBpmChange={setEndBpm}
               onMeasuresChange={setMeasures}
+              onMeasuresPerBpmChangeChange={setMeasuresPerBpmChange}
               onCurrentBpmChange={handleCurrentBpmChange}
             />
 

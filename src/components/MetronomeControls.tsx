@@ -13,11 +13,13 @@ interface MetronomeControlsProps {
   currentBpm: number;
   endBpm: number;
   measures: number;
+  measuresPerBpmChange: number;
   onModeChange: (mode: MetronomeMode) => void;
   onPlayPause: () => void;
   onStop: () => void;
   onEndBpmChange: (bpm: number) => void;
   onMeasuresChange: (measures: number) => void;
+  onMeasuresPerBpmChangeChange: (measures: number) => void;
   onCurrentBpmChange: (bpm: number) => void;
 }
 
@@ -27,11 +29,13 @@ export function MetronomeControls({
   currentBpm,
   endBpm,
   measures,
+  measuresPerBpmChange,
   onModeChange,
   onPlayPause,
   onStop,
   onEndBpmChange,
   onMeasuresChange,
+  onMeasuresPerBpmChangeChange,
   onCurrentBpmChange,
 }: MetronomeControlsProps) {
   return (
@@ -69,16 +73,29 @@ export function MetronomeControls({
 
         {/* Measures Control (for speed trainer and progressive modes) */}
         {mode !== 'regular' && (
-          <div className="space-y-2">
-            <Label className="text-sm font-medium">Measures (4/4)</Label>
-            <Input
-              type="number"
-              value={measures}
-              onChange={(e) => onMeasuresChange(Number(e.target.value))}
-              min={1}
-              max={100}
-              className="text-center"
-            />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Total Measures</Label>
+              <Input
+                type="number"
+                value={measures}
+                onChange={(e) => onMeasuresChange(Number(e.target.value))}
+                min={1}
+                max={100}
+                className="text-center"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Measures per BPM Change</Label>
+              <Input
+                type="number"
+                value={measuresPerBpmChange}
+                onChange={(e) => onMeasuresPerBpmChangeChange(Number(e.target.value))}
+                min={1}
+                max={20}
+                className="text-center"
+              />
+            </div>
           </div>
         )}
 

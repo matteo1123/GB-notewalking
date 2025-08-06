@@ -13,6 +13,7 @@ export interface MetronomeSettings {
   startBpm: number;
   endBpm: number;
   measures: number;
+  measuresPerBpmChange?: number;
 }
 
 export function useMetronome(settings: MetronomeSettings) {
@@ -30,6 +31,7 @@ export function useMetronome(settings: MetronomeSettings) {
   const measureCountRef = useRef<number>(1);
   const progressiveRoundRef = useRef<number>(1);
   const intervalRef = useRef<number | null>(null);
+  const measuresPerBpmChange = settings.measuresPerBpmChange || 1;
 
   // Initialize audio context
   const initAudioContext = useCallback(() => {
@@ -65,8 +67,10 @@ export function useMetronome(settings: MetronomeSettings) {
       return settings.startBpm;
     }
 
-    // Progress based on measures, not individual beats for smoother progression
-    const progress = Math.min((measure - 1) / settings.measures, 1);
+    // Calculate BPM changes based on measures per BPM change setting
+    const bpmChanges = Math.floor((measure - 1) / measuresPerBpmChange);
+    const totalBpmChanges = Math.floor(settings.measures / measuresPerBpmChange);
+    const progress = totalBpmChanges > 0 ? Math.min(bpmChanges / totalBpmChanges, 1) : 0;
 
     let baseBpm = settings.startBpm;
     if (settings.mode === 'progressive') {
@@ -75,7 +79,7 @@ export function useMetronome(settings: MetronomeSettings) {
 
     const targetBpm = settings.endBpm + (settings.mode === 'progressive' ? (round - 1) * 5 : 0);
     return baseBpm + (targetBpm - baseBpm) * progress;
-  }, [settings]);
+  }, [settings, measuresPerBpmChange]);
 
   // Process beat
   const scheduleNextBeat = useCallback(() => {

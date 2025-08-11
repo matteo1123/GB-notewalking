@@ -7,23 +7,47 @@ interface BeatVisualizerProps {
   currentBpm: number;
   onBpmChange?: (bpm: number) => void;
   canEdit?: boolean;
+  size?: 'sm' | 'md' | 'lg';
 }
 
-export function BeatVisualizer({ currentBeat, isPlaying, currentBpm, onBpmChange, canEdit = false }: BeatVisualizerProps) {
+export function BeatVisualizer({ currentBeat, isPlaying, currentBpm, onBpmChange, canEdit = false, size = 'lg' }: BeatVisualizerProps) {
+  const sizeClasses = {
+    sm: {
+      bpm: 'text-3xl md:text-4xl',
+      container: 'space-y-3',
+      beat: 'w-8 h-8',
+      pulse: 'w-12 h-12',
+      pulseInner: 'w-4 h-4'
+    },
+    md: {
+      bpm: 'text-4xl md:text-6xl',
+      container: 'space-y-4',
+      beat: 'w-10 h-10',
+      pulse: 'w-16 h-16',
+      pulseInner: 'w-6 h-6'
+    },
+    lg: {
+      bpm: 'text-6xl md:text-8xl',
+      container: 'space-y-6',
+      beat: 'w-12 h-12',
+      pulse: 'w-20 h-20',
+      pulseInner: 'w-8 h-8'
+    }
+  };
   return (
-    <div className="flex flex-col items-center space-y-6">
+    <div className={`flex flex-col items-center ${sizeClasses[size].container}`}>
       {/* BPM Display */}
       <div className="text-center">
         <div 
           className={cn(
-            "text-6xl md:text-8xl font-bold transition-all duration-200 select-none",
+            `${sizeClasses[size].bpm} font-bold transition-all duration-200 select-none`,
             isPlaying && "animate-tempo-glow"
           )}
         >
           {Math.round(currentBpm)}
         </div>
-        <div className="text-lg text-muted-foreground mt-2">
-          BPM {canEdit && "(↑↓ arrows, click & drag, or scroll)"}
+        <div className={`${size === 'sm' ? 'text-sm' : 'text-lg'} text-muted-foreground mt-2`}>
+          BPM {canEdit && size === 'lg' && "(↑↓ arrows, click & drag, or scroll)"}
         </div>
       </div>
 
@@ -33,7 +57,7 @@ export function BeatVisualizer({ currentBeat, isPlaying, currentBpm, onBpmChange
           <div
             key={beat}
             className={cn(
-              "w-12 h-12 rounded-full border-2 transition-all duration-150",
+              `${sizeClasses[size].beat} rounded-full border-2 transition-all duration-150`,
               "flex items-center justify-center font-bold",
               currentBeat === beat && isPlaying
                 ? "bg-beat-active border-beat-active text-background animate-beat-pulse"
@@ -46,22 +70,24 @@ export function BeatVisualizer({ currentBeat, isPlaying, currentBpm, onBpmChange
       </div>
 
       {/* Pulse Indicator */}
-      <div className={cn(
-        "w-20 h-20 rounded-full border-4 transition-all duration-100",
-        "flex items-center justify-center",
-        isPlaying
-          ? "border-tempo-glow bg-tempo-glow/10"
-          : "border-muted bg-muted/10"
-      )}>
+      {size !== 'sm' && (
         <div className={cn(
-          "w-8 h-8 rounded-full transition-all duration-100",
-          currentBeat === 1 && isPlaying
-            ? "bg-tempo-glow scale-125"
-            : isPlaying
-            ? "bg-tempo-glow/70 scale-110"
-            : "bg-muted scale-100"
-        )} />
-      </div>
+          `${sizeClasses[size].pulse} rounded-full border-4 transition-all duration-100`,
+          "flex items-center justify-center",
+          isPlaying
+            ? "border-tempo-glow bg-tempo-glow/10"
+            : "border-muted bg-muted/10"
+        )}>
+          <div className={cn(
+            `${sizeClasses[size].pulseInner} rounded-full transition-all duration-100`,
+            currentBeat === 1 && isPlaying
+              ? "bg-tempo-glow scale-125"
+              : isPlaying
+              ? "bg-tempo-glow/70 scale-110"
+              : "bg-muted scale-100"
+          )} />
+        </div>
+      )}
     </div>
   );
 }

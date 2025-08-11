@@ -3,7 +3,9 @@ import { BeatVisualizer } from '@/components/BeatVisualizer';
 import { MetronomeControls, MetronomeMode } from '@/components/MetronomeControls';
 import { ProgressIndicator } from '@/components/ProgressIndicator';
 import { useMetronome } from '@/hooks/useMetronome';
-import { Music } from 'lucide-react';
+import { Music, Crown } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
 
 const Index = () => {
   const [mode, setMode] = useState<MetronomeMode>('regular');
@@ -109,11 +111,22 @@ const Index = () => {
       <div className="max-w-4xl mx-auto space-y-8">
         {/* Header */}
         <div className="text-center space-y-2">
-          <div className="flex items-center justify-center gap-3 mb-4">
-            <Music className="h-8 w-8 text-primary" />
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-              Guitar Speed Trainer
-            </h1>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex-1"></div>
+            <div className="flex items-center gap-3">
+              <Music className="h-8 w-8 text-primary" />
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                Guitar Speed Trainer
+              </h1>
+            </div>
+            <div className="flex-1 flex justify-end">
+              <Link to="/premium">
+                <Button variant="outline" className="flex items-center gap-2">
+                  <Crown className="h-4 w-4" />
+                  Premium
+                </Button>
+              </Link>
+            </div>
           </div>
           <p className="text-muted-foreground max-w-2xl mx-auto">
             Professional metronome with speed training modes for guitar practice. 

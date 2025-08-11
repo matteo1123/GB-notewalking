@@ -8,6 +8,7 @@ import { Play, Pause, Square } from "lucide-react";
 export type MetronomeMode = 'regular' | 'speed-trainer' | 'progressive';
 
 interface MetronomeControlsProps {
+  compact?: boolean;
   mode: MetronomeMode;
   isPlaying: boolean;
   currentBpm: number;
@@ -24,6 +25,7 @@ interface MetronomeControlsProps {
 }
 
 export function MetronomeControls({
+  compact = false,
   mode,
   isPlaying,
   currentBpm,
@@ -39,8 +41,8 @@ export function MetronomeControls({
   onCurrentBpmChange,
 }: MetronomeControlsProps) {
   return (
-    <Card className="p-6 bg-gradient-to-br from-card to-card/50 border-border/50">
-      <div className="space-y-6">
+    <Card className={`${compact ? 'p-3' : 'p-6'} bg-gradient-to-br from-card to-card/50 border-border/50`}>
+      <div className={compact ? 'space-y-3' : 'space-y-6'}>
         {/* Mode Selection */}
         <div className="space-y-2">
           <Label className="text-sm font-medium">Mode</Label>

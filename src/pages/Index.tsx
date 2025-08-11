@@ -3,11 +3,13 @@ import { BeatVisualizer } from '@/components/BeatVisualizer';
 import { MetronomeControls, MetronomeMode } from '@/components/MetronomeControls';
 import { ProgressIndicator } from '@/components/ProgressIndicator';
 import { useMetronome } from '@/hooks/useMetronome';
-import { Music, Crown } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { Music, Crown, LogIn, LogOut } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 
 const Index = () => {
+  const { user, signOut } = useAuth();
   const [mode, setMode] = useState<MetronomeMode>('regular');
   const [startBpm, setStartBpm] = useState(80);
   const [endBpm, setEndBpm] = useState(120);
@@ -119,13 +121,26 @@ const Index = () => {
                 Guitar Speed Trainer
               </h1>
             </div>
-            <div className="flex-1 flex justify-end">
+            <div className="flex-1 flex justify-end gap-2">
               <Link to="/premium">
                 <Button variant="outline" className="flex items-center gap-2">
                   <Crown className="h-4 w-4" />
                   Premium
                 </Button>
               </Link>
+              {user ? (
+                <Button variant="outline" onClick={signOut} className="flex items-center gap-2">
+                  <LogOut className="h-4 w-4" />
+                  Sign Out
+                </Button>
+              ) : (
+                <Link to="/auth">
+                  <Button variant="outline" className="flex items-center gap-2">
+                    <LogIn className="h-4 w-4" />
+                    Sign In
+                  </Button>
+                </Link>
+              )}
             </div>
           </div>
           <p className="text-muted-foreground max-w-2xl mx-auto">

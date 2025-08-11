@@ -4,7 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import RiffPractice from '@/components/RiffPractice';
 import { RepertoireItem } from '@/types/repertoire';
-import { Music, Star, Zap, Home, Crown } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { Music, Star, Zap, Home, Crown, LogIn } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 // Sample repertoire data
@@ -61,10 +62,10 @@ const sampleRepertoire: RepertoireItem[] = [
 ];
 
 const Premium = () => {
-  const [isPremium, setIsPremium] = useState(false); // In real app, this would come from auth/subscription state
+  const { user } = useAuth();
   const [selectedRiff, setSelectedRiff] = useState<RepertoireItem | null>(null);
 
-  if (!isPremium) {
+  if (!user) {
     return (
       <div className="min-h-screen bg-background p-4">
         <div className="max-w-4xl mx-auto space-y-8">
@@ -138,15 +139,17 @@ const Premium = () => {
 
             {/* CTA */}
             <div className="space-y-4">
-              <Button 
-                size="lg" 
-                className="text-lg px-8 py-6"
-                onClick={() => setIsPremium(true)} // Demo: unlock premium
-              >
-                Start Premium Trial - $9.99/month
-              </Button>
+              <Link to="/auth">
+                <Button 
+                  size="lg" 
+                  className="text-lg px-8 py-6 flex items-center gap-2"
+                >
+                  <LogIn className="h-5 w-5" />
+                  Sign In to Access Premium Features
+                </Button>
+              </Link>
               <p className="text-sm text-muted-foreground">
-                7-day free trial • Cancel anytime • No commitment
+                Create an account to access premium guitar training tools
               </p>
             </div>
           </div>

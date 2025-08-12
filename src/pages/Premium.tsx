@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -8,62 +8,47 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Music, Star, Zap, Home, Crown, LogIn } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-// Sample repertoire data
-const sampleRepertoire: RepertoireItem[] = [
-  {
-    id: '1',
-    name: 'C Major Scale',
-    category: 'scale',
-    difficulty: 'beginner',
-    tempo: 80,
-    description: 'Basic C major scale in first position',
-    notes: [
-      { time: 0.0, duration: 0.5, string: 5, fret: 3 },
-      { time: 0.5, duration: 0.5, string: 4, fret: 2 },
-      { time: 1.0, duration: 0.5, string: 3, fret: 0 },
-      { time: 1.5, duration: 0.5, string: 3, fret: 2 },
-      { time: 2.0, duration: 0.5, string: 2, fret: 0 },
-      { time: 2.5, duration: 0.5, string: 2, fret: 1 },
-      { time: 3.0, duration: 0.5, string: 2, fret: 3 },
-      { time: 3.5, duration: 0.5, string: 1, fret: 0 },
-    ]
-  },
-  {
-    id: '2',
-    name: 'Blues Riff in A',
-    category: 'riff',
-    difficulty: 'intermediate',
-    tempo: 120,
-    description: 'Classic blues riff in the key of A',
-    notes: [
-      { time: 0.0, duration: 0.25, string: 6, fret: 5 },
-      { time: 0.25, duration: 0.25, string: 6, fret: 8 },
-      { time: 0.5, duration: 0.5, string: 5, fret: 7 },
-      { time: 1.0, duration: 0.25, string: 6, fret: 5 },
-      { time: 1.25, duration: 0.25, string: 6, fret: 7 },
-      { time: 1.5, duration: 0.5, string: 5, fret: 5 },
-    ]
-  },
-  {
-    id: '3',
-    name: 'Em Arpeggio',
-    category: 'arpeggio',
-    difficulty: 'intermediate',
-    tempo: 100,
-    description: 'E minor arpeggio in open position',
-    notes: [
-      { time: 0.0, duration: 0.5, string: 6, fret: 0 },
-      { time: 0.5, duration: 0.5, string: 4, fret: 2 },
-      { time: 1.0, duration: 0.5, string: 3, fret: 0 },
-      { time: 1.5, duration: 0.5, string: 2, fret: 0 },
-      { time: 2.0, duration: 0.5, string: 1, fret: 0 },
-    ]
-  }
-];
+import { supabase } from '@/integrations/supabase/client';
 
 const Premium = () => {
   const { user } = useAuth();
   const [selectedRiff, setSelectedRiff] = useState<RepertoireItem | null>(null);
+  const [exercises, setExercises] = useState<RepertoireItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    async function loadExercises() {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('exercises')
+        .select('id, name, type, difficulty, tempo, description, notes')
+        .order('created_at', { ascending: false });
+      if (!isMounted) return;
+      if (error) {
+        setError(error.message);
+        setExercises([]);
+      } else {
+        const mapped: RepertoireItem[] = (data ?? []).map((row: any) => ({
+          id: row.id,
+          name: row.name,
+          category: row.type as RepertoireItem['category'],
+          difficulty: row.difficulty as RepertoireItem['difficulty'],
+          tempo: row.tempo,
+          description: row.description ?? undefined,
+          notes: (row.notes as any) ?? [],
+        }));
+        setExercises(mapped);
+        setError(null);
+      }
+      setLoading(false);
+    }
+    loadExercises();
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.id]);
 
   if (!user) {
     return (
@@ -215,7 +200,7 @@ const Premium = () => {
 
           <TabsContent value="riffs" className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {sampleRepertoire.filter(item => item.category === 'riff').map(item => (
+              {exercises.filter(item => item.category === 'riff').map(item => (
                 <Card key={item.id} className="cursor-pointer hover:bg-card/80 transition-colors" onClick={() => setSelectedRiff(item)}>
                   <CardHeader>
                     <CardTitle className="flex items-center justify-between">
@@ -240,7 +225,7 @@ const Premium = () => {
 
           <TabsContent value="scales" className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {sampleRepertoire.filter(item => item.category === 'scale').map(item => (
+              {exercises.filter(item => item.category === 'scale').map(item => (
                 <Card key={item.id} className="cursor-pointer hover:bg-card/80 transition-colors" onClick={() => setSelectedRiff(item)}>
                   <CardHeader>
                     <CardTitle className="flex items-center justify-between">
@@ -265,7 +250,7 @@ const Premium = () => {
 
           <TabsContent value="arpeggios" className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {sampleRepertoire.filter(item => item.category === 'arpeggio').map(item => (
+              {exercises.filter(item => item.category === 'arpeggio').map(item => (
                 <Card key={item.id} className="cursor-pointer hover:bg-card/80 transition-colors" onClick={() => setSelectedRiff(item)}>
                   <CardHeader>
                     <CardTitle className="flex items-center justify-between">

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { RepertoireItem } from '@/types/repertoire';
 import { useMetronome, MetronomeSettings } from '@/hooks/useMetronome';
 import GuitarTablature from './GuitarTablature';
@@ -7,6 +7,23 @@ import { MetronomeControls, MetronomeMode } from './MetronomeControls';
 import { Button } from './ui/button';
 import { Progress } from './ui/progress';
 import { Play, Pause, Square, RotateCcw } from 'lucide-react';
+
+// Normalize raw notes (supports optional 'subdivision' for per-beat steps)
+// Defaults to quarter notes (1 step per beat) when subdivision is missing
+// Accepts legacy notes with 'duration' in seconds; otherwise duration = 1 step
+
+type AnyNote = { time: number; string: number; fret: number; subdivision?: number; duration?: number };
+
+function normalizeNotes(rawNotes: AnyNote[], bpm: number) {
+  const secondsPerBeat = 60 / Math.max(bpm, 1);
+  return (rawNotes || []).map((n) => {
+    const sub = typeof n.subdivision === 'number' && n.subdivision > 0 ? n.subdivision : 1;
+    const stepDuration = secondsPerBeat / sub;
+    const startTimeSeconds = (n.time ?? 0) * stepDuration;
+    const durationSeconds = typeof n.duration === 'number' && n.duration > 0 ? n.duration : stepDuration;
+    return { time: startTimeSeconds, duration: durationSeconds, string: n.string, fret: n.fret };
+  });
+}
 
 interface RiffPracticeProps {
   repertoireItem: RepertoireItem;
@@ -78,8 +95,12 @@ const RiffPractice = ({
     onComplete?.();
   }, [handleStop, onComplete]);
 
-  const maxNoteTime = Math.max(...repertoireItem.notes.map(note => note.time + note.duration));
-  const progress = timeLimit ? (elapsedTime / timeLimit) * 100 : (currentTime / maxNoteTime) * 100;
+  const normalizedNotes = useMemo(
+    () => normalizeNotes(repertoireItem.notes as unknown as AnyNote[], repertoireItem.tempo),
+    [repertoireItem.notes, repertoireItem.tempo]
+  );
+  const maxNoteTime = normalizedNotes.length > 0 ? Math.max(...normalizedNotes.map(note => note.time + note.duration)) : 0;
+  const progress = timeLimit ? (elapsedTime / timeLimit) * 100 : (maxNoteTime > 0 ? (currentTime / maxNoteTime) * 100 : 0);
 
   return (
     <div className="space-y-6">
@@ -121,7 +142,7 @@ const RiffPractice = ({
         {/* Tablature - Takes up more space */}
         <div className="lg:col-span-2">
           <GuitarTablature 
-            notes={repertoireItem.notes} 
+            notes={normalizedNotes} 
             currentTime={currentTime}
             className="h-full"
           />

@@ -14,7 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      exercises: {
+        Row: {
+          created_at: string
+          created_by: string
+          description: string | null
+          difficulty: Database["public"]["Enums"]["exercise_difficulty"]
+          id: string
+          is_public: boolean
+          name: string
+          notes: Json
+          tempo: number
+          type: Database["public"]["Enums"]["exercise_type"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          description?: string | null
+          difficulty?: Database["public"]["Enums"]["exercise_difficulty"]
+          id?: string
+          is_public?: boolean
+          name: string
+          notes: Json
+          tempo: number
+          type: Database["public"]["Enums"]["exercise_type"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          difficulty?: Database["public"]["Enums"]["exercise_difficulty"]
+          id?: string
+          is_public?: boolean
+          name?: string
+          notes?: Json
+          tempo?: number
+          type?: Database["public"]["Enums"]["exercise_type"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +64,8 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      exercise_difficulty: "beginner" | "intermediate" | "advanced"
+      exercise_type: "riff" | "scale" | "arpeggio"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +192,9 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      exercise_difficulty: ["beginner", "intermediate", "advanced"],
+      exercise_type: ["riff", "scale", "arpeggio"],
+    },
   },
 } as const

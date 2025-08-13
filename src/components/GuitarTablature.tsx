@@ -4,15 +4,30 @@ interface GuitarTablatureProps {
   notes: Note[];
   currentTime?: number;
   className?: string;
+  highlightEvery?: number; // Optional global pattern (e.g., 3 = every 3rd)
+  highlightOffset?: number; // Optional offset for the pattern
 }
 
-const GuitarTablature = ({ notes, currentTime = 0, className = '' }: GuitarTablatureProps) => {
+const GuitarTablature = ({ notes, currentTime = 0, className = '', highlightEvery, highlightOffset = 0 }: GuitarTablatureProps) => {
   const strings = [1, 2, 3, 4, 5, 6]; // High E to Low E
   
-  // Calculate which notes are currently active
-  const activeNotes = notes.filter(note => 
-    currentTime >= note.time && currentTime < note.time + note.duration
-  );
+// Calculate which notes are currently active
+const activeNotes = notes.filter(note => 
+  currentTime >= note.time && currentTime < note.time + note.duration
+);
+
+// Precompute total time for positioning
+const totalTime = notes.length > 0
+  ? Math.max(...notes.map(n => n.time + n.duration))
+  : 0;
+
+// Build a stable global order index (by time, then original index)
+const order = notes
+  .map((n, i) => ({ n, i }))
+  .sort((a, b) => (a.n.time - b.n.time) || (a.i - b.i));
+
+const indexMap = new Map<Note, number>();
+order.forEach(({ n }, idx) => indexMap.set(n, idx));
 
   return (
     <div className={`bg-card rounded-lg border border-border p-4 ${className}`}>

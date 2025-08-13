@@ -21,7 +21,7 @@ function normalizeNotes(rawNotes: AnyNote[], bpm: number) {
     const stepDuration = secondsPerBeat / sub;
     const startTimeSeconds = (n.time ?? 0) * stepDuration;
     const durationSeconds = typeof n.duration === 'number' && n.duration > 0 ? n.duration : stepDuration;
-    return { time: startTimeSeconds, duration: durationSeconds, string: n.string, fret: n.fret };
+    return { time: startTimeSeconds, duration: durationSeconds, string: n.string, fret: n.fret, accent: (n as any).accent ?? (n as any).highlight };
   });
 }
 
@@ -56,32 +56,6 @@ const RiffPractice = ({
 
   const metronome = useMetronome(metronomeSettings);
 
-  // Calculate current time in the riff based on metronome
-  useEffect(() => {
-    if (metronome.state.isPlaying && startTime !== null) {
-      const now = performance.now();
-      const elapsed = (now - startTime) / 1000; // Convert to seconds
-      setCurrentTime(elapsed);
-      setElapsedTime(elapsed);
-      
-      // Auto-complete based on time limit
-      if (timeLimit && elapsed >= timeLimit && autoAdvance) {
-        handleComplete();
-      }
-    }
-  }, [metronome.state.currentBeat, metronome.state.isPlaying, startTime, timeLimit, autoAdvance]);
-
-  const handlePlay = useCallback(() => {
-    if (!metronome.state.isPlaying) {
-      setStartTime(performance.now());
-      metronome.start();
-    } else {
-      metronome.pause();
-      setStartTime(null);
-    }
-    setIsPlaying(!metronome.state.isPlaying);
-  }, [metronome]);
-
   const handleStop = useCallback(() => {
     metronome.stop();
     setIsPlaying(false);
@@ -95,10 +69,56 @@ const RiffPractice = ({
     onComplete?.();
   }, [handleStop, onComplete]);
 
+  // Calculate current time in the riff based on metronome
+useEffect(() => {
+  if (!metronome.state.isPlaying || startTime === null) return;
+
+  let rafId: number;
+  const tick = () => {
+    const now = performance.now();
+    const elapsed = (now - startTime) / 1000; // seconds
+    setCurrentTime(elapsed);
+    setElapsedTime(elapsed);
+
+    if (timeLimit && autoAdvance && elapsed >= timeLimit) {
+      handleComplete();
+      return;
+    }
+
+    rafId = requestAnimationFrame(tick);
+  };
+
+  rafId = requestAnimationFrame(tick);
+  return () => cancelAnimationFrame(rafId);
+}, [metronome.state.isPlaying, startTime, timeLimit, autoAdvance, handleComplete]);
+
+  const handlePlay = useCallback(() => {
+    if (!metronome.state.isPlaying) {
+      setStartTime(performance.now());
+      metronome.start();
+    } else {
+      metronome.pause();
+      setStartTime(null);
+    }
+    setIsPlaying(!metronome.state.isPlaying);
+  }, [metronome]);
+
   const normalizedNotes = useMemo(
     () => normalizeNotes(repertoireItem.notes as unknown as AnyNote[], repertoireItem.tempo),
     [repertoireItem.notes, repertoireItem.tempo]
   );
+  const highlightDirectives = useMemo(() => {
+    let highlightEvery: number | undefined;
+    let highlightOffset: number | undefined;
+    for (const n of (repertoireItem.notes as unknown as AnyNote[])) {
+      const he = (n as any).highlightEvery;
+      const ho = (n as any).highlightOffset;
+      if (typeof he === 'number' && he > 0) highlightEvery = he;
+      if (typeof ho === 'number') highlightOffset = ho;
+      if (highlightEvery !== undefined && highlightOffset !== undefined) break;
+    }
+    return { highlightEvery, highlightOffset };
+  }, [repertoireItem.notes]);
   const maxNoteTime = normalizedNotes.length > 0 ? Math.max(...normalizedNotes.map(note => note.time + note.duration)) : 0;
   const progress = timeLimit ? (elapsedTime / timeLimit) * 100 : (maxNoteTime > 0 ? (currentTime / maxNoteTime) * 100 : 0);
 
@@ -141,11 +161,13 @@ const RiffPractice = ({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Tablature - Takes up more space */}
         <div className="lg:col-span-2">
-          <GuitarTablature 
-            notes={normalizedNotes} 
-            currentTime={currentTime}
-            className="h-full"
-          />
+<GuitarTablature 
+  notes={normalizedNotes} 
+  currentTime={currentTime}
+  className="h-full"
+  highlightEvery={highlightDirectives.highlightEvery}
+  highlightOffset={highlightDirectives.highlightOffset}
+/>
         </div>
 
         {/* Controls and Visualizer */}

@@ -69,7 +69,7 @@ const RiffPractice = ({
     onComplete?.();
   }, [handleStop, onComplete]);
 
-  // Calculate current time based on metronome beats (metronome is master)
+  // Calculate current time and subdivision based on metronome beats (metronome is master)
   useEffect(() => {
     if (!metronome.state.isPlaying) {
       return;
@@ -88,6 +88,16 @@ const RiffPractice = ({
       handleComplete();
     }
   }, [metronome.state.currentBeat, metronome.state.currentMeasure, metronome.state.currentBpm, metronome.state.isPlaying, timeLimit, autoAdvance, handleComplete]);
+
+  // Calculate current beat and subdivision for tablature highlighting
+  const currentBeat = metronome.state.isPlaying 
+    ? ((metronome.state.currentMeasure - 1) * 4 + metronome.state.currentBeat)
+    : 1;
+  
+  // For now, assume triplets and cycle through subdivisions based on metronome timing
+  const currentSubdivision = metronome.state.isPlaying 
+    ? Math.floor((performance.now() % (60000 / metronome.state.currentBpm / 3)) / (60000 / metronome.state.currentBpm / 3) * 3) + 1
+    : 1;
 
   const handlePlay = useCallback(() => {
     if (!metronome.state.isPlaying) {
@@ -156,13 +166,12 @@ const RiffPractice = ({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Tablature - Takes up more space */}
         <div className="lg:col-span-2">
-<GuitarTablature 
-  notes={normalizedNotes} 
-  currentTime={currentTime}
-  className="h-full"
-  highlightEvery={highlightDirectives.highlightEvery}
-  highlightOffset={highlightDirectives.highlightOffset}
-/>
+          <GuitarTablature 
+            notes={repertoireItem.notes}
+            currentBeat={currentBeat}
+            currentSubdivision={currentSubdivision}
+            className="h-full"
+          />
         </div>
 
         {/* Controls and Visualizer */}

@@ -69,36 +69,31 @@ const RiffPractice = ({
     onComplete?.();
   }, [handleStop, onComplete]);
 
-  // Calculate current time in the riff based on metronome
-useEffect(() => {
-  if (!metronome.state.isPlaying || startTime === null) return;
-
-  let rafId: number;
-  const tick = () => {
-    const now = performance.now();
-    const elapsed = (now - startTime) / 1000; // seconds
-    setCurrentTime(elapsed);
-    setElapsedTime(elapsed);
-
-    if (timeLimit && autoAdvance && elapsed >= timeLimit) {
-      handleComplete();
+  // Calculate current time based on metronome beats (metronome is master)
+  useEffect(() => {
+    if (!metronome.state.isPlaying) {
       return;
     }
 
-    rafId = requestAnimationFrame(tick);
-  };
+    // Calculate time based on metronome beats and BPM
+    const beatLength = 60 / metronome.state.currentBpm; // seconds per beat
+    const totalBeats = (metronome.state.currentMeasure - 1) * 4 + (metronome.state.currentBeat - 1);
+    const calculatedTime = totalBeats * beatLength;
+    
+    setCurrentTime(calculatedTime);
+    setElapsedTime(calculatedTime);
 
-  rafId = requestAnimationFrame(tick);
-  return () => cancelAnimationFrame(rafId);
-}, [metronome.state.isPlaying, startTime, timeLimit, autoAdvance, handleComplete]);
+    // Check time limit completion
+    if (timeLimit && autoAdvance && calculatedTime >= timeLimit) {
+      handleComplete();
+    }
+  }, [metronome.state.currentBeat, metronome.state.currentMeasure, metronome.state.currentBpm, metronome.state.isPlaying, timeLimit, autoAdvance, handleComplete]);
 
   const handlePlay = useCallback(() => {
     if (!metronome.state.isPlaying) {
-      setStartTime(performance.now());
       metronome.start();
     } else {
       metronome.pause();
-      setStartTime(null);
     }
     setIsPlaying(!metronome.state.isPlaying);
   }, [metronome]);

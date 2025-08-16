@@ -4,9 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
 import { Play, Pause, Square } from "lucide-react";
-
 export type MetronomeMode = 'regular' | 'speed-trainer' | 'progressive';
-
 interface MetronomeControlsProps {
   compact?: boolean;
   mode: MetronomeMode;
@@ -23,7 +21,6 @@ interface MetronomeControlsProps {
   onMeasuresPerBpmChangeChange: (measures: number) => void;
   onCurrentBpmChange: (bpm: number) => void;
 }
-
 export function MetronomeControls({
   compact = false,
   mode,
@@ -38,10 +35,9 @@ export function MetronomeControls({
   onEndBpmChange,
   onMeasuresChange,
   onMeasuresPerBpmChangeChange,
-  onCurrentBpmChange,
+  onCurrentBpmChange
 }: MetronomeControlsProps) {
-  return (
-    <Card className={`${compact ? 'p-3' : 'p-6'} bg-gradient-to-br from-card to-card/50 border-border/50`}>
+  return <Card className={`${compact ? 'p-3' : 'p-6'} bg-gradient-to-br from-card to-card/50 border-border/50`}>
       <div className={compact ? 'space-y-3' : 'space-y-6'}>
         {/* Mode Selection */}
         <div className="space-y-2">
@@ -59,55 +55,27 @@ export function MetronomeControls({
         </div>
 
         {/* BPM Controls */}
-        {mode !== 'regular' && (
-          <div className="space-y-2">
+        {mode !== 'regular' && <div className="space-y-2">
             <Label className="text-sm font-medium">End BPM</Label>
-            <Input
-              type="number"
-              value={endBpm}
-              onChange={(e) => onEndBpmChange(Number(e.target.value))}
-              min={40}
-              max={300}
-              className="text-center"
-            />
-          </div>
-        )}
+            <Input type="number" value={endBpm} onChange={e => onEndBpmChange(Number(e.target.value))} min={40} max={300} className="text-center" />
+          </div>}
 
         {/* Measures Control (for speed trainer and progressive modes) */}
-        {mode !== 'regular' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Total Measures</Label>
-              <Input
-                type="number"
-                value={measures}
-                onChange={(e) => onMeasuresChange(Number(e.target.value))}
-                min={1}
-                max={100}
-                className="text-center"
-              />
+        {mode !== 'regular' && <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2 mx-0 my-0 py-[18px]">
+              <Label className="text-sm font-medium"># of increments
+          </Label>
+              <Input type="number" value={measures} onChange={e => onMeasuresChange(Number(e.target.value))} min={1} max={100} className="text-center" />
             </div>
             <div className="space-y-2">
               <Label className="text-sm font-medium">Measures per BPM Change</Label>
-              <Input
-                type="number"
-                value={measuresPerBpmChange}
-                onChange={(e) => onMeasuresPerBpmChangeChange(Number(e.target.value))}
-                min={1}
-                max={20}
-                className="text-center"
-              />
+              <Input type="number" value={measuresPerBpmChange} onChange={e => onMeasuresPerBpmChangeChange(Number(e.target.value))} min={1} max={20} className="text-center" />
             </div>
-          </div>
-        )}
+          </div>}
 
         {/* Control Buttons */}
         <div className="flex gap-3 justify-center">
-          <Button
-            variant={isPlaying ? "secondary" : "default"}
-            onClick={onPlayPause}
-            className="flex items-center gap-2"
-          >
+          <Button variant={isPlaying ? "secondary" : "default"} onClick={onPlayPause} className="flex items-center gap-2">
             {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
             {isPlaying ? "Pause" : "Play"}
           </Button>
@@ -124,6 +92,5 @@ export function MetronomeControls({
           {mode === 'progressive' && "Like speed trainer, but restarts 5 BPM higher each cycle"}
         </div>
       </div>
-    </Card>
-  );
+    </Card>;
 }

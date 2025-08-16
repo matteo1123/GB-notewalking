@@ -75,25 +75,36 @@ export function useMetronome(settings: MetronomeSettings) {
       targetBpm = settings.endBpm + (round - 1) * 5;
     }
 
-    // For speed trainer and progressive modes
-    const totalMeasures = Math.max(2, settings.measures); // Ensure at least 2 measures
+    if (settings.mode === 'speed-trainer') {
+      // Calculate which BPM step we're on based on measures per BPM change
+      const currentMeasure = measure;
+      const measuresPerStep = measuresPerBpmChange;
+      
+      // Calculate total number of BPM steps
+      const totalSteps = Math.ceil(settings.measures / measuresPerStep);
+      const bpmIncrement = totalSteps > 1 ? (targetBpm - baseBpm) / (totalSteps - 1) : 0;
+      
+      // Determine current step (0-based)
+      const currentStep = Math.floor((currentMeasure - 1) / measuresPerStep);
+      const clampedStep = Math.min(currentStep, totalSteps - 1);
+      
+      return Math.round(baseBpm + (bpmIncrement * clampedStep));
+    }
+
+    // Progressive mode - same as before
+    const totalMeasures = Math.max(2, settings.measures);
     const currentMeasure = measure;
-    
-    // With 2 measures: 1 at start BPM, 1 at target BPM
-    // With more measures: ramp up over (totalMeasures - 1), then stay at target for 1
     const rampUpMeasures = totalMeasures - 1;
     
     if (currentMeasure <= rampUpMeasures && rampUpMeasures > 1) {
-      // Ramping up phase (only if we have more than 2 total measures)
       const progress = (currentMeasure - 1) / (rampUpMeasures - 1);
       const clampedProgress = Math.min(Math.max(progress, 0), 1);
       const result = baseBpm + (targetBpm - baseBpm) * clampedProgress;
       return Math.round(result);
     } else {
-      // Stay at target BPM phase
       return targetBpm;
     }
-  }, [settings]);
+  }, [settings, measuresPerBpmChange]);
 
   // Process beat
   const scheduleNextBeat = useCallback(() => {

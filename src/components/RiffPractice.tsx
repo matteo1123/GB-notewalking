@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { RepertoireItem } from '@/types/repertoire';
 import { useMetronome, MetronomeSettings } from '@/hooks/useMetronome';
 import { useBpmControls } from '@/hooks/useBpmControls';
+import { usePitchDetection } from '@/hooks/usePitchDetection';
 import GuitarTablature from './GuitarTablature';
 import { BeatVisualizer } from './BeatVisualizer';
 import { MetronomeControls, MetronomeMode } from './MetronomeControls';
@@ -47,6 +48,8 @@ const RiffPractice = ({
   const [startTime, setStartTime] = useState<number | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [currentBpm, setCurrentBpm] = useState(repertoireItem.tempo);
+  const [pitchDetectionEnabled, setPitchDetectionEnabled] = useState(false);
+  const [detectedNote, setDetectedNote] = useState<{ string: number; fret: number } | null>(null);
 
   const metronomeSettings: MetronomeSettings = {
     mode,
@@ -71,6 +74,17 @@ const RiffPractice = ({
     currentBpm,
     onBpmChange: handleBpmChange,
     isEnabled: true
+  });
+
+  // Pitch detection
+  const { isListening } = usePitchDetection({
+    isEnabled: pitchDetectionEnabled,
+    onNoteDetected: (result) => {
+      setDetectedNote({ string: result.string, fret: result.fret });
+      // Clear detected note after a short delay
+      setTimeout(() => setDetectedNote(null), 500);
+    },
+    sensitivity: 0.6
   });
 
   const handleStop = useCallback(() => {
@@ -176,6 +190,8 @@ const RiffPractice = ({
         <div className="lg:col-span-2 portrait:fixed portrait:inset-0 portrait:z-50 portrait:bg-background portrait:p-4 portrait:overflow-auto landscape:relative landscape:z-auto landscape:bg-transparent">
           <GuitarTablature 
             notes={repertoireItem.notes}
+            currentPosition={currentTime}
+            detectedNote={detectedNote}
             className="h-full"
           />
           {/* Mobile portrait instructions */}
@@ -242,6 +258,32 @@ const RiffPractice = ({
             onCurrentBpmChange={() => {}} // Disabled
             compact={true}
           />
+
+          {/* Pitch Detection Controls */}
+          <div className="bg-card rounded-lg border border-border p-4">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm font-medium">Guitar Tracking</label>
+              <button
+                onClick={() => setPitchDetectionEnabled(!pitchDetectionEnabled)}
+                className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
+                  pitchDetectionEnabled
+                    ? 'bg-green-500 text-white'
+                    : 'bg-muted text-muted-foreground'
+                }`}
+              >
+                {pitchDetectionEnabled ? 'ON' : 'OFF'}
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Enable microphone to track your guitar playing and highlight detected notes
+              {isListening && (
+                <span className="ml-2 inline-flex items-center">
+                  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse mr-1"></span>
+                  Listening...
+                </span>
+              )}
+            </p>
+          </div>
         </div>
       </div>
     </div>

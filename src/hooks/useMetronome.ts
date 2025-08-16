@@ -67,11 +67,6 @@ export function useMetronome(settings: MetronomeSettings) {
       return settings.startBpm;
     }
 
-    // Calculate BPM changes based on measures per BPM change setting
-    const bpmChanges = Math.floor((measure - 1) / measuresPerBpmChange);
-    const totalBpmChanges = Math.floor(settings.measures / measuresPerBpmChange);
-    const progress = totalBpmChanges > 0 ? Math.min(bpmChanges / totalBpmChanges, 1) : 0;
-
     let baseBpm = settings.startBpm;
     let targetBpm = settings.endBpm;
     
@@ -80,14 +75,22 @@ export function useMetronome(settings: MetronomeSettings) {
       targetBpm = settings.endBpm + (round - 1) * 5;
     }
 
-    const currentBpm = baseBpm + (targetBpm - baseBpm) * progress;
+    // For speed trainer and progressive modes
+    const totalMeasures = settings.measures;
+    const currentMeasure = measure;
     
-    // If we've reached the target BPM, stay at it
-    if (progress >= 1) {
+    // Calculate how many measures should be spent ramping up
+    const rampUpMeasures = Math.max(1, totalMeasures - measuresPerBpmChange);
+    
+    if (currentMeasure <= rampUpMeasures) {
+      // Ramping up phase
+      const progress = (currentMeasure - 1) / (rampUpMeasures - 1);
+      const clampedProgress = Math.min(Math.max(progress, 0), 1);
+      return baseBpm + (targetBpm - baseBpm) * clampedProgress;
+    } else {
+      // Stay at target BPM phase
       return targetBpm;
     }
-    
-    return currentBpm;
   }, [settings, measuresPerBpmChange]);
 
   // Process beat

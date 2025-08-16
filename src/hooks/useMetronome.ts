@@ -73,12 +73,21 @@ export function useMetronome(settings: MetronomeSettings) {
     const progress = totalBpmChanges > 0 ? Math.min(bpmChanges / totalBpmChanges, 1) : 0;
 
     let baseBpm = settings.startBpm;
+    let targetBpm = settings.endBpm;
+    
     if (settings.mode === 'progressive') {
       baseBpm = settings.startBpm + (round - 1) * 5;
+      targetBpm = settings.endBpm + (round - 1) * 5;
     }
 
-    const targetBpm = settings.endBpm + (settings.mode === 'progressive' ? (round - 1) * 5 : 0);
-    return baseBpm + (targetBpm - baseBpm) * progress;
+    const currentBpm = baseBpm + (targetBpm - baseBpm) * progress;
+    
+    // If we've reached the target BPM, stay at it
+    if (progress >= 1) {
+      return targetBpm;
+    }
+    
+    return currentBpm;
   }, [settings, measuresPerBpmChange]);
 
   // Process beat
@@ -117,10 +126,9 @@ export function useMetronome(settings: MetronomeSettings) {
           progressiveRoundRef.current++;
           measureCountRef.current = 1;
           beatCountRef.current = 0;
-        } else {
-          // Speed trainer mode - stop
-          setState(prev => ({ ...prev, isPlaying: false }));
-          return;
+        } else if (settings.mode === 'speed-trainer') {
+          // Speed trainer mode - continue playing at target BPM indefinitely
+          // Don't reset, just continue
         }
       }
     }
@@ -128,6 +136,12 @@ export function useMetronome(settings: MetronomeSettings) {
 
   // Main metronome loop using setInterval instead of requestAnimationFrame
   useEffect(() => {
+    // Clear any existing interval first to prevent multiple intervals
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+
     if (state.isPlaying) {
       const currentBpm = calculateCurrentBpm(
         (beatCountRef.current % 4) + 1,
@@ -140,11 +154,6 @@ export function useMetronome(settings: MetronomeSettings) {
       intervalRef.current = window.setInterval(() => {
         scheduleNextBeat();
       }, beatLength);
-    } else {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
     }
 
     return () => {

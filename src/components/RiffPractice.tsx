@@ -48,7 +48,7 @@ const RiffPractice = ({
   const [startTime, setStartTime] = useState<number | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [currentBpm, setCurrentBpm] = useState(repertoireItem.tempo);
-  const [pitchDetectionEnabled, setPitchDetectionEnabled] = useState(false);
+  const [pitchDetectionEnabled, setPitchDetectionEnabled] = useState(true);
   const [detectedNote, setDetectedNote] = useState<{ string: number; fret: number } | null>(null);
 
   const metronomeSettings: MetronomeSettings = {

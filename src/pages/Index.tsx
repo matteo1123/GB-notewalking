@@ -32,15 +32,20 @@ const Index = () => {
   };
 
   const handleCurrentBpmChange = (bpm: number) => {
-    setCurrentBpm(bpm);
-    if (metronome.state.isPlaying && mode !== 'regular') {
-      metronome.stop();
+    if (mode === 'regular') {
+      setCurrentBpm(bpm);
+    } else {
+      // For progressive and speed trainer modes, update the start BPM
+      setCurrentBpm(bpm);
+      if (metronome.state.isPlaying) {
+        metronome.stop();
+      }
     }
   };
 
   // Global BPM adjustment controls - always enabled for all modes
   useBpmControls({
-    currentBpm: mode === 'regular' ? currentBpm : metronome.state.currentBpm,
+    currentBpm: currentBpm, // Always use the start BPM for controls
     onBpmChange: handleCurrentBpmChange,
     isEnabled: true
   });

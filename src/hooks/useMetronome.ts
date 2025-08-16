@@ -85,66 +85,37 @@ export function useMetronome(settings: MetronomeSettings) {
       targetBpm = settings.endBpm + (round - 1) * 5;
     }
 
-    if (settings.mode === 'speed-trainer') {
-      // Calculate total beats elapsed
+    // Both speed-trainer and progressive use the same logic
+    if (settings.mode === 'speed-trainer' || settings.mode === 'progressive') {
       const totalBeatsElapsed = (measure - 1) * 4 + (beat - 1);
-      
-      // Each increment lasts for measuresPerBpmChange * 4 beats
       const beatsPerIncrement = measuresPerBpmChange * 4;
-      
-      // Calculate which increment we're on (0-based)
       const currentIncrement = Math.floor(totalBeatsElapsed / beatsPerIncrement);
       
-      // settings.measures is actually the number of increments the user wants
+      // settings.measures is number of increments
       const numberOfIncrements = settings.measures;
-      
-      // Clamp to not exceed the number of increments
       const clampedIncrement = Math.min(currentIncrement, numberOfIncrements - 1);
       
-      // Calculate BPM increment size (divide range by number of steps)
       const bpmIncrementSize = numberOfIncrements > 1 ? (targetBpm - baseBpm) / (numberOfIncrements - 1) : 0;
-      
-      // Calculate current BPM
       const currentBpmValue = baseBpm + (clampedIncrement * bpmIncrementSize);
       
-      console.log('SPEED TRAINER DEBUG:', {
-        measure,
-        beat,
+      console.log('SPEED TRAINER/PROGRESSIVE DEBUG:', {
+        mode: settings.mode,
         totalBeatsElapsed,
-        measuresPerBpmChange,
         beatsPerIncrement,
         currentIncrement,
         clampedIncrement,
         numberOfIncrements,
         bpmIncrementSize,
-        currentBpmValue: Math.round(currentBpmValue)
+        baseBpm,
+        targetBpm,
+        result: Math.round(currentBpmValue)
       });
       
       return Math.round(currentBpmValue);
     }
 
-    // Progressive mode
-    const totalBeatsElapsed = (measure - 1) * 4 + (beat - 1);
-    const beatsPerIncrement = measuresPerBpmChange * 4;
-    const currentIncrement = Math.floor(totalBeatsElapsed / beatsPerIncrement);
-    
-    // settings.measures is number of increments
-    const numberOfIncrements = settings.measures;
-    const clampedIncrement = Math.min(currentIncrement, numberOfIncrements - 1);
-    
-    const bpmIncrementSize = numberOfIncrements > 1 ? (targetBpm - baseBpm) / (numberOfIncrements - 1) : 0;
-    const currentBpmValue = baseBpm + (clampedIncrement * bpmIncrementSize);
-    
-    console.log('PROGRESSIVE DEBUG:', {
-      totalBeatsElapsed,
-      beatsPerIncrement,
-      currentIncrement,
-      clampedIncrement,
-      bpmIncrementSize,
-      result: Math.round(currentBpmValue)
-    });
-    
-    return Math.round(currentBpmValue);
+    // Regular mode fallback
+    return baseBpm;
   }, [settings, measuresPerBpmChange]);
 
   // Process beat

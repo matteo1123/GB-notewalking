@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { RepertoireItem } from '@/types/repertoire';
 import { useMetronome, MetronomeSettings } from '@/hooks/useMetronome';
+import { useBpmControls } from '@/hooks/useBpmControls';
 import GuitarTablature from './GuitarTablature';
 import { BeatVisualizer } from './BeatVisualizer';
 import { MetronomeControls, MetronomeMode } from './MetronomeControls';
@@ -45,16 +46,32 @@ const RiffPractice = ({
   const [mode, setMode] = useState<MetronomeMode>('regular');
   const [startTime, setStartTime] = useState<number | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
+  const [currentBpm, setCurrentBpm] = useState(repertoireItem.tempo);
 
   const metronomeSettings: MetronomeSettings = {
     mode,
-    startBpm: repertoireItem.tempo,
-    endBpm: repertoireItem.tempo,
+    startBpm: currentBpm,
+    endBpm: currentBpm,
     measures: 8,
     measuresPerBpmChange: 4,
   };
 
   const metronome = useMetronome(metronomeSettings);
+
+  // BPM control functionality
+  const handleBpmChange = useCallback((newBpm: number) => {
+    setCurrentBpm(newBpm);
+    if (metronome.state.isPlaying) {
+      metronome.stop();
+    }
+  }, [metronome]);
+
+  // Global BPM adjustment controls
+  useBpmControls({
+    currentBpm,
+    onBpmChange: handleBpmChange,
+    isEnabled: true
+  });
 
   const handleStop = useCallback(() => {
     metronome.stop();
@@ -119,7 +136,7 @@ const RiffPractice = ({
   const progress = timeLimit ? (elapsedTime / timeLimit) * 100 : (maxNoteTime > 0 ? (currentTime / maxNoteTime) * 100 : 0);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 bpm-control-area">
       {/* Header */}
       <div className="text-center space-y-2">
         <h2 className="text-2xl font-bold text-foreground">{repertoireItem.name}</h2>
@@ -132,7 +149,7 @@ const RiffPractice = ({
             {repertoireItem.difficulty}
           </span>
           <span className="px-3 py-1 bg-secondary rounded-full text-secondary-foreground">
-            {repertoireItem.tempo} BPM
+            {currentBpm} BPM
           </span>
         </div>
       </div>
@@ -171,8 +188,8 @@ const RiffPractice = ({
               currentBeat={metronome.state.currentBeat}
               isPlaying={metronome.state.isPlaying}
               currentBpm={metronome.state.currentBpm}
-              onBpmChange={(bpm) => {}} // Disabled for riff practice
-              canEdit={false}
+              onBpmChange={handleBpmChange}
+              canEdit={true}
               size="sm"
             />
           </div>

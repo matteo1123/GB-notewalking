@@ -47,8 +47,14 @@ export function BeatVisualizer({ currentBeat, isPlaying, currentBpm, onBpmChange
           {Math.round(currentBpm)}
         </div>
         <div className={`${size === 'sm' ? 'text-sm' : 'text-lg'} text-muted-foreground mt-2`}>
-          BPM {canEdit && size === 'lg' && "(↑↓ arrows, click & drag, or scroll)"}
+          BPM
         </div>
+        {canEdit && size === 'lg' && (
+          <div className="text-sm text-muted-foreground/70 mt-1 space-y-1">
+            <div>Click & drag anywhere • Arrow keys • Mouse wheel</div>
+            <div className="text-xs">Click anywhere on screen to adjust tempo smoothly</div>
+          </div>
+        )}
       </div>
 
       {/* Beat Indicators */}

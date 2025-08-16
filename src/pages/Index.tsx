@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { BeatVisualizer } from '@/components/BeatVisualizer';
 import { MetronomeControls, MetronomeMode } from '@/components/MetronomeControls';
 import { ProgressIndicator } from '@/components/ProgressIndicator';
 import { useMetronome } from '@/hooks/useMetronome';
+import { useBpmControls } from '@/hooks/useBpmControls';
 import { useAuth } from '@/contexts/AuthContext';
 import { Music, Crown, LogIn, LogOut } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -37,76 +38,12 @@ const Index = () => {
     }
   };
 
-  const changeBpm = (delta: number) => {
-    const newBpm = Math.max(40, Math.min(300, Math.round(currentBpm + delta)));
-    handleCurrentBpmChange(newBpm);
-  };
-
   // Global BPM adjustment controls
-  useEffect(() => {
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.target !== document.body && !(e.target as HTMLElement).classList.contains('bpm-control-area')) return;
-      
-      switch (e.key) {
-        case 'ArrowUp':
-          e.preventDefault();
-          changeBpm(1);
-          break;
-        case 'ArrowDown':
-          e.preventDefault();
-          changeBpm(-1);
-          break;
-      }
-    };
-
-    const handleWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      const delta = e.deltaY > 0 ? -1 : 1;
-      changeBpm(delta);
-    };
-
-    let isDragging = false;
-    let lastMouseY = 0;
-
-    const handleMouseDown = (e: MouseEvent) => {
-      isDragging = true;
-      lastMouseY = e.clientY;
-      document.body.style.cursor = 'ns-resize';
-    };
-
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isDragging) return;
-      e.preventDefault();
-      const deltaY = lastMouseY - e.clientY;
-      lastMouseY = e.clientY;
-      
-      // Make every pixel count for smooth continuous adjustment
-      if (Math.abs(deltaY) >= 1) {
-        const bpmChange = deltaY * 0.5; // 2 pixels = 1 BPM change
-        changeBpm(bpmChange);
-      }
-    };
-
-    const handleMouseUp = () => {
-      isDragging = false;
-      document.body.style.cursor = '';
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    document.addEventListener('wheel', handleWheel, { passive: false });
-    document.addEventListener('mousedown', handleMouseDown);
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-      document.removeEventListener('wheel', handleWheel);
-      document.removeEventListener('mousedown', handleMouseDown);
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [mode, currentBpm]);
+  useBpmControls({
+    currentBpm,
+    onBpmChange: handleCurrentBpmChange,
+    isEnabled: true
+  });
 
   return (
     <div className="min-h-screen bg-background p-4 bpm-control-area">

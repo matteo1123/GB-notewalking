@@ -96,6 +96,20 @@ export function useMetronome(settings: MetronomeSettings) {
       
       // Calculate current BPM
       const currentBpmValue = baseBpm + (clampedIncrement * bpmIncrementSize);
+      
+      console.log('SPEED TRAINER DEBUG:', {
+        measure,
+        beat,
+        totalBeatsElapsed,
+        measuresPerBpmChange,
+        beatsPerIncrement,
+        currentIncrement,
+        clampedIncrement,
+        numberOfIncrements,
+        bpmIncrementSize,
+        currentBpmValue: Math.round(currentBpmValue)
+      });
+      
       return Math.round(currentBpmValue);
     }
 

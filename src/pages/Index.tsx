@@ -32,14 +32,16 @@ const Index = () => {
   };
 
   const handleCurrentBpmChange = (bpm: number) => {
-    if (mode === 'regular') {
-      setCurrentBpm(bpm);
-    } else {
-      // For progressive and speed trainer modes, update the start BPM
-      setCurrentBpm(bpm);
-      if (metronome.state.isPlaying) {
-        metronome.stop();
-      }
+    const wasPlaying = metronome.state.isPlaying;
+    setCurrentBpm(bpm);
+    
+    // For progressive and speed trainer modes, we need to restart to pick up new start BPM
+    if (mode !== 'regular' && wasPlaying) {
+      metronome.stop();
+      // Small delay to ensure the new BPM is applied before restarting
+      setTimeout(() => {
+        metronome.start();
+      }, 100);
     }
   };
 

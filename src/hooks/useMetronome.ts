@@ -76,15 +76,22 @@ export function useMetronome(settings: MetronomeSettings) {
     }
 
     if (settings.mode === 'speed-trainer') {
-      // Number of increments = BPM difference (each increment is 1 BPM)
-      const totalIncrements = Math.abs(targetBpm - baseBpm);
+      // Calculate total beats elapsed (beat is 1-indexed, so subtract 1)
+      const totalBeatsElapsed = (measure - 1) * 4 + (beat - 1);
       
-      // Each increment should last for measuresPerBpmChange measures
-      const currentStep = Math.floor((measure - 1) / measuresPerBpmChange);
-      const clampedStep = Math.min(currentStep, totalIncrements);
+      // Each increment lasts for measuresPerBpmChange * 4 beats
+      const beatsPerIncrement = measuresPerBpmChange * 4;
       
-      // Each step increases by 1 BPM
-      return baseBpm + clampedStep;
+      // Calculate which increment we're on
+      const currentIncrement = Math.floor(totalBeatsElapsed / beatsPerIncrement);
+      
+      // Calculate BPM increment size based on total number of increments
+      const totalIncrements = Math.ceil((targetBpm - baseBpm));
+      const bpmIncrementSize = totalIncrements > 0 ? (targetBpm - baseBpm) / totalIncrements : 0;
+      
+      // Calculate current BPM
+      const currentBpmValue = baseBpm + (currentIncrement * bpmIncrementSize);
+      return Math.round(Math.min(currentBpmValue, targetBpm));
     }
 
     // Progressive mode - same as before

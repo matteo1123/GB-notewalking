@@ -63,7 +63,16 @@ export function useMetronome(settings: MetronomeSettings) {
 
   // Calculate current BPM based on mode and progress
   const calculateCurrentBpm = useCallback((beat: number, measure: number, round: number) => {
-    console.log('calculateCurrentBpm called with:', { mode: settings.mode, beat, measure, round });
+    console.log('calculateCurrentBpm called with:', { 
+      mode: settings.mode, 
+      beat, 
+      measure, 
+      round,
+      startBpm: settings.startBpm,
+      endBpm: settings.endBpm,
+      measures: settings.measures,
+      measuresPerBpmChange: settings.measuresPerBpmChange
+    });
     if (settings.mode === 'regular') {
       return settings.startBpm;
     }

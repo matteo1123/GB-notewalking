@@ -24,8 +24,9 @@ export function useBpmControls({
     if (!isEnabled) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Only respond if focused on body or elements with bpm-control class
-      if (e.target !== document.body && !(e.target as HTMLElement).classList.contains('bpm-control-area')) return;
+      // Only respond if no input elements are focused
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return;
       
       switch (e.key) {
         case 'ArrowUp':
@@ -40,9 +41,10 @@ export function useBpmControls({
     };
 
     const handleWheel = (e: WheelEvent) => {
-      // Only respond on elements with bpm-control class or body
+      // Check if we're in a bpm-control-area or if it's a general page area
       const target = e.target as HTMLElement;
-      if (!target.classList.contains('bpm-control-area') && e.target !== document.body) return;
+      const isInControlArea = target.closest('.bpm-control-area');
+      if (!isInControlArea) return;
       
       e.preventDefault();
       const delta = e.deltaY > 0 ? -1 : 1;
@@ -53,9 +55,15 @@ export function useBpmControls({
     let lastMouseY = 0;
 
     const handleMouseDown = (e: MouseEvent) => {
-      // Only respond on elements with bpm-control class
+      // Check if we're in a bpm-control-area and not clicking on interactive elements
       const target = e.target as HTMLElement;
-      if (!target.classList.contains('bpm-control-area')) return;
+      const isInControlArea = target.closest('.bpm-control-area');
+      const isInteractive = target.tagName === 'BUTTON' || target.tagName === 'INPUT' || 
+                           target.tagName === 'SELECT' || target.tagName === 'TEXTAREA' ||
+                           target.closest('button') || target.closest('input') || 
+                           target.closest('select') || target.closest('textarea');
+      
+      if (!isInControlArea || isInteractive) return;
       
       isDragging = true;
       lastMouseY = e.clientY;

@@ -190,17 +190,17 @@ const Premium = () => {
         </div>
 
         {/* Content */}
-        <Tabs defaultValue="riffs" className="space-y-6">
+        <Tabs defaultValue="rhythms" className="space-y-6">
           <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="riffs">Riffs & Licks</TabsTrigger>
+            <TabsTrigger value="rhythms">Rhythms</TabsTrigger>
             <TabsTrigger value="scales">Scales</TabsTrigger>
             <TabsTrigger value="arpeggios">Arpeggios</TabsTrigger>
             <TabsTrigger value="sessions">Practice Sessions</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="riffs" className="space-y-4">
+          <TabsContent value="rhythms" className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {exercises.filter(item => item.category === 'riff').map(item => (
+              {exercises.filter(item => item.category === 'rhythm').map(item => (
                 <Card key={item.id} className="cursor-pointer hover:bg-card/80 transition-colors" onClick={() => setSelectedRiff(item)}>
                   <CardHeader>
                     <CardTitle className="flex items-center justify-between">

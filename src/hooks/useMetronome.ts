@@ -123,19 +123,28 @@ export function useMetronome(settings: MetronomeSettings) {
       return Math.round(currentBpmValue);
     }
 
-    // Progressive mode - same as before
-    const totalMeasures = Math.max(2, settings.measures);
-    const currentMeasure = measure;
-    const rampUpMeasures = totalMeasures - 1;
+    // Progressive mode
+    const totalBeatsElapsed = (measure - 1) * 4 + (beat - 1);
+    const beatsPerIncrement = measuresPerBpmChange * 4;
+    const currentIncrement = Math.floor(totalBeatsElapsed / beatsPerIncrement);
     
-    if (currentMeasure <= rampUpMeasures && rampUpMeasures > 1) {
-      const progress = (currentMeasure - 1) / (rampUpMeasures - 1);
-      const clampedProgress = Math.min(Math.max(progress, 0), 1);
-      const result = baseBpm + (targetBpm - baseBpm) * clampedProgress;
-      return Math.round(result);
-    } else {
-      return targetBpm;
-    }
+    // settings.measures is number of increments
+    const numberOfIncrements = settings.measures;
+    const clampedIncrement = Math.min(currentIncrement, numberOfIncrements - 1);
+    
+    const bpmIncrementSize = numberOfIncrements > 1 ? (targetBpm - baseBpm) / (numberOfIncrements - 1) : 0;
+    const currentBpmValue = baseBpm + (clampedIncrement * bpmIncrementSize);
+    
+    console.log('PROGRESSIVE DEBUG:', {
+      totalBeatsElapsed,
+      beatsPerIncrement,
+      currentIncrement,
+      clampedIncrement,
+      bpmIncrementSize,
+      result: Math.round(currentBpmValue)
+    });
+    
+    return Math.round(currentBpmValue);
   }, [settings, measuresPerBpmChange]);
 
   // Process beat

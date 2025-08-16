@@ -8,50 +8,57 @@ interface GuitarTablatureProps {
 const GuitarTablature = ({ notes, className = '' }: GuitarTablatureProps) => {
   const strings = [1, 2, 3, 4, 5, 6]; // High E to Low E
   
-  // Calculate max time for positioning
+  // Calculate max time for positioning and minimum width
   const maxTime = notes.length > 0 ? Math.max(...notes.map(n => n.time + (n.duration || 0.5))) : 1;
+  
+  // Calculate minimum width based on note density - ensure enough space between notes
+  const noteCount = notes.length;
+  const minWidthPerNote = 60; // Minimum 60px per note to prevent overlap
+  const minWidth = Math.max(800, noteCount * minWidthPerNote); // At least 800px, more if needed
 
   return (
     <div className={`bg-card rounded-lg border border-border p-4 ${className}`}>
-      <div className="space-y-3">
-        {strings.map(string => (
-          <div key={string} className="flex items-center space-x-2">
-            {/* String number */}
-            <div className="w-6 text-sm text-muted-foreground font-mono">
-              {string}
-            </div>
-            
-            {/* String line */}
-            <div className="flex-1 relative">
-              <div className="h-px bg-border"></div>
+      <div className="overflow-x-auto max-h-96 overflow-y-auto">
+        <div className="space-y-2" style={{ minWidth: `${minWidth}px` }}>
+          {strings.map(string => (
+            <div key={string} className="flex items-center space-x-2">
+              {/* String number - sticky on left */}
+              <div className="w-6 text-sm text-muted-foreground font-mono shrink-0 sticky left-0 bg-card z-10">
+                {string}
+              </div>
               
-              {/* Fret positions for this string */}
-              <div className="absolute inset-0 flex">
-                {notes
-                  .filter(note => note.string === string)
-                  .map((note, index) => {
-                    const position = (note.time / maxTime) * 100;
-                    const isHighlighted = note.accent || note.highlight;
-                    
-                    return (
-                      <div
-                        key={index}
-                        className={`absolute -translate-y-1/2 top-1/2 min-w-8 h-6 rounded text-xs font-mono flex items-center justify-center transition-all duration-150 ${
-                          isHighlighted
-                            ? 'bg-accent text-accent-foreground border-2 border-accent-foreground/20 hover:bg-accent/80'
-                            : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                        }`}
-                        style={{ left: `${position}%` }}
-                        title={`Time: ${note.time}s, Duration: ${note.duration || 0.5}s`}
-                      >
-                        {note.fret}
-                      </div>
-                    );
-                  })}
+              {/* String line */}
+              <div className="flex-1 relative min-h-8">
+                <div className="h-px bg-border absolute top-1/2 w-full"></div>
+                
+                {/* Fret positions for this string */}
+                <div className="absolute inset-0">
+                  {notes
+                    .filter(note => note.string === string)
+                    .map((note, index) => {
+                      const position = (note.time / maxTime) * 100;
+                      const isHighlighted = note.accent || note.highlight;
+                      
+                      return (
+                        <div
+                          key={index}
+                          className={`absolute -translate-y-1/2 top-1/2 -translate-x-1/2 w-7 h-7 rounded text-xs font-mono flex items-center justify-center transition-all duration-150 ${
+                            isHighlighted
+                              ? 'bg-accent text-accent-foreground border-2 border-accent-foreground/20'
+                              : 'bg-muted text-muted-foreground'
+                          }`}
+                          style={{ left: `${position}%` }}
+                          title={`Time: ${note.time}s, Duration: ${note.duration || 0.5}s`}
+                        >
+                          {note.fret}
+                        </div>
+                      );
+                    })}
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
       
       {/* Legend */}

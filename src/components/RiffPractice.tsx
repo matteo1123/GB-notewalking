@@ -89,15 +89,6 @@ const RiffPractice = ({
     }
   }, [metronome.state.currentBeat, metronome.state.currentMeasure, metronome.state.currentBpm, metronome.state.isPlaying, timeLimit, autoAdvance, handleComplete]);
 
-  // Calculate current beat and subdivision for tablature highlighting
-  const currentBeat = metronome.state.isPlaying 
-    ? ((metronome.state.currentMeasure - 1) * 4 + metronome.state.currentBeat)
-    : 1;
-  
-  // For now, assume triplets and cycle through subdivisions based on metronome timing
-  const currentSubdivision = metronome.state.isPlaying 
-    ? Math.floor((performance.now() % (60000 / metronome.state.currentBpm / 3)) / (60000 / metronome.state.currentBpm / 3) * 3) + 1
-    : 1;
 
   const handlePlay = useCallback(() => {
     if (!metronome.state.isPlaying) {
@@ -168,8 +159,6 @@ const RiffPractice = ({
         <div className="lg:col-span-2">
           <GuitarTablature 
             notes={repertoireItem.notes}
-            currentBeat={currentBeat}
-            currentSubdivision={currentSubdivision}
             className="h-full"
           />
         </div>

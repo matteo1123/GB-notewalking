@@ -1,13 +1,10 @@
 export interface Note {
-  beat: number;
-  subdivision: number;
+  time: number;
   string: number;
   fret: number;
-  duration?: number; // Optional duration in seconds
+  duration?: number; // Duration in seconds
   accent?: boolean; // Force highlight this note
   highlight?: boolean; // Force highlight this note (alias for accent)
-  highlightEvery?: number; // Global pattern: highlight every Nth note
-  highlightOffset?: number; // Global pattern: offset for highlighting
 }
 
 export interface RepertoireItem {

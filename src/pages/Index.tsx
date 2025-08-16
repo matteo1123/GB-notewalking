@@ -38,9 +38,9 @@ const Index = () => {
     }
   };
 
-  // Global BPM adjustment controls
+  // Global BPM adjustment controls - always enabled for all modes
   useBpmControls({
-    currentBpm,
+    currentBpm: mode === 'regular' ? currentBpm : metronome.state.currentBpm,
     onBpmChange: handleCurrentBpmChange,
     isEnabled: true
   });

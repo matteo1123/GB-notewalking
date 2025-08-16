@@ -65,7 +65,7 @@ export function MetronomeControls({
             <div className="space-y-2 mx-0 my-0 py-[18px]">
               <Label className="text-sm font-medium"># of increments
           </Label>
-              <Input type="number" value={measures} onChange={e => onMeasuresChange(Number(e.target.value))} min={1} max={100} className="text-center" />
+              <Input type="number" value={measures} onChange={e => onMeasuresChange(Math.max(2, Number(e.target.value)))} min={2} max={100} className="text-center" />
             </div>
             <div className="space-y-2">
               <Label className="text-sm font-medium">Measures per BPM Change</Label>

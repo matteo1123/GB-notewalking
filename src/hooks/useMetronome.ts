@@ -76,22 +76,24 @@ export function useMetronome(settings: MetronomeSettings) {
     }
 
     // For speed trainer and progressive modes
-    const totalMeasures = settings.measures;
+    const totalMeasures = Math.max(2, settings.measures); // Ensure at least 2 measures
     const currentMeasure = measure;
     
-    // Calculate how many measures should be spent ramping up
-    const rampUpMeasures = Math.max(1, totalMeasures - measuresPerBpmChange);
+    // With 2 measures: 1 at start BPM, 1 at target BPM
+    // With more measures: ramp up over (totalMeasures - 1), then stay at target for 1
+    const rampUpMeasures = totalMeasures - 1;
     
-    if (currentMeasure <= rampUpMeasures) {
-      // Ramping up phase
+    if (currentMeasure <= rampUpMeasures && rampUpMeasures > 1) {
+      // Ramping up phase (only if we have more than 2 total measures)
       const progress = (currentMeasure - 1) / (rampUpMeasures - 1);
       const clampedProgress = Math.min(Math.max(progress, 0), 1);
-      return baseBpm + (targetBpm - baseBpm) * clampedProgress;
+      const result = baseBpm + (targetBpm - baseBpm) * clampedProgress;
+      return Math.round(result);
     } else {
       // Stay at target BPM phase
       return targetBpm;
     }
-  }, [settings, measuresPerBpmChange]);
+  }, [settings]);
 
   // Process beat
   const scheduleNextBeat = useCallback(() => {

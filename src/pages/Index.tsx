@@ -88,21 +88,26 @@ const Index = () => {
 
         {/* Main Content */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Beat Visualizer - Takes up more space */}
-          <div className="lg:col-span-2">
-            <div className="h-full flex items-center justify-center p-8">
+          {/* Beat Visualizer - Takes up more space on desktop, full screen on mobile portrait */}
+          <div className="lg:col-span-2 portrait:fixed portrait:inset-0 portrait:z-50 portrait:bg-background portrait:flex portrait:items-center portrait:justify-center landscape:relative landscape:z-auto landscape:bg-transparent">
+            <div className="h-full flex items-center justify-center p-8 landscape:p-4">
             <BeatVisualizer
               currentBeat={metronome.state.currentBeat}
               isPlaying={metronome.state.isPlaying}
               currentBpm={mode === 'regular' ? currentBpm : metronome.state.currentBpm}
               onBpmChange={handleCurrentBpmChange}
               canEdit={true}
+              size="lg"
             />
+            </div>
+            {/* Mobile portrait instructions */}
+            <div className="portrait:absolute portrait:bottom-8 portrait:left-1/2 portrait:transform portrait:-translate-x-1/2 portrait:text-center portrait:text-muted-foreground portrait:text-sm landscape:hidden hidden">
+              <p>Swipe up/down to adjust BPM</p>
             </div>
           </div>
 
-          {/* Controls */}
-          <div className="space-y-4">
+          {/* Controls - Hidden on mobile portrait */}
+          <div className="space-y-4 portrait:hidden landscape:block">
             <MetronomeControls
               mode={mode}
               isPlaying={metronome.state.isPlaying}

@@ -51,6 +51,7 @@ export function useBpmControls({
       changeBpm(delta);
     };
 
+    // Mouse/Desktop controls
     let isDragging = false;
     let lastMouseY = 0;
 
@@ -89,11 +90,52 @@ export function useBpmControls({
       document.body.style.cursor = '';
     };
 
+    // Touch/Mobile controls
+    let isTouching = false;
+    let lastTouchY = 0;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      const target = e.target as HTMLElement;
+      const isInControlArea = target.closest('.bpm-control-area');
+      const isInteractive = target.tagName === 'BUTTON' || target.tagName === 'INPUT' || 
+                           target.tagName === 'SELECT' || target.tagName === 'TEXTAREA' ||
+                           target.closest('button') || target.closest('input') || 
+                           target.closest('select') || target.closest('textarea');
+      
+      if (!isInControlArea || isInteractive) return;
+      
+      isTouching = true;
+      lastTouchY = e.touches[0].clientY;
+      e.preventDefault();
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (!isTouching) return;
+      e.preventDefault();
+      const currentTouchY = e.touches[0].clientY;
+      const deltaY = lastTouchY - currentTouchY;
+      lastTouchY = currentTouchY;
+      
+      // More sensitive on mobile: 2 pixels = 1 BPM change
+      if (Math.abs(deltaY) >= 1) {
+        const bpmChange = deltaY * 0.5;
+        changeBpm(bpmChange);
+      }
+    };
+
+    const handleTouchEnd = () => {
+      isTouching = false;
+    };
+
+    // Add all event listeners
     document.addEventListener('keydown', handleKeyDown);
     document.addEventListener('wheel', handleWheel, { passive: false });
     document.addEventListener('mousedown', handleMouseDown);
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('touchstart', handleTouchStart, { passive: false });
+    document.addEventListener('touchmove', handleTouchMove, { passive: false });
+    document.addEventListener('touchend', handleTouchEnd);
 
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
@@ -101,6 +143,9 @@ export function useBpmControls({
       document.removeEventListener('mousedown', handleMouseDown);
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('touchstart', handleTouchStart);
+      document.removeEventListener('touchmove', handleTouchMove);
+      document.removeEventListener('touchend', handleTouchEnd);
       document.body.style.cursor = '';
     };
   }, [currentBpm, isEnabled, minBpm, maxBpm]);

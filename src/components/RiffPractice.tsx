@@ -172,16 +172,20 @@ const RiffPractice = ({
 
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Tablature - Takes up more space */}
-        <div className="lg:col-span-2">
+        {/* Tablature - Takes up more space on desktop, full screen on mobile portrait */}
+        <div className="lg:col-span-2 portrait:fixed portrait:inset-0 portrait:z-50 portrait:bg-background portrait:p-4 portrait:overflow-auto landscape:relative landscape:z-auto landscape:bg-transparent">
           <GuitarTablature 
             notes={repertoireItem.notes}
             className="h-full"
           />
+          {/* Mobile portrait instructions */}
+          <div className="portrait:absolute portrait:bottom-4 portrait:left-1/2 portrait:transform portrait:-translate-x-1/2 portrait:text-center portrait:text-muted-foreground portrait:text-sm landscape:hidden hidden">
+            <p>Swipe up/down to adjust BPM</p>
+          </div>
         </div>
 
-        {/* Controls and Visualizer */}
-        <div className="space-y-4">
+        {/* Controls and Visualizer - Compact on mobile landscape, hidden on portrait */}
+        <div className="space-y-4 portrait:hidden landscape:block">
           {/* Beat Visualizer */}
           <div className="flex justify-center">
             <BeatVisualizer

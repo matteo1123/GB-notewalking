@@ -51,8 +51,10 @@ export function BeatVisualizer({ currentBeat, isPlaying, currentBpm, onBpmChange
         </div>
         {canEdit && size === 'lg' && (
           <div className="text-sm text-muted-foreground/70 mt-1 space-y-1">
-            <div>Click & drag anywhere • Arrow keys • Mouse wheel</div>
-            <div className="text-xs">Click anywhere on screen to adjust tempo smoothly</div>
+            <div className="hidden md:block">Click & drag anywhere • Arrow keys • Mouse wheel</div>
+            <div className="block md:hidden">Swipe up/down anywhere to adjust tempo</div>
+            <div className="text-xs hidden md:block">Click anywhere on screen to adjust tempo smoothly</div>
+            <div className="text-xs block md:hidden">Touch and drag vertically on the screen</div>
           </div>
         )}
       </div>

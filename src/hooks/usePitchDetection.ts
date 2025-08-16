@@ -160,7 +160,9 @@ export const usePitchDetection = ({ isEnabled, onNoteDetected, sensitivity = 0.7
   }, [isEnabled, sensitivity, isListening, onNoteDetected]);
   
   const startListening = useCallback(async () => {
+    console.log('Attempting to start pitch detection...');
     try {
+      console.log('Requesting microphone access...');
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           sampleRate: 44100,
@@ -171,6 +173,7 @@ export const usePitchDetection = ({ isEnabled, onNoteDetected, sensitivity = 0.7
         }
       });
       
+      console.log('Microphone access granted, setting up audio processing...');
       const audioContext = new AudioContext();
       const analyser = audioContext.createAnalyser();
       const source = audioContext.createMediaStreamSource(stream);
@@ -185,8 +188,10 @@ export const usePitchDetection = ({ isEnabled, onNoteDetected, sensitivity = 0.7
       streamRef.current = stream;
       
       setIsListening(true);
+      console.log('Pitch detection started successfully');
     } catch (error) {
       console.error('Error accessing microphone:', error);
+      console.error('Make sure to allow microphone permissions in your browser');
     }
   }, []);
   

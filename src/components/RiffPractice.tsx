@@ -6,6 +6,7 @@ import { usePitchDetection } from '@/hooks/usePitchDetection';
 import GuitarTablature from './GuitarTablature';
 import { BeatVisualizer } from './BeatVisualizer';
 import { MetronomeControls, MetronomeMode } from './MetronomeControls';
+import ExerciseHierarchy from './ExerciseHierarchy';
 import { Button } from './ui/button';
 import { Progress } from './ui/progress';
 import { Play, Pause, Square, RotateCcw } from 'lucide-react';
@@ -30,6 +31,7 @@ function normalizeNotes(rawNotes: AnyNote[], bpm: number) {
 interface RiffPracticeProps {
   repertoireItem: RepertoireItem;
   onComplete?: () => void;
+  onExerciseSelect?: (exercise: RepertoireItem) => void;
   autoAdvance?: boolean;
   timeLimit?: number; // Time in seconds
   isControlledSession?: boolean; // If true, parent controls the session
@@ -38,6 +40,7 @@ interface RiffPracticeProps {
 const RiffPractice = ({ 
   repertoireItem, 
   onComplete, 
+  onExerciseSelect,
   autoAdvance = false, 
   timeLimit,
   isControlledSession = false 
@@ -47,7 +50,7 @@ const RiffPractice = ({
   const [mode, setMode] = useState<MetronomeMode>('regular');
   const [startTime, setStartTime] = useState<number | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
-  const [currentBpm, setCurrentBpm] = useState(repertoireItem.tempo);
+  const [currentBpm, setCurrentBpm] = useState(repertoireItem.notes_per_beat ? 60 * repertoireItem.notes_per_beat : 120);
   const [pitchDetectionEnabled, setPitchDetectionEnabled] = useState(true);
   const [detectedNote, setDetectedNote] = useState<{ string: number; fret: number } | null>(null);
 
@@ -131,8 +134,8 @@ const RiffPractice = ({
   }, [metronome]);
 
   const normalizedNotes = useMemo(
-    () => normalizeNotes(repertoireItem.notes as unknown as AnyNote[], repertoireItem.tempo),
-    [repertoireItem.notes, repertoireItem.tempo]
+    () => normalizeNotes(repertoireItem.notes as unknown as AnyNote[], currentBpm),
+    [repertoireItem.notes, currentBpm]
   );
   const highlightDirectives = useMemo(() => {
     let highlightEvery: number | undefined;
@@ -151,6 +154,14 @@ const RiffPractice = ({
 
   return (
     <div className="space-y-6 bpm-control-area">
+      {/* Exercise Hierarchy */}
+      {onExerciseSelect && (
+        <ExerciseHierarchy 
+          currentExercise={repertoireItem}
+          onExerciseSelect={onExerciseSelect}
+        />
+      )}
+
       {/* Header */}
       <div className="text-center space-y-2">
         <h2 className="text-2xl font-bold text-foreground">{repertoireItem.name}</h2>
@@ -160,7 +171,7 @@ const RiffPractice = ({
             {repertoireItem.category}
           </span>
           <span className="px-3 py-1 bg-secondary rounded-full text-secondary-foreground">
-            {repertoireItem.difficulty}
+            {repertoireItem.difficulty}/10
           </span>
           <span className="px-3 py-1 bg-secondary rounded-full text-secondary-foreground">
             {currentBpm} BPM
@@ -246,7 +257,7 @@ const RiffPractice = ({
             mode={mode}
             isPlaying={metronome.state.isPlaying}
             currentBpm={metronome.state.currentBpm}
-            endBpm={repertoireItem.tempo}
+            endBpm={currentBpm}
             measures={8}
             measuresPerBpmChange={4}
             onModeChange={setMode}

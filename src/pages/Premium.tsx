@@ -23,7 +23,7 @@ const Premium = () => {
       setLoading(true);
       const { data, error } = await supabase
         .from('exercises')
-        .select('id, name, type, difficulty, tempo, description, notes')
+        .select('*')
         .order('created_at', { ascending: false });
       if (!isMounted) return;
       if (error) {
@@ -34,10 +34,14 @@ const Premium = () => {
           id: row.id,
           name: row.name,
           category: row.type as RepertoireItem['category'],
-          difficulty: row.difficulty as RepertoireItem['difficulty'],
-          tempo: row.tempo,
+          difficulty: row.Difficulty,
           description: row.description ?? undefined,
           notes: (row.notes as any) ?? [],
+          notes_per_beat: row.notes_per_beat,
+          tonic: row.Tonic,
+          tonality: row.Tonality,
+          position: row.Position,
+          parent: row.Parent,
         }));
         setExercises(mapped);
         setError(null);
@@ -166,6 +170,7 @@ const Premium = () => {
           <RiffPractice 
             repertoireItem={selectedRiff}
             onComplete={() => setSelectedRiff(null)}
+            onExerciseSelect={(exercise) => setSelectedRiff(exercise)}
           />
         </div>
       </div>
@@ -206,17 +211,20 @@ const Premium = () => {
                     <CardTitle className="flex items-center justify-between">
                       {item.name}
                       <span className={`px-2 py-1 rounded text-xs ${
-                        item.difficulty === 'beginner' ? 'bg-green-500/20 text-green-400' :
-                        item.difficulty === 'intermediate' ? 'bg-yellow-500/20 text-yellow-400' :
+                        item.difficulty <= 3 ? 'bg-green-500/20 text-green-400' :
+                        item.difficulty <= 7 ? 'bg-yellow-500/20 text-yellow-400' :
                         'bg-red-500/20 text-red-400'
                       }`}>
-                        {item.difficulty}
+                        {item.difficulty}/10
                       </span>
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <p className="text-muted-foreground text-sm mb-2">{item.description}</p>
-                    <p className="text-sm font-mono">{item.tempo} BPM</p>
+                    <div className="flex justify-between text-sm">
+                      <span className="font-mono">{item.tonic} {item.tonality}</span>
+                      <span className="text-muted-foreground">Pos {item.position}</span>
+                    </div>
                   </CardContent>
                 </Card>
               ))}
@@ -231,17 +239,20 @@ const Premium = () => {
                     <CardTitle className="flex items-center justify-between">
                       {item.name}
                       <span className={`px-2 py-1 rounded text-xs ${
-                        item.difficulty === 'beginner' ? 'bg-green-500/20 text-green-400' :
-                        item.difficulty === 'intermediate' ? 'bg-yellow-500/20 text-yellow-400' :
+                        item.difficulty <= 3 ? 'bg-green-500/20 text-green-400' :
+                        item.difficulty <= 7 ? 'bg-yellow-500/20 text-yellow-400' :
                         'bg-red-500/20 text-red-400'
                       }`}>
-                        {item.difficulty}
+                        {item.difficulty}/10
                       </span>
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <p className="text-muted-foreground text-sm mb-2">{item.description}</p>
-                    <p className="text-sm font-mono">{item.tempo} BPM</p>
+                    <div className="flex justify-between text-sm">
+                      <span className="font-mono">{item.tonic} {item.tonality}</span>
+                      <span className="text-muted-foreground">Pos {item.position}</span>
+                    </div>
                   </CardContent>
                 </Card>
               ))}
@@ -256,17 +267,20 @@ const Premium = () => {
                     <CardTitle className="flex items-center justify-between">
                       {item.name}
                       <span className={`px-2 py-1 rounded text-xs ${
-                        item.difficulty === 'beginner' ? 'bg-green-500/20 text-green-400' :
-                        item.difficulty === 'intermediate' ? 'bg-yellow-500/20 text-yellow-400' :
+                        item.difficulty <= 3 ? 'bg-green-500/20 text-green-400' :
+                        item.difficulty <= 7 ? 'bg-yellow-500/20 text-yellow-400' :
                         'bg-red-500/20 text-red-400'
                       }`}>
-                        {item.difficulty}
+                        {item.difficulty}/10
                       </span>
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <p className="text-muted-foreground text-sm mb-2">{item.description}</p>
-                    <p className="text-sm font-mono">{item.tempo} BPM</p>
+                    <div className="flex justify-between text-sm">
+                      <span className="font-mono">{item.tonic} {item.tonality}</span>
+                      <span className="text-muted-foreground">Pos {item.position}</span>
+                    </div>
                   </CardContent>
                 </Card>
               ))}

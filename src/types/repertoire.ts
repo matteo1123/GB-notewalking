@@ -11,10 +11,14 @@ export interface RepertoireItem {
   id: string;
   name: string;
   category: 'scale' | 'arpeggio' | 'riff' | 'rhythm' | 'ear-training';
-  difficulty: 'beginner' | 'intermediate' | 'advanced';
+  difficulty: number; // 1-10 scale
   notes: Note[];
-  tempo: number;
   description?: string;
+  notes_per_beat?: number;
+  tonic: string; // e.g., "A", "C#"
+  tonality: string; // "Major", "Minor"
+  position?: number;
+  parent?: string | null; // UUID of parent exercise
 }
 
 export interface PracticeSession {

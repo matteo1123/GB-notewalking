@@ -33,11 +33,19 @@ All colors MUST be HSL.
     --beat-active: 25 95% 53%;
     --beat-inactive: 220 20% 25%;
     --tempo-glow: 25 95% 53%;
-    
+
     /* Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(25 95% 53%), hsl(35 90% 60%));
-    --gradient-card: linear-gradient(145deg, hsl(220 26% 10%), hsl(220 20% 12%));
-    
+    --gradient-primary: linear-gradient(
+      135deg,
+      hsl(25 95% 53%),
+      hsl(35 90% 60%)
+    );
+    --gradient-card: linear-gradient(
+      145deg,
+      hsl(220 26% 10%),
+      hsl(220 20% 12%)
+    );
+
     /* Shadows */
     --shadow-glow: 0 0 40px hsl(25 95% 53% / 0.3);
     --shadow-card: 0 8px 32px hsl(220 26% 4% / 0.4);
@@ -115,4 +123,21 @@ All colors MUST be HSL.
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Modern subtle scroll indicators for tablature */
+.animated-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--border)) transparent;
+  position: relative;
+}
+.animated-scrollbar::-webkit-scrollbar {
+  height: 6px;
+}
+.animated-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.animated-scrollbar::-webkit-scrollbar-thumb {
+  background-color: hsl(var(--border));
+  border-radius: 9999px;
 }

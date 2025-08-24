@@ -1,30 +1,47 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { RepertoireItem } from '@/types/repertoire';
-import { useMetronome, MetronomeSettings } from '@/hooks/useMetronome';
-import { useBpmControls } from '@/hooks/useBpmControls';
-import { usePitchDetection } from '@/hooks/usePitchDetection';
-import GuitarTablature from './GuitarTablature';
-import { BeatVisualizer } from './BeatVisualizer';
-import { MetronomeControls, MetronomeMode } from './MetronomeControls';
-import ExerciseHierarchy from './ExerciseHierarchy';
-import { Button } from './ui/button';
-import { Progress } from './ui/progress';
-import { Play, Pause, Square, RotateCcw } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { RepertoireItem } from "@/types/repertoire";
+import { useMetronome, MetronomeSettings } from "@/hooks/useMetronome";
+import { useBpmControls } from "@/hooks/useBpmControls";
+import { usePitchDetection } from "@/hooks/usePitchDetection";
+import GuitarTablature from "./GuitarTablature";
+import { BeatVisualizer } from "./BeatVisualizer";
+import { MetronomeControls, MetronomeMode } from "./MetronomeControls";
+import ExerciseHierarchy from "./ExerciseHierarchy";
+import { Button } from "./ui/button";
+import { Progress } from "./ui/progress";
+import { Play, Pause, Square, RotateCcw } from "lucide-react";
 
 // Normalize raw notes (supports optional 'subdivision' for per-beat steps)
 // Defaults to quarter notes (1 step per beat) when subdivision is missing
 // Accepts legacy notes with 'duration' in seconds; otherwise duration = 1 step
 
-type AnyNote = { time: number; string: number; fret: number; subdivision?: number; duration?: number };
+import { Note } from "@/types/repertoire";
+
+type AnyNote = Note & {
+  subdivision?: number;
+  highlightEvery?: number;
+  highlightOffset?: number;
+};
 
 function normalizeNotes(rawNotes: AnyNote[], bpm: number) {
   const secondsPerBeat = 60 / Math.max(bpm, 1);
   return (rawNotes || []).map((n) => {
-    const sub = typeof n.subdivision === 'number' && n.subdivision > 0 ? n.subdivision : 1;
-    const stepDuration = secondsPerBeat / sub;
-    const startTimeSeconds = (n.time ?? 0) * stepDuration;
-    const durationSeconds = typeof n.duration === 'number' && n.duration > 0 ? n.duration : stepDuration;
-    return { time: startTimeSeconds, duration: durationSeconds, string: n.string, fret: n.fret, accent: (n as any).accent ?? (n as any).highlight };
+    const sub =
+      typeof n.subdivision === "number" && n.subdivision > 0
+        ? n.subdivision
+        : 1;
+    // Interpret both time and duration in BEATS.
+    const startTimeSeconds = (n.time ?? 0) * secondsPerBeat;
+    const durationBeats =
+      typeof n.duration === "number" && n.duration > 0 ? n.duration : 1 / sub;
+    const durationSeconds = durationBeats * secondsPerBeat;
+    return {
+      time: startTimeSeconds,
+      duration: durationSeconds,
+      string: n.string,
+      fret: n.fret,
+      accent: n.accent ?? n.highlight,
+    };
   });
 }
 
@@ -37,27 +54,32 @@ interface RiffPracticeProps {
   isControlledSession?: boolean; // If true, parent controls the session
 }
 
-const RiffPractice = ({ 
-  repertoireItem, 
-  onComplete, 
+const RiffPractice = ({
+  repertoireItem,
+  onComplete,
   onExerciseSelect,
-  autoAdvance = false, 
+  autoAdvance = false,
   timeLimit,
-  isControlledSession = false 
+  isControlledSession = false,
 }: RiffPracticeProps) => {
   const [currentTime, setCurrentTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [mode, setMode] = useState<MetronomeMode>('regular');
+  const [mode, setMode] = useState<MetronomeMode>("regular");
   const [startTime, setStartTime] = useState<number | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
-  const [currentBpm, setCurrentBpm] = useState(repertoireItem.notes_per_beat ? 60 * repertoireItem.notes_per_beat : 120);
+  const [metronomeBpm, setMetronomeBpm] = useState(80);
   const [pitchDetectionEnabled, setPitchDetectionEnabled] = useState(true);
-  const [detectedNote, setDetectedNote] = useState<{ string: number; fret: number } | null>(null);
+  const [detectedNote, setDetectedNote] = useState<{
+    string: number;
+    fret: number;
+  } | null>(null);
+  const noteTimesRef = useRef<number[]>([]);
+  const noteIndexRef = useRef<number>(0);
 
   const metronomeSettings: MetronomeSettings = {
     mode,
-    startBpm: currentBpm,
-    endBpm: currentBpm,
+    startBpm: metronomeBpm,
+    endBpm: metronomeBpm,
     measures: 8,
     measuresPerBpmChange: 4,
   };
@@ -65,29 +87,41 @@ const RiffPractice = ({
   const metronome = useMetronome(metronomeSettings);
 
   // BPM control functionality
-  const handleBpmChange = useCallback((newBpm: number) => {
-    setCurrentBpm(newBpm);
-    if (metronome.state.isPlaying) {
-      metronome.stop();
-    }
-  }, [metronome]);
+  const handleMetronomeBpmChange = useCallback(
+    (bpm: number) => {
+      const wasPlaying = metronome.state.isPlaying;
+      setMetronomeBpm(bpm);
+      if (mode !== "regular" && wasPlaying) {
+        metronome.stop();
+        setTimeout(() => metronome.start(), 100);
+      }
+    },
+    [metronome, mode]
+  );
 
-  // Global BPM adjustment controls
+  // Global BPM adjustment controls (anywhere on page)
   useBpmControls({
-    currentBpm,
-    onBpmChange: handleBpmChange,
-    isEnabled: true
+    currentBpm: metronomeBpm,
+    onBpmChange: handleMetronomeBpmChange,
+    isEnabled: true,
   });
 
   // Pitch detection
   const { isListening } = usePitchDetection({
-    isEnabled: pitchDetectionEnabled,
+    isEnabled: pitchDetectionEnabled && !metronome.state.isPlaying,
     onNoteDetected: (result) => {
       setDetectedNote({ string: result.string, fret: result.fret });
-      // Clear detected note after a short delay
-      setTimeout(() => setDetectedNote(null), 500);
+      // Advance to the next note index regardless of rhythmic value
+      const times = noteTimesRef.current;
+      if (times.length > 0) {
+        noteIndexRef.current = (noteIndexRef.current + 1) % times.length;
+        setCurrentTime(times[noteIndexRef.current]);
+      }
+
+      // Clear detected indicator quickly so UI remains responsive
+      setTimeout(() => setDetectedNote(null), 200);
     },
-    sensitivity: 0.6
+    sensitivity: 0.6,
   });
 
   const handleStop = useCallback(() => {
@@ -111,9 +145,11 @@ const RiffPractice = ({
 
     // Calculate time based on metronome beats and BPM
     const beatLength = 60 / metronome.state.currentBpm; // seconds per beat
-    const totalBeats = (metronome.state.currentMeasure - 1) * 4 + (metronome.state.currentBeat - 1);
+    const totalBeats =
+      (metronome.state.currentMeasure - 1) * 4 +
+      (metronome.state.currentBeat - 1);
     const calculatedTime = totalBeats * beatLength;
-    
+
     setCurrentTime(calculatedTime);
     setElapsedTime(calculatedTime);
 
@@ -121,8 +157,15 @@ const RiffPractice = ({
     if (timeLimit && autoAdvance && calculatedTime >= timeLimit) {
       handleComplete();
     }
-  }, [metronome.state.currentBeat, metronome.state.currentMeasure, metronome.state.currentBpm, metronome.state.isPlaying, timeLimit, autoAdvance, handleComplete]);
-
+  }, [
+    metronome.state.currentBeat,
+    metronome.state.currentMeasure,
+    metronome.state.currentBpm,
+    metronome.state.isPlaying,
+    timeLimit,
+    autoAdvance,
+    handleComplete,
+  ]);
 
   const handlePlay = useCallback(() => {
     if (!metronome.state.isPlaying) {
@@ -134,29 +177,61 @@ const RiffPractice = ({
   }, [metronome]);
 
   const normalizedNotes = useMemo(
-    () => normalizeNotes(repertoireItem.notes as unknown as AnyNote[], currentBpm),
-    [repertoireItem.notes, currentBpm]
+    () =>
+      normalizeNotes(
+        repertoireItem.notes as unknown as AnyNote[],
+        metronomeBpm
+      ),
+    [repertoireItem.notes, metronomeBpm]
   );
+
+  // Precompute unique, sorted note times for deterministic stepping
+  useEffect(() => {
+    const epsilon = 1e-3;
+    const sorted = normalizedNotes.map((n) => n.time).sort((a, b) => a - b);
+    const dedup: number[] = [];
+    for (const t of sorted) {
+      if (
+        dedup.length === 0 ||
+        Math.abs(dedup[dedup.length - 1] - t) > epsilon
+      ) {
+        dedup.push(t);
+      }
+    }
+    noteTimesRef.current = dedup;
+    // Reset index to nearest time so next detection moves forward cleanly
+    const current = currentTime;
+    let idx = dedup.findIndex((t) => t >= current - epsilon);
+    if (idx < 0) idx = 0;
+    noteIndexRef.current = idx;
+  }, [normalizedNotes, currentTime]);
   const highlightDirectives = useMemo(() => {
     let highlightEvery: number | undefined;
     let highlightOffset: number | undefined;
-    for (const n of (repertoireItem.notes as unknown as AnyNote[])) {
-      const he = (n as any).highlightEvery;
-      const ho = (n as any).highlightOffset;
-      if (typeof he === 'number' && he > 0) highlightEvery = he;
-      if (typeof ho === 'number') highlightOffset = ho;
+    for (const n of repertoireItem.notes as unknown as AnyNote[]) {
+      const he = n.highlightEvery;
+      const ho = n.highlightOffset;
+      if (typeof he === "number" && he > 0) highlightEvery = he;
+      if (typeof ho === "number") highlightOffset = ho;
       if (highlightEvery !== undefined && highlightOffset !== undefined) break;
     }
     return { highlightEvery, highlightOffset };
   }, [repertoireItem.notes]);
-  const maxNoteTime = normalizedNotes.length > 0 ? Math.max(...normalizedNotes.map(note => note.time + note.duration)) : 0;
-  const progress = timeLimit ? (elapsedTime / timeLimit) * 100 : (maxNoteTime > 0 ? (currentTime / maxNoteTime) * 100 : 0);
+  const maxNoteTime =
+    normalizedNotes.length > 0
+      ? Math.max(...normalizedNotes.map((note) => note.time + note.duration))
+      : 0;
+  const progress = timeLimit
+    ? (elapsedTime / timeLimit) * 100
+    : maxNoteTime > 0
+    ? (currentTime / maxNoteTime) * 100
+    : 0;
 
   return (
     <div className="space-y-6 bpm-control-area">
       {/* Exercise Hierarchy */}
       {onExerciseSelect && (
-        <ExerciseHierarchy 
+        <ExerciseHierarchy
           currentExercise={repertoireItem}
           onExerciseSelect={onExerciseSelect}
         />
@@ -164,7 +239,9 @@ const RiffPractice = ({
 
       {/* Header */}
       <div className="text-center space-y-2">
-        <h2 className="text-2xl font-bold text-foreground">{repertoireItem.name}</h2>
+        <h2 className="text-2xl font-bold text-foreground">
+          {repertoireItem.name}
+        </h2>
         <p className="text-muted-foreground">{repertoireItem.description}</p>
         <div className="flex items-center justify-center gap-4 text-sm">
           <span className="px-3 py-1 bg-secondary rounded-full text-secondary-foreground">
@@ -174,7 +251,7 @@ const RiffPractice = ({
             {repertoireItem.difficulty}/10
           </span>
           <span className="px-3 py-1 bg-secondary rounded-full text-secondary-foreground">
-            {currentBpm} BPM
+            Highest Clean BPM: —
           </span>
         </div>
       </div>
@@ -185,10 +262,9 @@ const RiffPractice = ({
           <div className="flex justify-between text-sm text-muted-foreground">
             <span>Progress</span>
             <span>
-              {timeLimit 
+              {timeLimit
                 ? `${Math.floor(elapsedTime)}s / ${timeLimit}s`
-                : `${Math.floor(currentTime)}s / ${Math.floor(maxNoteTime)}s`
-              }
+                : `${Math.floor(currentTime)}s / ${Math.floor(maxNoteTime)}s`}
             </span>
           </div>
           <Progress value={Math.min(progress, 100)} className="h-2" />
@@ -199,8 +275,8 @@ const RiffPractice = ({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Tablature - Takes up more space on desktop, full screen on mobile portrait */}
         <div className="lg:col-span-2 portrait:fixed portrait:inset-0 portrait:z-50 portrait:bg-background portrait:p-4 portrait:overflow-auto landscape:relative landscape:z-auto landscape:bg-transparent">
-          <GuitarTablature 
-            notes={repertoireItem.notes}
+          <GuitarTablature
+            notes={normalizedNotes}
             currentPosition={currentTime}
             detectedNote={detectedNote}
             className="h-full"
@@ -218,8 +294,12 @@ const RiffPractice = ({
             <BeatVisualizer
               currentBeat={metronome.state.currentBeat}
               isPlaying={metronome.state.isPlaying}
-              currentBpm={metronome.state.currentBpm}
-              onBpmChange={handleBpmChange}
+              currentBpm={
+                metronome.state.isPlaying
+                  ? metronome.state.currentBpm
+                  : metronomeBpm
+              }
+              onBpmChange={handleMetronomeBpmChange}
               canEdit={true}
               size="sm"
             />
@@ -234,12 +314,20 @@ const RiffPractice = ({
                   variant={metronome.state.isPlaying ? "secondary" : "default"}
                   size="sm"
                 >
-                  {metronome.state.isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                  {metronome.state.isPlaying ? (
+                    <Pause className="h-4 w-4" />
+                  ) : (
+                    <Play className="h-4 w-4" />
+                  )}
                 </Button>
                 <Button onClick={handleStop} variant="outline" size="sm">
                   <Square className="h-4 w-4" />
                 </Button>
-                <Button onClick={() => setCurrentTime(0)} variant="outline" size="sm">
+                <Button
+                  onClick={() => setCurrentTime(0)}
+                  variant="outline"
+                  size="sm"
+                >
                   <RotateCcw className="h-4 w-4" />
                 </Button>
               </div>
@@ -256,8 +344,12 @@ const RiffPractice = ({
           <MetronomeControls
             mode={mode}
             isPlaying={metronome.state.isPlaying}
-            currentBpm={metronome.state.currentBpm}
-            endBpm={currentBpm}
+            currentBpm={
+              metronome.state.isPlaying
+                ? metronome.state.currentBpm
+                : metronomeBpm
+            }
+            endBpm={metronomeBpm}
             measures={8}
             measuresPerBpmChange={4}
             onModeChange={setMode}
@@ -266,7 +358,7 @@ const RiffPractice = ({
             onEndBpmChange={() => {}} // Disabled
             onMeasuresChange={() => {}} // Disabled
             onMeasuresPerBpmChangeChange={() => {}} // Disabled
-            onCurrentBpmChange={() => {}} // Disabled
+            onCurrentBpmChange={handleMetronomeBpmChange}
             compact={true}
           />
 
@@ -278,15 +370,16 @@ const RiffPractice = ({
                 onClick={() => setPitchDetectionEnabled(!pitchDetectionEnabled)}
                 className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
                   pitchDetectionEnabled
-                    ? 'bg-green-500 text-white'
-                    : 'bg-muted text-muted-foreground'
+                    ? "bg-green-500 text-white"
+                    : "bg-muted text-muted-foreground"
                 }`}
               >
-                {pitchDetectionEnabled ? 'ON' : 'OFF'}
+                {pitchDetectionEnabled ? "ON" : "OFF"}
               </button>
             </div>
             <p className="text-xs text-muted-foreground">
-              Enable microphone to track your guitar playing and highlight detected notes
+              Tracking is automatically disabled while the metronome is playing
+              to avoid false triggers.
               {isListening && (
                 <span className="ml-2 inline-flex items-center">
                   <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse mr-1"></span>

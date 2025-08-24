@@ -7,7 +7,12 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import Index from "./pages/Index";
 import Premium from "./pages/Premium";
 import Auth from "./pages/Auth";
+import AdminIndex from "./pages/Admin/Index";
+import ScaleShapeEditor from "./pages/Admin/ScaleShapeEditor";
 import NotFound from "./pages/NotFound";
+import AdminRoute from "./components/AdminRoute";
+import MainLayout from "./components/MainLayout";
+import Profile from "./pages/Profile";
 
 const queryClient = new QueryClient();
 
@@ -19,9 +24,14 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <Routes>
-            <Route path="/" element={<Index />} />
+            <Route element={<MainLayout />}>
+              <Route path="/" element={<Index />} />
+              <Route path="/premium" element={<Premium />} />
+              <Route path="/profile" element={<Profile />} />
+              <Route path="/admin" element={<AdminRoute><AdminIndex /></AdminRoute>} />
+              <Route path="/admin/scale-shape-editor" element={<AdminRoute><ScaleShapeEditor /></AdminRoute>} />
+            </Route>
             <Route path="/auth" element={<Auth />} />
-            <Route path="/premium" element={<Premium />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

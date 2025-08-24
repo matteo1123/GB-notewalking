@@ -1,14 +1,18 @@
-import { useEffect, useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import RiffPractice from '@/components/RiffPractice';
-import { RepertoireItem } from '@/types/repertoire';
-import { useAuth } from '@/contexts/AuthContext';
-import { Music, Star, Zap, Home, Crown, LogIn } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import RiffPractice from "@/components/RiffPractice";
+import ExerciseList from "@/components/ExerciseList";
+import { MetronomeScreen } from "@/components/MetronomeScreen";
+import { RepertoireItem } from "@/types/repertoire";
+import { useAuth } from "@/contexts/AuthContext";
+import { Music, Star, Zap, Home, Crown, LogIn } from "lucide-react";
+import { Link } from "react-router-dom";
 
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from "@/integrations/supabase/client";
+import { Tables } from "@/integrations/supabase/types";
+
 
 const Premium = () => {
   const { user } = useAuth();
@@ -21,31 +25,35 @@ const Premium = () => {
     let isMounted = true;
     async function loadExercises() {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('exercises')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const { data: scalesData, error: scalesError } = await supabase
+        .from("scales")
+        .select("*");
+      
       if (!isMounted) return;
-      if (error) {
-        setError(error.message);
+
+      if (scalesError) {
+        setError(scalesError.message);
         setExercises([]);
-      } else {
-        const mapped: RepertoireItem[] = (data ?? []).map((row: any) => ({
-          id: row.id,
-          name: row.name,
-          category: row.type as RepertoireItem['category'],
-          difficulty: row.Difficulty,
-          description: row.description ?? undefined,
-          notes: (row.notes as any) ?? [],
-          notes_per_beat: row.notes_per_beat,
-          tonic: row.Tonic,
-          tonality: row.Tonality,
-          position: row.Position,
-          parent: row.Parent,
-        }));
-        setExercises(mapped);
-        setError(null);
+        setLoading(false);
+        return;
       }
+
+      const mapped: RepertoireItem[] = (scalesData ?? []).map((row: Tables<'scales'>) => ({
+        id: row.id,
+        name: row.name,
+        category: 'scale',
+        difficulty: row.difficulty,
+        description: undefined,
+        notes: (row.notes_json as unknown as RepertoireItem['notes']) ?? [],
+        notes_per_beat: 4,
+        tonic: row.tonic,
+        tonality: row.tonality,
+        position: row.position,
+        parent: undefined,
+      }));
+
+      setExercises(mapped);
+      setError(null);
       setLoading(false);
     }
     loadExercises();
@@ -58,20 +66,6 @@ const Premium = () => {
     return (
       <div className="min-h-screen bg-background p-4">
         <div className="max-w-4xl mx-auto space-y-8">
-          {/* Header with navigation */}
-          <div className="flex items-center justify-between">
-            <Link to="/" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
-              <Home className="h-4 w-4" />
-              Back to Free Metronome
-            </Link>
-            <div className="flex items-center gap-3">
-              <Crown className="h-6 w-6 text-primary" />
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                Premium Guitar Training
-              </h1>
-            </div>
-          </div>
-
           {/* Paywall */}
           <div className="text-center space-y-6">
             <div className="space-y-4">
@@ -79,8 +73,9 @@ const Premium = () => {
                 Unlock Advanced Practice Tools
               </h2>
               <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-                Take your guitar practice to the next level with repertoire-based training, 
-                visual tablature, and structured practice sessions.
+                Take your guitar practice to the next level with
+                repertoire-based training, visual tablature, and structured
+                practice sessions.
               </p>
             </div>
 
@@ -93,7 +88,7 @@ const Premium = () => {
                 </CardHeader>
                 <CardContent>
                   <p className="text-muted-foreground">
-                    Access hundreds of scales, arpeggios, riffs, and exercises 
+                    Access hundreds of scales, arpeggios, riffs, and exercises
                     with visual tablature display.
                   </p>
                 </CardContent>
@@ -106,7 +101,7 @@ const Premium = () => {
                 </CardHeader>
                 <CardContent>
                   <p className="text-muted-foreground">
-                    Structured routines that automatically guide you through 
+                    Structured routines that automatically guide you through
                     exercises for maximum practice efficiency.
                   </p>
                 </CardContent>
@@ -119,8 +114,8 @@ const Premium = () => {
                 </CardHeader>
                 <CardContent>
                   <p className="text-muted-foreground">
-                    Track your improvement across different techniques 
-                    and difficulty levels over time.
+                    Track your improvement across different techniques and
+                    difficulty levels over time.
                   </p>
                 </CardContent>
               </Card>
@@ -129,8 +124,8 @@ const Premium = () => {
             {/* CTA */}
             <div className="space-y-4">
               <Link to="/auth">
-                <Button 
-                  size="lg" 
+                <Button
+                  size="lg"
                   className="text-lg px-8 py-6 flex items-center gap-2"
                 >
                   <LogIn className="h-5 w-5" />
@@ -149,25 +144,10 @@ const Premium = () => {
 
   if (selectedRiff) {
     return (
-      <div className="min-h-screen bg-background p-4">
+      <div className="min-h-screen bg-background p-4 bpm-control-area">
         <div className="max-w-6xl mx-auto space-y-6">
-          {/* Header */}
-          <div className="flex items-center justify-between">
-            <Button 
-              variant="outline" 
-              onClick={() => setSelectedRiff(null)}
-              className="flex items-center gap-2"
-            >
-              ← Back to Library
-            </Button>
-            <Link to="/" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
-              <Home className="h-4 w-4" />
-              Free Metronome
-            </Link>
-          </div>
-
           {/* Riff Practice */}
-          <RiffPractice 
+          <RiffPractice
             repertoireItem={selectedRiff}
             onComplete={() => setSelectedRiff(null)}
             onExerciseSelect={(exercise) => setSelectedRiff(exercise)}
@@ -180,118 +160,47 @@ const Premium = () => {
   return (
     <div className="min-h-screen bg-background p-4">
       <div className="max-w-6xl mx-auto space-y-8">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Crown className="h-6 w-6 text-primary" />
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-              Premium Guitar Training
-            </h1>
-          </div>
-          <Link to="/" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
-            <Home className="h-4 w-4" />
-            Free Metronome
-          </Link>
-        </div>
-
         {/* Content */}
-        <Tabs defaultValue="rhythms" className="space-y-6">
+        <Tabs defaultValue="sessions" className="space-y-6">
           <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="sessions">Lessons</TabsTrigger>
             <TabsTrigger value="rhythms">Rhythms</TabsTrigger>
             <TabsTrigger value="scales">Scales</TabsTrigger>
             <TabsTrigger value="arpeggios">Arpeggios</TabsTrigger>
-            <TabsTrigger value="sessions">Practice Sessions</TabsTrigger>
           </TabsList>
 
           <TabsContent value="rhythms" className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {exercises.filter(item => item.category === 'rhythm').map(item => (
-                <Card key={item.id} className="cursor-pointer hover:bg-card/80 transition-colors" onClick={() => setSelectedRiff(item)}>
-                  <CardHeader>
-                    <CardTitle className="flex items-center justify-between">
-                      {item.name}
-                      <span className={`px-2 py-1 rounded text-xs ${
-                        item.difficulty <= 3 ? 'bg-green-500/20 text-green-400' :
-                        item.difficulty <= 7 ? 'bg-yellow-500/20 text-yellow-400' :
-                        'bg-red-500/20 text-red-400'
-                      }`}>
-                        {item.difficulty}/10
-                      </span>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-muted-foreground text-sm mb-2">{item.description}</p>
-                    <div className="flex justify-between text-sm">
-                      <span className="font-mono">{item.tonic} {item.tonality}</span>
-                      <span className="text-muted-foreground">Pos {item.position}</span>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+            <ExerciseList
+              items={exercises.filter((e) => e.category === "rhythm")}
+              defaultSort={{ key: "difficulty", dir: "asc" }}
+              onSelect={(item) => setSelectedRiff(item)}
+            />
           </TabsContent>
 
           <TabsContent value="scales" className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {exercises.filter(item => item.category === 'scale').map(item => (
-                <Card key={item.id} className="cursor-pointer hover:bg-card/80 transition-colors" onClick={() => setSelectedRiff(item)}>
-                  <CardHeader>
-                    <CardTitle className="flex items-center justify-between">
-                      {item.name}
-                      <span className={`px-2 py-1 rounded text-xs ${
-                        item.difficulty <= 3 ? 'bg-green-500/20 text-green-400' :
-                        item.difficulty <= 7 ? 'bg-yellow-500/20 text-yellow-400' :
-                        'bg-red-500/20 text-red-400'
-                      }`}>
-                        {item.difficulty}/10
-                      </span>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-muted-foreground text-sm mb-2">{item.description}</p>
-                    <div className="flex justify-between text-sm">
-                      <span className="font-mono">{item.tonic} {item.tonality}</span>
-                      <span className="text-muted-foreground">Pos {item.position}</span>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+            <ExerciseList
+              items={exercises.filter((e) => e.category === "scale")}
+              defaultSort={{ key: "position", dir: "asc" }}
+              onSelect={(item) => setSelectedRiff(item)}
+            />
           </TabsContent>
 
           <TabsContent value="arpeggios" className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {exercises.filter(item => item.category === 'arpeggio').map(item => (
-                <Card key={item.id} className="cursor-pointer hover:bg-card/80 transition-colors" onClick={() => setSelectedRiff(item)}>
-                  <CardHeader>
-                    <CardTitle className="flex items-center justify-between">
-                      {item.name}
-                      <span className={`px-2 py-1 rounded text-xs ${
-                        item.difficulty <= 3 ? 'bg-green-500/20 text-green-400' :
-                        item.difficulty <= 7 ? 'bg-yellow-500/20 text-yellow-400' :
-                        'bg-red-500/20 text-red-400'
-                      }`}>
-                        {item.difficulty}/10
-                      </span>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-muted-foreground text-sm mb-2">{item.description}</p>
-                    <div className="flex justify-between text-sm">
-                      <span className="font-mono">{item.tonic} {item.tonality}</span>
-                      <span className="text-muted-foreground">Pos {item.position}</span>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+            <ExerciseList
+              items={exercises.filter((e) => e.category === "arpeggio")}
+              defaultSort={{ key: "difficulty", dir: "asc" }}
+              onSelect={(item) => setSelectedRiff(item)}
+            />
           </TabsContent>
 
           <TabsContent value="sessions" className="space-y-4">
             <div className="text-center py-12">
-              <h3 className="text-xl font-semibold mb-4">Practice Sessions Coming Soon</h3>
+              <h3 className="text-xl font-semibold mb-4">
+                Lessons Coming Soon
+              </h3>
               <p className="text-muted-foreground">
-                Structured practice routines that automatically guide you through multiple exercises.
+                Structured practice routines that automatically guide you
+                through multiple exercises.
               </p>
             </div>
           </TabsContent>

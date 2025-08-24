@@ -10,7 +10,7 @@ export interface Note {
 export interface RepertoireItem {
   id: string;
   name: string;
-  category: 'scale' | 'arpeggio' | 'riff' | 'rhythm' | 'ear-training';
+  category: "scale" | "arpeggio" | "riff" | "rhythm" | "ear-training";
   difficulty: number; // 1-10 scale
   notes: Note[];
   description?: string;
@@ -19,6 +19,8 @@ export interface RepertoireItem {
   tonality: string; // "Major", "Minor"
   position?: number;
   parent?: string | null; // UUID of parent exercise
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface PracticeSession {

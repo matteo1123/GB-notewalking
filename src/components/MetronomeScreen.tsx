@@ -35,6 +35,7 @@ export interface MetronomeScreenProps {
     totalPlannedMeasures: number;
   }) => void;
   onTick?: (state: MetronomeState) => void;
+  onStop?: () => void;
 }
 
 export function MetronomeScreen({
@@ -49,6 +50,7 @@ export function MetronomeScreen({
   exposeControlsRef,
   onProgress,
   onTick,
+  onStop,
 }: MetronomeScreenProps) {
   const [mode, setMode] = useState<MetronomeMode>(initialMode);
   const [startBpm, setStartBpm] = useState<number>(initialStartBpm);
@@ -192,7 +194,12 @@ export function MetronomeScreen({
             measuresPerBpmChange={measuresPerIncrement}
             onModeChange={handleModeChange}
             onPlayPause={metronome.togglePlayPause}
-            onStop={metronome.stop}
+            onStop={() => {
+              metronome.stop();
+              if (onStop) {
+                onStop();
+              }
+            }}
             onEndBpmChange={setEndBpm}
             onMeasuresChange={setIncrements}
             onMeasuresPerBpmChangeChange={setMeasuresPerIncrement}

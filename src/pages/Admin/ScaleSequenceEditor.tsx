@@ -122,6 +122,8 @@ const ScaleSequenceEditor = () => {
     }
   };
 
+  const selectedScaleObject = scales.find(s => s.id === selectedScale);
+
   return (
     <div className="p-4">
       <h1 className="text-2xl font-bold mb-4">Scale Sequence Editor</h1>
@@ -141,6 +143,11 @@ const ScaleSequenceEditor = () => {
             ))}
           </select>
         </div>
+        {selectedScaleObject && (
+          <div>
+            <Label>Scale Length: {selectedScaleObject.notes_json.length}</Label>
+          </div>
+        )}
         <div>
           <Label htmlFor="sequence-name">Sequence Name</Label>
           <Input id="sequence-name" value={sequenceName} onChange={(e) => setSequenceName(e.target.value)} className="bg-gray-800 text-white" />
@@ -169,10 +176,12 @@ const ScaleSequenceEditor = () => {
       </div>
       <div className="mt-8">
         <MetronomeScreen
-          initialStartBpm={bpm * (subdivision / 4) * (isTriplet ? 3 : 1)}
+          initialStartBpm={bpm}
           onTick={() => {
-            setSequencePosition((prev) => (prev + 1) % (generatedNotes.length || 1));
+            const step = (subdivision / 4) * (isTriplet ? 3 : 1);
+            setSequencePosition((prev) => (prev + step) % (generatedNotes.length || 1));
           }}
+          onStop={() => setSequencePosition(0)}
         />
       </div>
       <div className="mt-8">

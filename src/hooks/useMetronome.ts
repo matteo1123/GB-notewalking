@@ -15,6 +15,7 @@ export interface MetronomeSettings {
   measures: number;
   measuresPerBpmChange?: number;
   progressiveStepBpm?: number;
+  onTick?: (state: MetronomeState) => void;
 }
 
 export const DEFAULT_PROGRESSIVE_STEP_BPM = 5;
@@ -42,7 +43,7 @@ export function useMetronome(settings: MetronomeSettings) {
   const initAudioContext = useCallback(() => {
     if (!audioContextRef.current) {
       audioContextRef.current = new (window.AudioContext ||
-        (window as any).webkitAudioContext)();
+        (window as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext)();
     }
     return audioContextRef.current;
   }, []);
@@ -79,16 +80,6 @@ export function useMetronome(settings: MetronomeSettings) {
   // Calculate current BPM based on mode and progress
   const calculateCurrentBpm = useCallback(
     (beat: number, measure: number, round: number) => {
-      console.log("calculateCurrentBpm called with:", {
-        mode: settings.mode,
-        beat,
-        measure,
-        round,
-        startBpm: settings.startBpm,
-        endBpm: settings.endBpm,
-        measures: settings.measures,
-        measuresPerBpmChange: settings.measuresPerBpmChange,
-      });
       if (settings.mode === "regular") {
         return settings.startBpm;
       }
@@ -126,19 +117,6 @@ export function useMetronome(settings: MetronomeSettings) {
         const high = Math.max(baseBpm, targetBpm);
         if (currentBpmValue < low) currentBpmValue = low;
         if (currentBpmValue > high) currentBpmValue = high;
-
-        console.log("SPEED TRAINER/PROGRESSIVE DEBUG:", {
-          mode: settings.mode,
-          totalBeatsElapsed,
-          beatsPerIncrement,
-          currentIncrement,
-          clampedIncrement,
-          numberOfIncrements,
-          bpmIncrementSize,
-          baseBpm,
-          targetBpm,
-          result: Number(currentBpmValue.toFixed(2)),
-        });
 
         return Number(currentBpmValue.toFixed(2));
       }
@@ -193,7 +171,10 @@ export function useMetronome(settings: MetronomeSettings) {
         }
       }
     }
-  }, [calculateCurrentBpm, playClick, settings]);
+    if (settings.onTick) {
+      settings.onTick(state);
+    }
+  }, [calculateCurrentBpm, playClick, settings, state]);
 
   // Main metronome loop using setInterval instead of requestAnimationFrame
   useEffect(() => {
@@ -223,7 +204,7 @@ export function useMetronome(settings: MetronomeSettings) {
         intervalRef.current = null;
       }
     };
-  }, [state.isPlaying, calculateCurrentBpm, scheduleNextBeat]);
+  }, [state.isPlaying, state.currentBpm, calculateCurrentBpm, scheduleNextBeat]);
 
   const start = useCallback(() => {
     initAudioContext();

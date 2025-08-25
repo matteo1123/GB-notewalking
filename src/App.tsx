@@ -9,6 +9,7 @@ import Premium from "./pages/Premium";
 import Auth from "./pages/Auth";
 import AdminIndex from "./pages/Admin/Index";
 import ScaleShapeEditor from "./pages/Admin/ScaleShapeEditor";
+import ScaleSequenceEditor from "./pages/Admin/ScaleSequenceEditor";
 import NotFound from "./pages/NotFound";
 import AdminRoute from "./components/AdminRoute";
 import MainLayout from "./components/MainLayout";
@@ -30,6 +31,7 @@ const App = () => (
               <Route path="/profile" element={<Profile />} />
               <Route path="/admin" element={<AdminRoute><AdminIndex /></AdminRoute>} />
               <Route path="/admin/scale-shape-editor" element={<AdminRoute><ScaleShapeEditor /></AdminRoute>} />
+              <Route path="/admin/scale-sequence-editor" element={<AdminRoute><ScaleSequenceEditor /></AdminRoute>} />
             </Route>
             <Route path="/auth" element={<Auth />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

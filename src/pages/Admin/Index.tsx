@@ -11,6 +11,11 @@ const AdminIndex = () => {
             Scale Shape Editor
           </Link>
         </li>
+        <li>
+          <Link to="/admin/scale-sequence-editor" className="text-blue-500 hover:underline">
+            Scale Sequence Editor
+          </Link>
+        </li>
       </ul>
     </div>
   );

@@ -8,6 +8,7 @@ import { ProgressIndicator } from "@/components/ProgressIndicator";
 import {
   useMetronome,
   DEFAULT_PROGRESSIVE_STEP_BPM,
+  MetronomeState,
 } from "@/hooks/useMetronome";
 import { useBpmControls } from "@/hooks/useBpmControls";
 
@@ -33,6 +34,7 @@ export interface MetronomeScreenProps {
     progressiveRound: number;
     totalPlannedMeasures: number;
   }) => void;
+  onTick?: (state: MetronomeState) => void;
 }
 
 export function MetronomeScreen({
@@ -46,6 +48,7 @@ export function MetronomeScreen({
   autoStart = false,
   exposeControlsRef,
   onProgress,
+  onTick,
 }: MetronomeScreenProps) {
   const [mode, setMode] = useState<MetronomeMode>(initialMode);
   const [startBpm, setStartBpm] = useState<number>(initialStartBpm);
@@ -62,6 +65,7 @@ export function MetronomeScreen({
     measures: increments,
     measuresPerBpmChange: measuresPerIncrement,
     progressiveStepBpm,
+    onTick,
   });
 
   const handleModeChange = useCallback(

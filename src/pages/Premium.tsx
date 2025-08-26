@@ -8,7 +8,7 @@ import { MetronomeScreen } from "@/components/MetronomeScreen";
 import { RepertoireItem } from "@/types/repertoire";
 import { useAuth } from "@/contexts/AuthContext";
 import { Music, Star, Zap, Home, Crown, LogIn } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { supabase } from "@/integrations/supabase/client";
 import { Tables } from "@/integrations/supabase/types";
@@ -20,6 +20,16 @@ const Premium = () => {
   const [exercises, setExercises] = useState<RepertoireItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (location.state?.reset) {
+      setSelectedRiff(null);
+      // Clear the state to prevent re-triggering
+      navigate(location.pathname, { replace: true });
+    }
+  }, [location.state, navigate, location.pathname]);
 
   useEffect(() => {
     let isMounted = true;
@@ -50,6 +60,8 @@ const Premium = () => {
         tonality: row.tonality,
         position: row.position,
         parent: undefined,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Type: (row as any).Type,
       }));
 
       setExercises(mapped);

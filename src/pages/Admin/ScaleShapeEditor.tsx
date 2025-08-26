@@ -20,6 +20,7 @@ const ScaleShapeEditor = () => {
   const [tonality, setTonality] = useState('Major');
   const [savedShapes, setSavedShapes] = useState([]);
   const [shapeToGeneralize, setShapeToGeneralize] = useState('');
+  const [selectedShapeId, setSelectedShapeId] = useState<string | null>(null);
   const { toast } = useToast();
 
   const fetchShapes = async () => {
@@ -84,11 +85,29 @@ const ScaleShapeEditor = () => {
         return a.fret_offset - b.fret_offset;
       });
 
-    const { error } = await supabase
-      .from('scale_shapes')
-      .insert([
-        { name: scaleName, shape_json, intervals: intervals.split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n)), Type: scaleType, Position: position, Mode: mode, tonality: tonality },
-      ]);
+    const shapeData = {
+      name: scaleName,
+      shape_json,
+      intervals: intervals.split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n)),
+      Type: scaleType,
+      Position: position,
+      Mode: mode,
+      tonality: tonality
+    };
+
+    let error;
+    if (selectedShapeId) {
+      const { error: updateError } = await supabase
+        .from('scale_shapes')
+        .update(shapeData)
+        .eq('id', selectedShapeId);
+      error = updateError;
+    } else {
+      const { error: insertError } = await supabase
+        .from('scale_shapes')
+        .insert([shapeData]);
+      error = insertError;
+    }
 
     if (error) {
       toast({ title: "Error saving scale shape", description: error.message });
@@ -102,6 +121,7 @@ const ScaleShapeEditor = () => {
       setPosition(1);
       setMode('Ionian');
       setTonality('Major');
+      setSelectedShapeId(null);
       fetchShapes();
     }
   };
@@ -151,7 +171,7 @@ const ScaleShapeEditor = () => {
         continue;
       }
 
-      const newNotesJson = sourceShape.shape_json.map((note, index) => {
+      let newNotesJson = sourceShape.shape_json.map((note, index) => {
         const time = index * 0.5;
         return {
           string: note.string,
@@ -160,6 +180,13 @@ const ScaleShapeEditor = () => {
           duration: 0.5,
         };
       });
+
+      if (newNotesJson.some(note => note.fret < 0)) {
+        newNotesJson = newNotesJson.map(note => ({
+          ...note,
+          fret: note.fret + 12,
+        }));
+      }
 
       const filteredNotesJson = newNotesJson.filter(note => note.fret >= 0 && note.fret <= FRET_COUNT);
 
@@ -207,12 +234,14 @@ const ScaleShapeEditor = () => {
       setIntervals('');
       setScaleType('2 notes per string scale');
       setHighlightedNotes([]);
+      setSelectedShapeId(null);
       return;
     }
 
     const selectedShape = savedShapes.find(shape => shape.id === shapeId);
 
     if (selectedShape) {
+      setSelectedShapeId(selectedShape.id);
       setScaleName(selectedShape.name);
       setIntervals(selectedShape.intervals ? selectedShape.intervals.join(',') : '');
       setScaleType(selectedShape.Type || '2 notes per string scale');

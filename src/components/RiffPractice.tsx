@@ -10,8 +10,8 @@ import ExerciseHierarchy from "./ExerciseHierarchy";
 import { Button } from "./ui/button";
 import { Progress } from "./ui/progress";
 import { Play, Pause, Square, RotateCcw } from "lucide-react";
-
-// Normalize raw notes (supports optional 'subdivision' for per-beat steps)
+import { supabase } from "@/integrations/supabase/client";
+import { Tables } from "@/integrations/supabase/types";
 // Defaults to quarter notes (1 step per beat) when subdivision is missing
 // Accepts legacy notes with 'duration' in seconds; otherwise duration = 1 step
 
@@ -75,6 +75,40 @@ const RiffPractice = ({
   } | null>(null);
   const noteTimesRef = useRef<number[]>([]);
   const noteIndexRef = useRef<number>(0);
+  const [availableSequences, setAvailableSequences] = useState<Tables<'sequences'>[]>([]);
+  const [activeSequence, setActiveSequence] = useState<Tables<'sequences'> | null>(null);
+
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const itemType = (repertoireItem as any).Type;
+    if (!repertoireItem || !itemType) {
+      setAvailableSequences([]);
+      setActiveSequence(null);
+      return;
+    }
+
+    const fetchSequences = async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error }: { data: any; error: any } = await supabase
+        .from('sequences')
+        .select('*')
+        .eq('Type', itemType);
+
+      if (error) {
+        console.error('Error fetching sequences:', error);
+        return;
+      }
+
+      setAvailableSequences(data || []);
+      if (data && data.length > 0) {
+        setActiveSequence(data[0]);
+      } else {
+        setActiveSequence(null);
+      }
+    };
+
+    fetchSequences();
+  }, [repertoireItem]);
 
   const metronomeSettings: MetronomeSettings = {
     mode,
@@ -176,13 +210,47 @@ const RiffPractice = ({
     setIsPlaying(!metronome.state.isPlaying);
   }, [metronome]);
 
+  const displayNotes = useMemo(() => {
+    const scaleNotes = repertoireItem.notes as unknown as AnyNote[];
+    if (!scaleNotes) return [];
+
+    if (!activeSequence) {
+      return scaleNotes.map((note, index) => ({
+        ...note,
+        time: index,
+        duration: 1,
+      }));
+    }
+
+    const sequenceNumbers = activeSequence.pattern_string.split(' ').map(s => s.trim()).filter(s => s !== '');
+    const newNotes: AnyNote[] = [];
+
+    for (let i = 0; i < sequenceNumbers.length; i++) {
+      const numStr = sequenceNumbers[i];
+      if (numStr.toLowerCase() === 'r') {
+        continue;
+      }
+
+      const noteIndex = parseInt(numStr, 10) - 1;
+      if (noteIndex >= 0 && noteIndex < scaleNotes.length) {
+        const originalNote = scaleNotes[noteIndex];
+        newNotes.push({
+          ...originalNote,
+          time: i,
+          duration: 1,
+        });
+      }
+    }
+    return newNotes;
+  }, [activeSequence, repertoireItem.notes]);
+
   const normalizedNotes = useMemo(
     () =>
       normalizeNotes(
-        repertoireItem.notes as unknown as AnyNote[],
+        displayNotes,
         metronomeBpm
       ),
-    [repertoireItem.notes, metronomeBpm]
+    [displayNotes, metronomeBpm]
   );
 
   // Precompute unique, sorted note times for deterministic stepping
@@ -255,6 +323,21 @@ const RiffPractice = ({
           </span>
         </div>
       </div>
+
+
+      {/* Sequence Buttons */}
+      <div className="flex flex-wrap items-center justify-center gap-2">
+        {availableSequences.map((sequence) => (
+          <Button
+            key={sequence.id}
+            onClick={() => setActiveSequence(sequence)}
+            variant={activeSequence?.id === sequence.id ? 'secondary' : 'outline'}
+          >
+            {sequence.name}
+          </Button>
+        ))}
+      </div>
+
 
       {/* Progress */}
       {(timeLimit || !isControlledSession) && (

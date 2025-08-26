@@ -19,6 +19,7 @@ export interface RepertoireItem {
   tonality: string; // "Major", "Minor"
   position?: number;
   parent?: string | null; // UUID of parent exercise
+  Type?: string;
   created_at?: string;
   updated_at?: string;
 }

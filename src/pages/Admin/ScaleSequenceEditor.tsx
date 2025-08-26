@@ -12,6 +12,8 @@ const ScaleSequenceEditor = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [scales, setScales] = useState([]);
+  const [sequences, setSequences] = useState([]);
+  const [selectedSequenceId, setSelectedSequenceId] = useState<string | null>(null);
   const [selectedScale, setSelectedScale] = useState(null);
   const [sequence, setSequence] = useState('');
   const [subdivision, setSubdivision] = useState(4);
@@ -23,15 +25,22 @@ const ScaleSequenceEditor = () => {
   const [bpm, setBpm] = useState(60);
 
   useEffect(() => {
-    const fetchScales = async () => {
-      const { data, error } = await supabase.from('scales').select('*');
-      if (error) {
-        toast({ title: "Error fetching scales", description: error.message });
+    const fetchData = async () => {
+      const { data: scalesData, error: scalesError } = await supabase.from('scales').select('*');
+      if (scalesError) {
+        toast({ title: "Error fetching scales", description: scalesError.message });
       } else {
-        setScales(data);
+        setScales(scalesData);
+      }
+
+      const { data: sequencesData, error: sequencesError } = await supabase.from('sequences').select('*');
+      if (sequencesError) {
+        toast({ title: "Error fetching sequences", description: sequencesError.message });
+      } else {
+        setSequences(sequencesData);
       }
     };
-    fetchScales();
+    fetchData();
   }, []);
 
   useEffect(() => {
@@ -74,6 +83,20 @@ const ScaleSequenceEditor = () => {
     setGeneratedNotes(newNotes);
   };
 
+  const handleSequenceSelect = (id: string) => {
+    const selected = sequences.find(s => s.id === id);
+    if (selected) {
+      setSelectedSequenceId(selected.id);
+      setSequenceName(selected.name);
+      setSequence(selected.pattern_string);
+      setSubdivision(selected.note_value);
+      setIsTriplet(selected.is_triplet);
+      setBpm(selected.bpm);
+      // Note: We can't reliably set the selectedScale here as we don't store it with the sequence.
+      // The user will need to select the scale they wish to use for previewing.
+    }
+  };
+
   const handleSave = async () => {
     if (!sequenceName || !sequence || !selectedScale) {
       toast({
@@ -94,16 +117,31 @@ const ScaleSequenceEditor = () => {
       return;
     }
 
-    const { error } = await supabase.from('sequences').insert([
-      {
-        name: sequenceName,
-        pattern_string: sequence,
-        notes_per_beat: subdivision,
-        subdivision: isTriplet ? 3 : 1,
-        Type: scale.Type,
-        repetition_style: 'DIATONIC_SHIFT' // default value
-      },
-    ]);
+    const sequenceData = {
+      name: sequenceName,
+      pattern_string: sequence,
+      Type: scale.Type,
+      note_value: subdivision,
+      is_triplet: isTriplet,
+      bpm: bpm,
+      repetition_style: 'DIATONIC_SHIFT' // default value
+    };
+
+    let error;
+    if (selectedSequenceId) {
+      // Update existing sequence
+      const { error: updateError } = await supabase
+        .from('sequences')
+        .update(sequenceData)
+        .eq('id', selectedSequenceId);
+      error = updateError;
+    } else {
+      // Insert new sequence
+      const { error: insertError } = await supabase
+        .from('sequences')
+        .insert([sequenceData]);
+      error = insertError;
+    }
 
     if (error) {
       toast({
@@ -119,6 +157,7 @@ const ScaleSequenceEditor = () => {
       setSequenceName('');
       setSequence('');
       setSelectedScale(null);
+      setSelectedSequenceId(null);
     }
   };
 
@@ -129,7 +168,22 @@ const ScaleSequenceEditor = () => {
       <h1 className="text-2xl font-bold mb-4">Scale Sequence Editor</h1>
       <div className="form-container grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
-          <Label htmlFor="scale-select">Select Scale</Label>
+          <Label htmlFor="sequence-select">Load Sequence</Label>
+          <select
+            id="sequence-select"
+            onChange={(e) => handleSequenceSelect(e.target.value)}
+            className="w-full p-2 border rounded bg-gray-800 text-white"
+          >
+            <option value="">New Sequence</option>
+            {sequences.map((seq) => (
+              <option key={seq.id} value={seq.id}>
+                {seq.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <Label htmlFor="scale-select">Select Scale (for preview)</Label>
           <select
             id="scale-select"
             onChange={(e) => setSelectedScale(e.target.value)}

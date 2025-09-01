@@ -20,6 +20,7 @@ export interface RepertoireItem {
   position?: number;
   parent?: string | null; // UUID of parent exercise
   Type?: string;
+  major_key?: string;
   created_at?: string;
   updated_at?: string;
 }

@@ -244,18 +244,27 @@ export type Database = {
           name: string
           pattern_string: string
           repetition_style: string
+          Type: string
+          note_value: number
+          is_triplet: boolean
         }
         Insert: {
           id?: string
           name: string
           pattern_string: string
           repetition_style: string
+          Type: string
+          note_value: number
+          is_triplet: boolean
         }
         Update: {
           id?: string
           name?: string
           pattern_string?: string
           repetition_style?: string
+          Type?: string
+          note_value?: number
+          is_triplet?: boolean
         }
         Relationships: []
       }

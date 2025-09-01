@@ -5,8 +5,9 @@ import { Label } from '@/components/ui/label';
 import { useToast } from "@/components/ui/use-toast"
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import GuitarTablature from '@/components/GuitarTablature';
+import NoteDisplay from '@/components/NoteDisplay';
 import MetronomeScreen from '@/components/MetronomeScreen';
+import { applySequenceToScale } from '@/lib/sequenceUtils';
 
 const ScaleSequenceEditor = () => {
   const { user } = useAuth();
@@ -23,6 +24,9 @@ const ScaleSequenceEditor = () => {
   const [scaleType, setScaleType] = useState('');
   const [sequencePosition, setSequencePosition] = useState(0);
   const [bpm, setBpm] = useState(60);
+  const [scaleTypeFilter, setScaleTypeFilter] = useState('All');
+
+  const SCALE_TYPES = ['2 notes per string scale', '3 notes per string scale', '4 notes per string scale', 'chord', 'arpeggio'];
 
   useEffect(() => {
     const fetchData = async () => {
@@ -53,34 +57,19 @@ const ScaleSequenceEditor = () => {
     setSequencePosition(0);
   }, [generatedNotes]);
 
+
   const generateSequence = () => {
     const scale = scales.find(s => s.id === selectedScale);
-    if (!scale || !scale.notes_json) {
-      return;
+    if (scale) {
+      const newNotes = applySequenceToScale(
+        scale,
+        sequence,
+        subdivision,
+        isTriplet
+      );
+      setGeneratedNotes(newNotes);
+      setScaleType(scale.Type);
     }
-    setScaleType(scale.Type);
-
-    const sequenceNumbers = sequence.split(' ').map(s => s.trim()).filter(s => s !== '');
-    const newNotes = [];
-    for (let i = 0; i < sequenceNumbers.length; i++) {
-      const numStr = sequenceNumbers[i];
-      if (numStr.toLowerCase() === 'r') {
-        // For rests, we could add a placeholder or skip it.
-        // Skipping for now as it simplifies highlighting logic.
-        continue;
-      }
-
-      const noteIndex = parseInt(numStr, 10) - 1;
-      if (noteIndex >= 0 && noteIndex < scale.notes_json.length) {
-        const originalNote = scale.notes_json[noteIndex];
-        newNotes.push({
-          ...originalNote,
-          time: i, // Use index as time for even spacing
-          duration: 1, // Duration is 1 unit of time
-        });
-      }
-    }
-    setGeneratedNotes(newNotes);
   };
 
   const handleSequenceSelect = (id: string) => {
@@ -163,6 +152,8 @@ const ScaleSequenceEditor = () => {
 
   const selectedScaleObject = scales.find(s => s.id === selectedScale);
 
+  const filteredScales = scales.filter(scale => scaleTypeFilter === 'All' || scale.Type === scaleTypeFilter);
+
   return (
     <div className="p-4">
       <h1 className="text-2xl font-bold mb-4">Scale Sequence Editor</h1>
@@ -183,6 +174,18 @@ const ScaleSequenceEditor = () => {
           </select>
         </div>
         <div>
+          <Label htmlFor="scale-type-filter">Filter by Type</Label>
+          <select
+            id="scale-type-filter"
+            value={scaleTypeFilter}
+            onChange={(e) => setScaleTypeFilter(e.target.value)}
+            className="w-full p-2 border rounded bg-gray-800 text-white"
+          >
+            <option value="All">All</option>
+            {SCALE_TYPES.map(type => <option key={type} value={type}>{type}</option>)}
+          </select>
+        </div>
+        <div>
           <Label htmlFor="scale-select">Select Scale (for preview)</Label>
           <select
             id="scale-select"
@@ -190,7 +193,7 @@ const ScaleSequenceEditor = () => {
             className="w-full p-2 border rounded bg-gray-800 text-white"
           >
             <option value="">Select a scale</option>
-            {scales.map((scale) => (
+            {filteredScales.map((scale) => (
               <option key={scale.id} value={scale.id}>
                 {scale.name}
               </option>
@@ -239,8 +242,9 @@ const ScaleSequenceEditor = () => {
         />
       </div>
       <div className="mt-8">
-        <GuitarTablature
+        <NoteDisplay
           notes={generatedNotes}
+          major_key={selectedScaleObject?.major_key}
           currentPosition={generatedNotes[sequencePosition]?.time}
         />
       </div>

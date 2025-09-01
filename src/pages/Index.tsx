@@ -6,7 +6,7 @@ const Index = () => {
   const [mode] = useState<MetronomeMode>("regular");
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
+    <div className="max-w-4xl mx-auto space-y-8 bpm-control-area">
       {/* Main Content */}
       <MetronomeScreen initialMode={mode} />
 

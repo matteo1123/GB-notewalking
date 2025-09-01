@@ -2,8 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { RepertoireItem } from "@/types/repertoire";
 import { useMetronome, MetronomeSettings } from "@/hooks/useMetronome";
 import { useBpmControls } from "@/hooks/useBpmControls";
-import { usePitchDetection } from "@/hooks/usePitchDetection";
-import GuitarTablature from "./GuitarTablature";
+import NoteDisplay from "./NoteDisplay";
 import { BeatVisualizer } from "./BeatVisualizer";
 import { MetronomeControls, MetronomeMode } from "./MetronomeControls";
 import ExerciseHierarchy from "./ExerciseHierarchy";
@@ -12,10 +11,13 @@ import { Progress } from "./ui/progress";
 import { Play, Pause, Square, RotateCcw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Tables } from "@/integrations/supabase/types";
+import { PostgrestError } from "@supabase/supabase-js";
 // Defaults to quarter notes (1 step per beat) when subdivision is missing
 // Accepts legacy notes with 'duration' in seconds; otherwise duration = 1 step
 
 import { Note } from "@/types/repertoire";
+import { applySequenceToScale } from "@/lib/sequenceUtils";
+import { Scale } from "@/types/scales";
 
 type AnyNote = Note & {
   subdivision?: number;
@@ -23,30 +25,9 @@ type AnyNote = Note & {
   highlightOffset?: number;
 };
 
-function normalizeNotes(rawNotes: AnyNote[], bpm: number) {
-  const secondsPerBeat = 60 / Math.max(bpm, 1);
-  return (rawNotes || []).map((n) => {
-    const sub =
-      typeof n.subdivision === "number" && n.subdivision > 0
-        ? n.subdivision
-        : 1;
-    // Interpret both time and duration in BEATS.
-    const startTimeSeconds = (n.time ?? 0) * secondsPerBeat;
-    const durationBeats =
-      typeof n.duration === "number" && n.duration > 0 ? n.duration : 1 / sub;
-    const durationSeconds = durationBeats * secondsPerBeat;
-    return {
-      time: startTimeSeconds,
-      duration: durationSeconds,
-      string: n.string,
-      fret: n.fret,
-      accent: n.accent ?? n.highlight,
-    };
-  });
-}
-
 interface RiffPracticeProps {
   repertoireItem: RepertoireItem;
+  sequences: Tables<"sequences">[];
   onComplete?: () => void;
   onExerciseSelect?: (exercise: RepertoireItem) => void;
   autoAdvance?: boolean;
@@ -56,59 +37,34 @@ interface RiffPracticeProps {
 
 const RiffPractice = ({
   repertoireItem,
+  sequences,
   onComplete,
   onExerciseSelect,
   autoAdvance = false,
   timeLimit,
   isControlledSession = false,
 }: RiffPracticeProps) => {
-  const [currentTime, setCurrentTime] = useState(0);
+  const [noteIndex, setNoteIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [mode, setMode] = useState<MetronomeMode>("regular");
   const [startTime, setStartTime] = useState<number | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [metronomeBpm, setMetronomeBpm] = useState(80);
   const [pitchDetectionEnabled, setPitchDetectionEnabled] = useState(true);
-  const [detectedNote, setDetectedNote] = useState<{
-    string: number;
-    fret: number;
-  } | null>(null);
-  const noteTimesRef = useRef<number[]>([]);
-  const noteIndexRef = useRef<number>(0);
-  const [availableSequences, setAvailableSequences] = useState<Tables<'sequences'>[]>([]);
-  const [activeSequence, setActiveSequence] = useState<Tables<'sequences'> | null>(null);
+  const [activeSequence, setActiveSequence] = useState<Tables<"sequences"> | null>(null);
+
+  const availableSequences = useMemo(() => {
+    const itemType = repertoireItem.Type;
+    return sequences.filter((s) => s.Type === itemType);
+  }, [sequences, repertoireItem]);
 
   useEffect(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const itemType = (repertoireItem as any).Type;
-    if (!repertoireItem || !itemType) {
-      setAvailableSequences([]);
+    if (availableSequences.length > 0) {
+      setActiveSequence(availableSequences[0]);
+    } else {
       setActiveSequence(null);
-      return;
     }
-
-    const fetchSequences = async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error }: { data: any; error: any } = await supabase
-        .from('sequences')
-        .select('*')
-        .eq('Type', itemType);
-
-      if (error) {
-        console.error('Error fetching sequences:', error);
-        return;
-      }
-
-      setAvailableSequences(data || []);
-      if (data && data.length > 0) {
-        setActiveSequence(data[0]);
-      } else {
-        setActiveSequence(null);
-      }
-    };
-
-    fetchSequences();
-  }, [repertoireItem]);
+  }, [availableSequences]);
 
   const metronomeSettings: MetronomeSettings = {
     mode,
@@ -118,7 +74,14 @@ const RiffPractice = ({
     measuresPerBpmChange: 4,
   };
 
-  const metronome = useMetronome(metronomeSettings);
+  const metronome = useMetronome({
+    ...metronomeSettings,
+    onTick: () => {
+      if (isPlaying) {
+        setNoteIndex((prevIndex) => prevIndex + 1);
+      }
+    },
+  });
 
   // BPM control functionality
   const handleMetronomeBpmChange = useCallback(
@@ -140,28 +103,11 @@ const RiffPractice = ({
     isEnabled: true,
   });
 
-  // Pitch detection
-  const { isListening } = usePitchDetection({
-    isEnabled: pitchDetectionEnabled && !metronome.state.isPlaying,
-    onNoteDetected: (result) => {
-      setDetectedNote({ string: result.string, fret: result.fret });
-      // Advance to the next note index regardless of rhythmic value
-      const times = noteTimesRef.current;
-      if (times.length > 0) {
-        noteIndexRef.current = (noteIndexRef.current + 1) % times.length;
-        setCurrentTime(times[noteIndexRef.current]);
-      }
-
-      // Clear detected indicator quickly so UI remains responsive
-      setTimeout(() => setDetectedNote(null), 200);
-    },
-    sensitivity: 0.6,
-  });
 
   const handleStop = useCallback(() => {
     metronome.stop();
     setIsPlaying(false);
-    setCurrentTime(0);
+    setNoteIndex(0);
     setElapsedTime(0);
     setStartTime(null);
   }, [metronome]);
@@ -171,35 +117,6 @@ const RiffPractice = ({
     onComplete?.();
   }, [handleStop, onComplete]);
 
-  // Calculate current time and subdivision based on metronome beats (metronome is master)
-  useEffect(() => {
-    if (!metronome.state.isPlaying) {
-      return;
-    }
-
-    // Calculate time based on metronome beats and BPM
-    const beatLength = 60 / metronome.state.currentBpm; // seconds per beat
-    const totalBeats =
-      (metronome.state.currentMeasure - 1) * 4 +
-      (metronome.state.currentBeat - 1);
-    const calculatedTime = totalBeats * beatLength;
-
-    setCurrentTime(calculatedTime);
-    setElapsedTime(calculatedTime);
-
-    // Check time limit completion
-    if (timeLimit && autoAdvance && calculatedTime >= timeLimit) {
-      handleComplete();
-    }
-  }, [
-    metronome.state.currentBeat,
-    metronome.state.currentMeasure,
-    metronome.state.currentBpm,
-    metronome.state.isPlaying,
-    timeLimit,
-    autoAdvance,
-    handleComplete,
-  ]);
 
   const handlePlay = useCallback(() => {
     if (!metronome.state.isPlaying) {
@@ -211,68 +128,35 @@ const RiffPractice = ({
   }, [metronome]);
 
   const displayNotes = useMemo(() => {
-    const scaleNotes = repertoireItem.notes as unknown as AnyNote[];
-    if (!scaleNotes) return [];
-
     if (!activeSequence) {
-      return scaleNotes.map((note, index) => ({
+      return repertoireItem.notes.map((note, index) => ({
         ...note,
         time: index,
         duration: 1,
       }));
     }
 
-    const sequenceNumbers = activeSequence.pattern_string.split(' ').map(s => s.trim()).filter(s => s !== '');
-    const newNotes: AnyNote[] = [];
+    const scale: Scale = {
+      id: repertoireItem.id,
+      name: repertoireItem.name,
+      notes_json: repertoireItem.notes,
+      Type: repertoireItem.Type || '',
+    };
 
-    for (let i = 0; i < sequenceNumbers.length; i++) {
-      const numStr = sequenceNumbers[i];
-      if (numStr.toLowerCase() === 'r') {
-        continue;
-      }
+    return applySequenceToScale(
+      scale,
+      activeSequence.pattern_string,
+      activeSequence.note_value,
+      activeSequence.is_triplet
+    );
+  }, [activeSequence, repertoireItem]);
 
-      const noteIndex = parseInt(numStr, 10) - 1;
-      if (noteIndex >= 0 && noteIndex < scaleNotes.length) {
-        const originalNote = scaleNotes[noteIndex];
-        newNotes.push({
-          ...originalNote,
-          time: i,
-          duration: 1,
-        });
-      }
+  const currentTime = useMemo(() => {
+    if (noteIndex >= displayNotes.length) {
+      return 0;
     }
-    return newNotes;
-  }, [activeSequence, repertoireItem.notes]);
-
-  const normalizedNotes = useMemo(
-    () =>
-      normalizeNotes(
-        displayNotes,
-        metronomeBpm
-      ),
-    [displayNotes, metronomeBpm]
-  );
-
-  // Precompute unique, sorted note times for deterministic stepping
-  useEffect(() => {
-    const epsilon = 1e-3;
-    const sorted = normalizedNotes.map((n) => n.time).sort((a, b) => a - b);
-    const dedup: number[] = [];
-    for (const t of sorted) {
-      if (
-        dedup.length === 0 ||
-        Math.abs(dedup[dedup.length - 1] - t) > epsilon
-      ) {
-        dedup.push(t);
-      }
-    }
-    noteTimesRef.current = dedup;
-    // Reset index to nearest time so next detection moves forward cleanly
-    const current = currentTime;
-    let idx = dedup.findIndex((t) => t >= current - epsilon);
-    if (idx < 0) idx = 0;
-    noteIndexRef.current = idx;
-  }, [normalizedNotes, currentTime]);
+    return displayNotes[noteIndex].time;
+  }, [noteIndex, displayNotes]);
   const highlightDirectives = useMemo(() => {
     let highlightEvery: number | undefined;
     let highlightOffset: number | undefined;
@@ -286,14 +170,11 @@ const RiffPractice = ({
     return { highlightEvery, highlightOffset };
   }, [repertoireItem.notes]);
   const maxNoteTime =
-    normalizedNotes.length > 0
-      ? Math.max(...normalizedNotes.map((note) => note.time + note.duration))
+    displayNotes.length > 0
+      ? Math.max(...displayNotes.map((note) => note.time + note.duration))
       : 0;
-  const progress = timeLimit
-    ? (elapsedTime / timeLimit) * 100
-    : maxNoteTime > 0
-    ? (currentTime / maxNoteTime) * 100
-    : 0;
+  const progress =
+    displayNotes.length > 0 ? (noteIndex / displayNotes.length) * 100 : 0;
 
   return (
     <div className="space-y-6 bpm-control-area">
@@ -347,7 +228,7 @@ const RiffPractice = ({
             <span>
               {timeLimit
                 ? `${Math.floor(elapsedTime)}s / ${timeLimit}s`
-                : `${Math.floor(currentTime)}s / ${Math.floor(maxNoteTime)}s`}
+                : `${noteIndex} / ${displayNotes.length}`}
             </span>
           </div>
           <Progress value={Math.min(progress, 100)} className="h-2" />
@@ -358,10 +239,11 @@ const RiffPractice = ({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Tablature - Takes up more space on desktop, full screen on mobile portrait */}
         <div className="lg:col-span-2 portrait:fixed portrait:inset-0 portrait:z-50 portrait:bg-background portrait:p-4 portrait:overflow-auto landscape:relative landscape:z-auto landscape:bg-transparent">
-          <GuitarTablature
-            notes={normalizedNotes}
+          <NoteDisplay
+            notes={displayNotes}
+            major_key={repertoireItem.major_key}
             currentPosition={currentTime}
-            detectedNote={detectedNote}
+            enableListening={pitchDetectionEnabled && !metronome.state.isPlaying}
             className="h-full"
           />
           {/* Mobile portrait instructions */}
@@ -407,7 +289,7 @@ const RiffPractice = ({
                   <Square className="h-4 w-4" />
                 </Button>
                 <Button
-                  onClick={() => setCurrentTime(0)}
+                  onClick={() => setNoteIndex(0)}
                   variant="outline"
                   size="sm"
                 >
@@ -463,12 +345,6 @@ const RiffPractice = ({
             <p className="text-xs text-muted-foreground">
               Tracking is automatically disabled while the metronome is playing
               to avoid false triggers.
-              {isListening && (
-                <span className="ml-2 inline-flex items-center">
-                  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse mr-1"></span>
-                  Listening...
-                </span>
-              )}
             </p>
           </div>
         </div>

@@ -1,0 +1,88 @@
+.fretboard-area {
+  display: flex;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.open-notes-container {
+  display: grid;
+  grid-template-columns: 50px;
+  grid-template-rows: repeat(6, 30px);
+  margin-right: 5px;
+}
+
+.fretboard-container {
+  overflow-x: visible;
+}
+
+.fretboard {
+  display: grid;
+  grid-template-columns: repeat(24, 50px);
+  grid-template-rows: repeat(6, 30px);
+  position: relative;
+  background-color: #000;
+  width: 1200px;
+  border: 2px solid #fff;
+  border-left-width: 5px;
+}
+
+.fret {
+  grid-row: 1 / -1;
+  border-right: 1px solid #fff;
+  z-index: 1;
+}
+
+.string {
+  height: 1px;
+  background-color: #fff;
+  align-self: center;
+  grid-column: 1 / -1;
+  z-index: 2;
+}
+
+.note {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  justify-self: center;
+  align-self: center;
+  cursor: pointer;
+  z-index: 3;
+  box-sizing: border-box;
+}
+
+.note.selected {
+  background-color: #ccc;
+}
+
+.note.root {
+  background-color: #ff0000;
+}
+
+.note.highlighted:not(.root) {
+  box-shadow: 0 0 0 2px #ff0000 inset;
+}
+
+.note.selected.highlighted:not(.root) {
+  background-color: #ccc;
+}
+
+.marker-wrapper {
+  grid-row: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 0;
+}
+
+.marker-wrapper.double {
+  justify-content: space-around;
+}
+
+.marker {
+  width: 15px;
+  height: 15px;
+  background-color: #fff;
+  border-radius: 50%;
+}

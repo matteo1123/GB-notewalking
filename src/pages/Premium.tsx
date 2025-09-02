@@ -4,7 +4,7 @@ import RiffPractice from "@/components/RiffPractice";
 import ExerciseList from "@/components/ExerciseList";
 import { RepertoireItem } from "@/types/repertoire";
 import { useAuth } from "@/contexts/AuthContext";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Tables } from "@/integrations/supabase/types";
 import Paywall from "@/components/Premium/Paywall";
@@ -16,16 +16,19 @@ const Premium = () => {
   const [sequences, setSequences] = useState<Tables<"sequences">[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const location = useLocation();
-  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const exerciseId = searchParams.get("exerciseId");
 
   useEffect(() => {
-    if (location.state?.reset) {
+    if (exerciseId) {
+      const exercise = exercises.find((e) => e.id === exerciseId);
+      if (exercise) {
+        setSelectedRiff(exercise);
+      }
+    } else {
       setSelectedRiff(null);
-      // Clear the state to prevent re-triggering
-      navigate(location.pathname, { replace: true });
     }
-  }, [location.state, navigate, location.pathname]);
+  }, [exerciseId, exercises]);
 
   useEffect(() => {
     let isMounted = true;
@@ -52,9 +55,9 @@ const Premium = () => {
         description: undefined,
         notes: (row.notes_json as unknown as RepertoireItem['notes']) ?? [],
         notes_per_beat: 4,
-        tonic: row.tonic,
+        tonic: row.root_note,
         tonality: row.tonality,
-        position: row.position,
+        position: row.Position,
         parent: undefined,
         major_key: row.major_key,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -95,8 +98,8 @@ const Premium = () => {
           <RiffPractice
             repertoireItem={selectedRiff}
             sequences={sequences}
-            onComplete={() => setSelectedRiff(null)}
-            onExerciseSelect={(exercise) => setSelectedRiff(exercise)}
+            onComplete={() => setSearchParams({})}
+            onExerciseSelect={(exercise) => setSearchParams({ exerciseId: exercise.id })}
           />
         </div>
       </div>
@@ -119,7 +122,7 @@ const Premium = () => {
             <ExerciseList
               items={exercises.filter((e) => e.category === "rhythm")}
               defaultSort={{ key: "difficulty", dir: "asc" }}
-              onSelect={(item) => setSelectedRiff(item)}
+              onSelect={(item) => setSearchParams({ exerciseId: item.id })}
             />
           </TabsContent>
 
@@ -127,7 +130,7 @@ const Premium = () => {
             <ExerciseList
               items={exercises.filter((e) => e.category === "scale")}
               defaultSort={{ key: "position", dir: "asc" }}
-              onSelect={(item) => setSelectedRiff(item)}
+              onSelect={(item) => setSearchParams({ exerciseId: item.id })}
             />
           </TabsContent>
 
@@ -135,7 +138,7 @@ const Premium = () => {
             <ExerciseList
               items={exercises.filter((e) => e.category === "arpeggio")}
               defaultSort={{ key: "difficulty", dir: "asc" }}
-              onSelect={(item) => setSelectedRiff(item)}
+              onSelect={(item) => setSearchParams({ exerciseId: item.id })}
             />
           </TabsContent>
 

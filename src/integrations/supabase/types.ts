@@ -179,20 +179,35 @@ export type Database = {
         Row: {
           id: string
           intervals: number[] | null
+          Mode: string | null
           name: string
+          Position: number | null
+          root_fret: number | null
           shape_json: Json
+          tonality: string | null
+          Type: string | null
         }
         Insert: {
           id?: string
           intervals?: number[] | null
+          Mode?: string | null
           name: string
+          Position?: number | null
+          root_fret?: number | null
           shape_json: Json
+          tonality?: string | null
+          Type?: string | null
         }
         Update: {
           id?: string
           intervals?: number[] | null
+          Mode?: string | null
           name?: string
+          Position?: number | null
+          root_fret?: number | null
           shape_json?: Json
+          tonality?: string | null
+          Type?: string | null
         }
         Relationships: []
       }
@@ -202,12 +217,17 @@ export type Database = {
           created_by: string | null
           difficulty: number | null
           id: string
+          intervals: number[] | null
           is_public: boolean | null
+          major_key: string | null
+          mode: string | null
           name: string
           notes_json: Json
-          position: number | null
+          Position: number | null
+          root_note: string | null
+          scale_shape_id: string | null
           tonality: string | null
-          tonic: string | null
+          Type: Database["public"]["Enums"]["scale_type"] | null
           updated_at: string | null
         }
         Insert: {
@@ -215,12 +235,17 @@ export type Database = {
           created_by?: string | null
           difficulty?: number | null
           id?: string
+          intervals?: number[] | null
           is_public?: boolean | null
+          major_key?: string | null
+          mode?: string | null
           name: string
           notes_json: Json
-          position?: number | null
+          Position?: number | null
+          root_note?: string | null
+          scale_shape_id?: string | null
           tonality?: string | null
-          tonic?: string | null
+          Type?: Database["public"]["Enums"]["scale_type"] | null
           updated_at?: string | null
         }
         Update: {
@@ -228,43 +253,51 @@ export type Database = {
           created_by?: string | null
           difficulty?: number | null
           id?: string
+          intervals?: number[] | null
           is_public?: boolean | null
+          major_key?: string | null
+          mode?: string | null
           name?: string
           notes_json?: Json
-          position?: number | null
+          Position?: number | null
+          root_note?: string | null
+          scale_shape_id?: string | null
           tonality?: string | null
-          tonic?: string | null
+          Type?: Database["public"]["Enums"]["scale_type"] | null
           updated_at?: string | null
         }
         Relationships: []
       }
       sequences: {
         Row: {
+          bpm: number | null
           id: string
+          is_triplet: boolean | null
           name: string
+          note_value: number | null
           pattern_string: string
           repetition_style: string
-          Type: string
-          note_value: number
-          is_triplet: boolean
+          Type: string | null
         }
         Insert: {
+          bpm?: number | null
           id?: string
+          is_triplet?: boolean | null
           name: string
+          note_value?: number | null
           pattern_string: string
           repetition_style: string
-          Type: string
-          note_value: number
-          is_triplet: boolean
+          Type?: string | null
         }
         Update: {
+          bpm?: number | null
           id?: string
+          is_triplet?: boolean | null
           name?: string
+          note_value?: number | null
           pattern_string?: string
           repetition_style?: string
-          Type?: string
-          note_value?: number
-          is_triplet?: boolean
+          Type?: string | null
         }
         Relationships: []
       }
@@ -300,6 +333,12 @@ export type Database = {
       app_role: "admin" | "user"
       exercise_difficulty: "beginner" | "intermediate" | "advanced"
       exercise_type: "riff" | "scale" | "arpeggio"
+      scale_type:
+        | "2 notes per string scale"
+        | "3 notes per string scale"
+        | "4 notes per string scale"
+        | "chord"
+        | "arpeggio"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -430,6 +469,13 @@ export const Constants = {
       app_role: ["admin", "user"],
       exercise_difficulty: ["beginner", "intermediate", "advanced"],
       exercise_type: ["riff", "scale", "arpeggio"],
+      scale_type: [
+        "2 notes per string scale",
+        "3 notes per string scale",
+        "4 notes per string scale",
+        "chord",
+        "arpeggio",
+      ],
     },
   },
 } as const

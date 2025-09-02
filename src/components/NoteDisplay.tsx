@@ -132,7 +132,7 @@ const NoteDisplay = ({
                         ? DEGREE_COLORS[degree as keyof typeof DEGREE_COLORS]
                         : null;
 
-                      const noteStyle = color ? { backgroundColor: color, color: 'white', border: `2px solid ${color}aa` } : {};
+                      const noteStyle = color ? { borderColor: color, borderWidth: '3px' } : {};
                       
                       return (
                         <div
@@ -141,9 +141,9 @@ const NoteDisplay = ({
                             isDetectedNote
                               ? "bg-green-500 text-white border-2 border-green-400 scale-110"
                               : isCurrentNote
-                              ? "bg-blue-500 text-white border-2 border-blue-400"
+                              ? "bg-blue-500 text-white"
                               : isHighlighted
-                              ? "bg-accent text-accent-foreground border-2 border-accent-foreground/20"
+                              ? "bg-accent text-accent-foreground"
                               : "bg-muted text-muted-foreground"
                           }`}
                           style={{ left: `${position}%`, ...noteStyle }}

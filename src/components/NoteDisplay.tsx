@@ -6,21 +6,24 @@ import {
   getNoteFromFret,
 } from "@/lib/music";
 import { usePitchDetection } from "@/hooks/usePitchDetection";
+import { Button } from "@/components/ui/button";
 
 interface NoteDisplayProps {
-  notes: Note[];
-  major_key?: string;
-  className?: string;
-  currentPosition?: number; // Current time position for highlighting
-  enableListening?: boolean;
+   notes: Note[];
+   major_key?: string;
+   className?: string;
+   currentPosition?: number; // Current time position for highlighting
+   enableListening?: boolean;
+   mode?: 'tablature' | 'grid'; // Display mode
 }
 
 const NoteDisplay = ({
-  notes,
-  major_key,
-  className = "",
-  currentPosition = 0,
-  enableListening = false,
+   notes,
+   major_key,
+   className = "",
+   currentPosition = 0,
+   enableListening = false,
+   mode = 'tablature',
 }: NoteDisplayProps) => {
   const strings = [1, 2, 3, 4, 5, 6]; // High E to Low E
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -29,6 +32,7 @@ const NoteDisplay = ({
     string: number;
     fret: number;
   } | null>(null);
+  const [displayMode, setDisplayMode] = useState<'tablature' | 'grid'>(mode);
 
   const { isListening } = usePitchDetection({
     isEnabled: enableListening,
@@ -99,71 +103,153 @@ const NoteDisplay = ({
     closestTime = best;
   }
 
+  // For grid mode
+  const frets = notes.length > 0 ? Math.max(...notes.map(n => n.fret)) + 1 : 12;
+  const minFret = notes.length > 0 ? Math.min(...notes.map(n => n.fret)) : 0;
+
   return (
     <div className={`bg-card rounded-lg border border-border p-4 ${className}`}>
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="text-lg font-semibold">Note Display</h3>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setDisplayMode(displayMode === 'tablature' ? 'grid' : 'tablature')}
+        >
+          {displayMode === 'tablature' ? 'Switch to Grid' : 'Switch to Tablature'}
+        </Button>
+      </div>
       <div
         ref={containerRef}
         className="overflow-x-auto overflow-y-hidden max-h-96 animated-scrollbar"
       >
-        <div className="space-y-2" style={{ minWidth: `${minWidth}px` }}>
-          {strings.map((string) => (
-            <div key={string} className="flex items-center space-x-2">
-              <div className="w-6 text-sm text-muted-foreground font-mono shrink-0 sticky left-0 bg-card z-10">
-                {string}
-              </div>
-              <div className="flex-1 relative min-h-8">
-                <div className="h-px bg-border absolute top-1/2 w-full"></div>
-                <div className="absolute inset-0">
-                  {notes
-                    .filter((note) => note.string === string)
-                    .map((note, index) => {
-                      const position = (note.time / maxTime) * 100;
-                      const isHighlighted = note.accent || note.highlight;
-                      const isCurrentNote =
-                        Math.abs(note.time - closestTime) <= 0.08;
-                      const isDetectedNote =
-                        detectedNote &&
-                        detectedNote.string === note.string &&
-                        detectedNote.fret === note.fret;
+        {displayMode === 'tablature' ? (
+          <div className="space-y-2" style={{ minWidth: `${minWidth}px` }}>
+            {strings.map((string) => (
+              <div key={string} className="flex items-center space-x-2">
+                <div className="w-6 text-sm text-muted-foreground font-mono shrink-0 sticky left-0 bg-card z-10">
+                  {string}
+                </div>
+                <div className="flex-1 relative min-h-8">
+                  <div className="h-px bg-border absolute top-1/2 w-full"></div>
+                  <div className="absolute inset-0">
+                    {notes
+                      .filter((note) => note.string === string)
+                      .map((note, index) => {
+                        const position = (note.time / maxTime) * 100;
+                        const isHighlighted = note.accent || note.highlight;
+                        const isCurrentNote =
+                          Math.abs(note.time - closestTime) <= 0.08;
+                        const isDetectedNote =
+                          detectedNote &&
+                          detectedNote.string === note.string &&
+                          detectedNote.fret === note.fret;
 
-                      const noteName = getNoteFromFret(note.string, note.fret);
-                      const degree = degreeMap ? degreeMap.get(noteName) : null;
-                      const color = degree
-                        ? DEGREE_COLORS[degree as keyof typeof DEGREE_COLORS]
-                        : null;
+                        const noteName = getNoteFromFret(note.string, note.fret);
+                        const degree = degreeMap ? degreeMap.get(noteName) : null;
+                        const color = degree
+                          ? DEGREE_COLORS[degree as keyof typeof DEGREE_COLORS]
+                          : null;
 
-                      const noteStyle = color ? { borderColor: color, borderWidth: '3px' } : {};
-                      
-                      return (
-                        <div
-                          key={index}
-                          className={`absolute -translate-y-1/2 top-1/2 -translate-x-1/2 w-7 h-7 rounded text-xs font-mono flex items-center justify-center transition-all duration-150 ${
-                            isDetectedNote
-                              ? "bg-green-500 text-white border-2 border-green-400 scale-110"
-                              : isCurrentNote
-                              ? "bg-blue-500 text-white"
-                              : isHighlighted
-                              ? "bg-accent text-accent-foreground"
-                              : "bg-muted text-muted-foreground"
-                          }`}
-                          style={{ left: `${position}%`, ...noteStyle }}
-                          title={`Time: ${note.time}s, Duration: ${
-                            note.duration || 0.5
-                          }s`}
-                        >
-                          {note.fret}
-                        </div>
-                      );
-                    })}
+                        const noteStyle = color ? { borderColor: color, borderWidth: '3px' } : {};
+
+                        return (
+                          <div
+                            key={index}
+                            className={`absolute -translate-y-1/2 top-1/2 -translate-x-1/2 w-7 h-7 rounded text-xs font-mono flex items-center justify-center transition-all duration-150 ${
+                              isDetectedNote
+                                ? "bg-green-500 text-white border-2 border-green-400 scale-110"
+                                : isCurrentNote
+                                ? "bg-blue-500 text-white"
+                                : isHighlighted
+                                ? "bg-accent text-accent-foreground"
+                                : "bg-muted text-muted-foreground"
+                            }`}
+                            style={{ left: `${position}%`, ...noteStyle }}
+                            title={`Time: ${note.time}s, Duration: ${
+                              note.duration || 0.5
+                            }s`}
+                          >
+                            {note.fret}
+                          </div>
+                        );
+                      })}
+                  </div>
                 </div>
               </div>
+            ))}
+          </div>
+        ) : (
+          <div className="grid-view">
+            <div className="mb-2 text-sm text-muted-foreground">
+              Pattern starts at fret {minFret}
             </div>
-          ))}
-        </div>
+            <div className="flex">
+              <div className="w-12"></div>
+              {Array.from({ length: frets - minFret }, (_, fretIndex) => (
+                <div key={fretIndex} className="w-12 h-8 flex items-center justify-center text-xs font-mono text-muted-foreground">
+                  {fretIndex + minFret}
+                </div>
+              ))}
+            </div>
+            {strings.map((string) => (
+              <div key={string} className="flex">
+                <div className="w-12 text-sm text-muted-foreground font-mono flex items-center justify-center">
+                  {string}
+                </div>
+                {Array.from({ length: frets - minFret }, (_, fretIndex) => {
+                  const fret = fretIndex + minFret;
+                  const note = notes.find(n => n.string === string && n.fret === fret);
+                  const isHighlighted = note ? (note.accent || note.highlight) : false;
+                  const isCurrentNote = note ? Math.abs(note.time - closestTime) <= 0.08 : false;
+                  const isDetectedNote = detectedNote && detectedNote.string === string && detectedNote.fret === fret;
+
+                  let noteName = '';
+                  let color = null;
+                  if (note) {
+                    noteName = getNoteFromFret(note.string, note.fret);
+                    const degree = degreeMap ? degreeMap.get(noteName) : null;
+                    color = degree ? DEGREE_COLORS[degree as keyof typeof DEGREE_COLORS] : null;
+                  }
+
+                  const noteStyle = color ? { backgroundColor: color, color: ['#FFD700', '#ADFF2F', '#40E0D0'].includes(color) ? 'black' : 'white' } : {};
+
+                  return (
+                    <div
+                      key={fret}
+                      className={`w-12 h-12 border border-border flex items-center justify-center text-sm font-mono ${
+                        note
+                          ? isDetectedNote
+                            ? "bg-green-500 text-white border-2 border-green-400"
+                            : isCurrentNote
+                            ? "bg-blue-500 text-white"
+                            : isHighlighted
+                            ? "bg-accent text-accent-foreground"
+                            : "bg-muted text-muted-foreground"
+                          : "bg-card"
+                      }`}
+                      style={note ? noteStyle : {}}
+                      title={note ? noteName : ''}
+                    >
+                      {note ? noteName : ''}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
       <div className="mt-4 text-xs text-muted-foreground text-center">
-        String numbers (1 = High E, 6 = Low E) • Numbers on strings = Fret
-        positions
+        {displayMode === 'tablature' ? (
+          <>
+            String numbers (1 = High E, 6 = Low E) • Numbers on strings = Fret positions
+          </>
+        ) : (
+          <>
+            String numbers (1 = High E, 6 = Low E) • Note names on grid = Note positions
+          </>
+        )}
         <br />
         <span className="inline-block w-3 h-3 bg-green-500 rounded mr-1"></span>
         Detected •

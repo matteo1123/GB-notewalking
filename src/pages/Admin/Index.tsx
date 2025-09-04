@@ -16,6 +16,11 @@ const AdminIndex = () => {
             Scale Sequence Editor
           </Link>
         </li>
+        <li>
+          <Link to="/admin/audio-sandbox" className="text-blue-500 hover:underline">
+            Audio Sandbox
+          </Link>
+        </li>
       </ul>
     </div>
   );

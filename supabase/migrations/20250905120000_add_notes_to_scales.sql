@@ -1,0 +1,2 @@
+ALTER TABLE scales
+ADD COLUMN notes TEXT[];

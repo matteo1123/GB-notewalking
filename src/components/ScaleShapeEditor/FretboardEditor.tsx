@@ -1,5 +1,5 @@
 import React from 'react';
-import { FRET_COUNT, STRING_COUNT } from '@/lib/fretboard';
+import { FRET_COUNT, STRING_COUNT } from '@/lib/musicTheory';
 import './FretboardEditor.css';
 
 interface Note {

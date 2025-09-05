@@ -9,6 +9,8 @@ interface ScaleShapeFormProps {
   setScaleName: (name: string) => void;
   intervals: string;
   setIntervals: (intervals: string) => void;
+  notes: string;
+  setNotes: (notes: string) => void;
   position: number;
   setPosition: (position: number) => void;
   mode: string;
@@ -33,6 +35,8 @@ const ScaleShapeForm: React.FC<ScaleShapeFormProps> = ({
   setScaleName,
   intervals,
   setIntervals,
+  notes,
+  setNotes,
   position,
   setPosition,
   mode,
@@ -73,6 +77,10 @@ const ScaleShapeForm: React.FC<ScaleShapeFormProps> = ({
         <div>
           <Label htmlFor="intervals">Intervals (comma-separated)</Label>
           <Input id="intervals" value={intervals} onChange={(e) => setIntervals(e.target.value)} placeholder="e.g., 0,2,3,5,7,8,10" className="bg-gray-800 text-white" />
+        </div>
+        <div>
+          <Label htmlFor="notes">Notes (comma-separated)</Label>
+          <Input id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g., E,F#,G#,A,B,C#,D#" className="bg-gray-800 text-white" />
         </div>
         <div>
           <Label htmlFor="position">Position</Label>

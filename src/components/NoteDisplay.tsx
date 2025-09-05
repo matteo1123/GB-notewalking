@@ -4,7 +4,7 @@ import {
   createDegreeMap,
   DEGREE_COLORS,
   getNoteFromFret,
-} from "@/lib/music";
+} from "@/lib/musicTheory";
 import { usePitchDetection } from "@/hooks/usePitchDetection";
 import { Button } from "@/components/ui/button";
 

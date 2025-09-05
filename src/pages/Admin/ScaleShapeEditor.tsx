@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useToast } from "@/components/ui/use-toast"
 import { supabase } from '@/integrations/supabase/client';
-import { FRET_COUNT, findAllNoteOccurrences, notes as allNotes } from '@/lib/fretboard';
-import { getNote } from '@/lib/music';
-import { getNoteWithEnharmonicPreference } from '@/lib/musicTheory';
+import { FRET_COUNT, findAllNoteOccurrences, notes as allNotes, getNote, getNoteWithEnharmonicPreference, determineEnharmonicNotes } from '@/lib/musicTheory';
 import { useAuth } from '@/contexts/AuthContext';
 import { Tables } from '@/integrations/supabase/types';
 import FretboardEditor from '@/components/ScaleShapeEditor/FretboardEditor';
@@ -16,12 +14,13 @@ const ScaleShapeEditor = () => {
   const [rootNote, setRootNote] = useState(null);
   const [scaleName, setScaleName] = useState('');
   const [intervals, setIntervals] = useState('');
+  const [notes, setNotes] = useState('');
   const [highlightedNotes, setHighlightedNotes] = useState([]);
   const [scaleType, setScaleType] = useState('All');
   const [position, setPosition] = useState(1);
   const [mode, setMode] = useState('Ionian');
   const [tonality, setTonality] = useState('Major');
-  const [savedShapes, setSavedShapes] = useState<(Tables<'scale_shapes'> & { Type: string, Mode: string, Position: number, tonality: string, root_fret: number, shape_json: { string: number, fret_offset: number }[] })[]>([]);
+  const [savedShapes, setSavedShapes] = useState<(Tables<'scale_shapes'> & { Type: string, Mode: string, Position: number, tonality: string, root_fret: number, notes: string[], shape_json: { string: number, fret_offset: number }[] })[]>([]);
   const [shapeToGeneralize, setShapeToGeneralize] = useState('');
   const [selectedShapeId, setSelectedShapeId] = useState<string | null>(null);
   const [previewNotes, setPreviewNotes] = useState([]);
@@ -34,7 +33,7 @@ const ScaleShapeEditor = () => {
     if (error) {
       toast({ title: "Error fetching shapes", description: error.message });
     } else if (data) {
-      setSavedShapes(data as (Tables<'scale_shapes'> & { Type: string, Mode: string, Position: number, tonality: string, root_fret: number, shape_json: { string: number, fret_offset: number }[] })[]);
+      setSavedShapes(data as (Tables<'scale_shapes'> & { Type: string, Mode: string, Position: number, tonality: string, root_fret: number, notes: string[], shape_json: { string: number, fret_offset: number }[] })[]);
     }
   };
 
@@ -43,7 +42,29 @@ const ScaleShapeEditor = () => {
   }, []);
 
   useEffect(() => {
-    if (selectedNotes.length > 0) {
+    if (selectedNotes.length > 0 && rootNote) {
+      const rootNoteName = getNote(rootNote.string, rootNote.fret);
+      const rootNoteIndex = allNotes.indexOf(rootNoteName);
+
+      const calculatedIntervals = selectedNotes.map(note => {
+        const noteName = getNote(note.string, note.fret);
+        const noteIndex = allNotes.indexOf(noteName);
+        return (noteIndex - rootNoteIndex + 12) % 12;
+      });
+      const uniqueIntervals = [...new Set(calculatedIntervals)].sort((a, b) => a - b);
+      setIntervals(uniqueIntervals.join(','));
+
+      const calculatedNotes = selectedNotes.map(note => getNote(note.string, note.fret));
+      const uniqueNotes = [...new Set(calculatedNotes)];
+      const enharmonicNotes = determineEnharmonicNotes(uniqueNotes, rootNoteName);
+      const rootNoteIndexInScale = enharmonicNotes.indexOf(rootNoteName);
+      const sortedNotes = [
+        ...enharmonicNotes.slice(rootNoteIndexInScale),
+        ...enharmonicNotes.slice(0, rootNoteIndexInScale)
+      ];
+      setNotes(sortedNotes.join(','));
+
+
       const notes = selectedNotes.map((note, index) => ({
         ...note,
         time: index * 0.5,
@@ -52,8 +73,10 @@ const ScaleShapeEditor = () => {
       setPreviewNotes(notes);
     } else {
       setPreviewNotes([]);
+      setIntervals('');
+      setNotes('');
     }
-  }, [selectedNotes]);
+  }, [selectedNotes, rootNote]);
 
   const toggleNote = (string, fret) => {
     const note = { string, fret };
@@ -111,11 +134,23 @@ const ScaleShapeEditor = () => {
 
     const root_fret = rootNote.fret - lowestFret;
 
+    const rootNoteName = getNote(rootNote.string, rootNote.fret);
+    const rootNoteIndex = allNotes.indexOf(rootNoteName);
+
+    const calculatedIntervals = selectedNotes.map(note => {
+      const noteName = getNote(note.string, note.fret);
+      const noteIndex = allNotes.indexOf(noteName);
+      return (noteIndex - rootNoteIndex + 12) % 12;
+    });
+
+    const calculatedNotes = selectedNotes.map(note => getNote(note.string, note.fret));
+
     const shapeData = {
       name: scaleName,
       shape_json,
       root_fret,
-      intervals: intervals.split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n)),
+      intervals: calculatedIntervals,
+      notes: calculatedNotes,
       Type: scaleType,
       Position: position,
       Mode: mode,
@@ -144,6 +179,7 @@ const ScaleShapeEditor = () => {
       setRootNote(null);
       setScaleName('');
       setIntervals('');
+      setNotes('');
       setHighlightedNotes([]);
       setScaleType('All');
       setPosition(1);
@@ -233,9 +269,14 @@ const ScaleShapeEditor = () => {
 
       const enharmonicallyCorrectRoot = getNoteWithEnharmonicPreference(rootString, startingFret, majorKey);
 
+      const newNotes = filteredNotesJson.map(note => getNote(note.string, note.fret));
+      const uniqueNotes = [...new Set(newNotes)];
+      const enharmonicNotes = determineEnharmonicNotes(uniqueNotes, enharmonicallyCorrectRoot);
+
       const newScale = {
         name: `${enharmonicallyCorrectRoot} ${sourceShape.Mode}`,
         intervals: sourceShape.intervals,
+        notes: enharmonicNotes,
         notes_json: filteredNotesJson,
         root_note: rootNoteName,
         Type: sourceShape.Type,
@@ -265,6 +306,7 @@ const ScaleShapeEditor = () => {
       setRootNote(null);
       setScaleName('');
       setIntervals('');
+      setNotes('');
       setScaleType('All');
       setHighlightedNotes([]);
       setSelectedShapeId(null);
@@ -277,6 +319,7 @@ const ScaleShapeEditor = () => {
       setSelectedShapeId(selectedShape.id);
       setScaleName(selectedShape.name);
       setIntervals(selectedShape.intervals ? selectedShape.intervals.join(',') : '');
+      setNotes(selectedShape.notes ? selectedShape.notes.join(',') : '');
       setScaleType(selectedShape.Type || '2 notes per string scale');
       setPosition(selectedShape.Position || 1);
       setMode(selectedShape.Mode || 'Ionian');
@@ -320,6 +363,8 @@ const ScaleShapeEditor = () => {
               setScaleName={setScaleName}
               intervals={intervals}
               setIntervals={setIntervals}
+              notes={notes}
+              setNotes={setNotes}
               position={position}
               setPosition={setPosition}
               mode={mode}
@@ -344,6 +389,7 @@ const ScaleShapeEditor = () => {
             <NoteDisplay
               notes={previewNotes}
               major_key={rootNote ? getNote(rootNote.string, rootNote.fret) : null}
+              className="mt-64"
             />
           </div>
         </div>

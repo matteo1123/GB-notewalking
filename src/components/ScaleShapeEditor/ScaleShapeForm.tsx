@@ -18,6 +18,7 @@ interface ScaleShapeFormProps {
   tonality: string;
   setTonality: (tonality: string) => void;
   handleSave: () => void;
+  handleSaveAs: () => void;
   savedShapes: (Tables<'scale_shapes'> & { Type: string, Mode: string, Position: number, tonality: string, shape_json: { string: number, fret_offset: number }[] })[];
   filteredShapes: (Tables<'scale_shapes'> & { Type: string, Mode: string, Position: number, tonality: string, shape_json: { string: number, fret_offset: number }[] })[];
   handleShapeSelect: (e: React.ChangeEvent<HTMLSelectElement>) => void;
@@ -44,6 +45,7 @@ const ScaleShapeForm: React.FC<ScaleShapeFormProps> = ({
   tonality,
   setTonality,
   handleSave,
+  handleSaveAs,
   savedShapes,
   filteredShapes,
   handleShapeSelect,
@@ -102,7 +104,8 @@ const ScaleShapeForm: React.FC<ScaleShapeFormProps> = ({
           </select>
         </div>
         <div className="md:col-span-3">
-          <Button onClick={handleSave}>Save Scale Shape</Button>
+          <Button onClick={handleSave}>Save</Button>
+          <Button onClick={handleSaveAs} className="ml-2">Save As</Button>
         </div>
       </div>
 

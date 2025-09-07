@@ -86,7 +86,7 @@ const ScaleSequenceEditor = () => {
     }
   };
 
-  const handleSave = async () => {
+  const saveSequence = async (isSaveAs = false) => {
     if (!sequenceName || !sequence || !selectedScale) {
       toast({
         title: "Error",
@@ -117,7 +117,7 @@ const ScaleSequenceEditor = () => {
     };
 
     let error;
-    if (selectedSequenceId) {
+    if (selectedSequenceId && !isSaveAs) {
       // Update existing sequence
       const { error: updateError } = await supabase
         .from('sequences')
@@ -126,9 +126,14 @@ const ScaleSequenceEditor = () => {
       error = updateError;
     } else {
       // Insert new sequence
-      const { error: insertError } = await supabase
+      const { data, error: insertError } = await supabase
         .from('sequences')
-        .insert([sequenceData]);
+        .insert([sequenceData])
+        .select();
+
+      if (!insertError && data) {
+        setSelectedSequenceId(data[0].id);
+      }
       error = insertError;
     }
 
@@ -141,14 +146,26 @@ const ScaleSequenceEditor = () => {
     } else {
       toast({
         title: "Success",
-        description: "Sequence saved successfully.",
+        description: `Sequence saved successfully. ${isSaveAs ? 'You are now editing the new sequence.' : ''}`,
       });
-      setSequenceName('');
-      setSequence('');
-      setSelectedScale(null);
-      setSelectedSequenceId(null);
+      if (!isSaveAs) {
+        setSequenceName('');
+        setSequence('');
+        setSelectedScale(null);
+        setSelectedSequenceId(null);
+      }
+      // Refetch sequences
+      const { data: sequencesData, error: sequencesError } = await supabase.from('sequences').select('*');
+      if (sequencesError) {
+        toast({ title: "Error fetching sequences", description: sequencesError.message });
+      } else {
+        setSequences(sequencesData);
+      }
     }
   };
+
+  const handleSave = () => saveSequence(false);
+  const handleSaveAs = () => saveSequence(true);
 
   const selectedScaleObject = scales.find(s => s.id === selectedScale);
 
@@ -228,7 +245,8 @@ const ScaleSequenceEditor = () => {
           <Input id="bpm" type="number" value={bpm} onChange={(e) => setBpm(parseInt(e.target.value, 10))} className="bg-gray-800 text-white" />
         </div>
         <div className="md:col-span-3">
-          <Button onClick={handleSave}>Save Sequence</Button>
+          <Button onClick={handleSave}>Save</Button>
+          <Button onClick={handleSaveAs} className="ml-2">Save As</Button>
         </div>
       </div>
       <div className="mt-8">

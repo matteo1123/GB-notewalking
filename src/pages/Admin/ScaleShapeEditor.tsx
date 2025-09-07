@@ -106,7 +106,7 @@ const ScaleShapeEditor = () => {
     }
   };
 
-  const handleSave = async () => {
+  const saveShape = async (isSaveAs = false) => {
     if (!rootNote) {
       toast({ title: "Error", description: "Please select a root note." });
       return;
@@ -115,7 +115,7 @@ const ScaleShapeEditor = () => {
       toast({ title: "Error", description: "Please enter a name for the scale shape." });
       return;
     }
-    if (scaleType === 'All' && !selectedShapeId) {
+    if (scaleType === 'All' && !selectedShapeId && !isSaveAs) {
       toast({ title: "Error", description: "Please select a specific scale type." });
       return;
     }
@@ -158,37 +158,48 @@ const ScaleShapeEditor = () => {
     };
 
     let error;
-    if (selectedShapeId) {
+    if (selectedShapeId && !isSaveAs) {
       const { error: updateError } = await supabase
         .from('scale_shapes')
         .update(shapeData)
         .eq('id', selectedShapeId);
       error = updateError;
     } else {
-      const { error: insertError } = await supabase
+      const { data: insertData, error: insertError } = await supabase
         .from('scale_shapes')
-        .insert([shapeData]);
+        .insert([shapeData])
+        .select();
       error = insertError;
+      if (!error && insertData) {
+        setSelectedShapeId(insertData[0].id);
+      }
     }
 
     if (error) {
       toast({ title: "Error saving scale shape", description: error.message });
     } else {
-      toast({ title: "Success", description: "Scale shape saved successfully." });
-      setSelectedNotes([]);
-      setRootNote(null);
-      setScaleName('');
-      setIntervals('');
-      setNotes('');
-      setHighlightedNotes([]);
-      setScaleType('All');
-      setPosition(1);
-      setMode('Ionian');
-      setTonality('Major');
-      setSelectedShapeId(null);
+      toast({ title: "Success", description: `Scale shape saved successfully. ${isSaveAs ? 'You are now editing the new shape.' : ''}` });
+      if (isSaveAs) {
+        // Don't clear the form, just update the ID
+      } else {
+        setSelectedNotes([]);
+        setRootNote(null);
+        setScaleName('');
+        setIntervals('');
+        setNotes('');
+        setHighlightedNotes([]);
+        setScaleType('All');
+        setPosition(1);
+        setMode('Ionian');
+        setTonality('Major');
+        setSelectedShapeId(null);
+      }
       fetchShapes();
     }
   };
+
+  const handleSave = () => saveShape(false);
+  const handleSaveAs = () => saveShape(true);
 
   const modeToMajorKeyInfo = {
     'Ionian': { degree: 1, semitone_offset: 0 },
@@ -372,6 +383,7 @@ const ScaleShapeEditor = () => {
               tonality={tonality}
               setTonality={setTonality}
               handleSave={handleSave}
+              handleSaveAs={handleSaveAs}
               savedShapes={savedShapes}
               filteredShapes={filteredShapes}
               handleShapeSelect={handleShapeSelect}

@@ -1,0 +1,1 @@
+ALTER TABLE scale_shapes ADD COLUMN notes TEXT[];

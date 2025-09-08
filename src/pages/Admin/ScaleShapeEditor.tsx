@@ -120,11 +120,10 @@ const ScaleShapeEditor = () => {
       return;
     }
 
-    const lowestFret = Math.min(...selectedNotes.map(n => n.fret));
     const shape_json = selectedNotes
       .map(note => ({
         string: note.string,
-        fret_offset: note.fret - lowestFret,
+        fret_offset: note.fret - rootNote.fret,
       }))
       .sort((a, b) => {
         if (a.string > b.string) return -1;
@@ -132,7 +131,7 @@ const ScaleShapeEditor = () => {
         return a.fret_offset - b.fret_offset;
       });
 
-    const root_fret = rootNote.fret - lowestFret;
+    const root_fret = 0;
 
     const rootNoteName = getNote(rootNote.string, rootNote.fret);
     const rootNoteIndex = allNotes.indexOf(rootNoteName);
@@ -336,16 +335,21 @@ const ScaleShapeEditor = () => {
       setMode(selectedShape.Mode || 'Ionian');
       setTonality(selectedShape.tonality || 'Major');
 
-      const baseFret = 5;
-      const shapeRoot = selectedShape.shape_json.find(n => n.fret_offset === 0);
-      const rootString = shapeRoot ? shapeRoot.string : 6;
-      
+      const baseFret = 5; // Arbitrary fret to display the shape
+      const rootNoteInShape = selectedShape.shape_json.find(n => n.fret_offset === selectedShape.root_fret);
+
+      if (!rootNoteInShape) {
+        toast({ title: "Error", description: "Could not find root note in shape." });
+        return;
+      }
+
+      const rootString = rootNoteInShape.string;
       const newRootNote = { string: rootString, fret: baseFret };
       setRootNote(newRootNote);
 
       const newSelectedNotes = selectedShape.shape_json.map(note => ({
         string: note.string,
-        fret: baseFret + note.fret_offset
+        fret: baseFret + note.fret_offset - selectedShape.root_fret
       }));
       setSelectedNotes(newSelectedNotes);
 

@@ -36,6 +36,7 @@ interface RiffPracticeProps {
   autoAdvance?: boolean;
   timeLimit?: number; // Time in seconds
   isControlledSession?: boolean; // If true, parent controls the session
+  lessonExercise?: Tables<"lesson_exercises"> | null; // For lesson-specific settings
 }
 
 const RiffPractice = ({
@@ -46,14 +47,15 @@ const RiffPractice = ({
   autoAdvance = false,
   timeLimit,
   isControlledSession = false,
+  lessonExercise,
 }: RiffPracticeProps) => {
   const { user } = useAuth();
   const [noteIndex, setNoteIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [mode, setMode] = useState<MetronomeMode>("regular");
+  const [mode, setMode] = useState<MetronomeMode>(lessonExercise?.metronome_mode as MetronomeMode || "regular");
   const [startTime, setStartTime] = useState<number | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
-  const [metronomeBpm, setMetronomeBpm] = useState(80);
+  const [metronomeBpm, setMetronomeBpm] = useState(lessonExercise?.starting_bpm || 80);
   const [pitchDetectionEnabled, setPitchDetectionEnabled] = useState(true);
   const [activeSequence, setActiveSequence] = useState<Tables<"sequences"> | null>(null);
   const [practiceLog, setPracticeLog] = useState<Tables<'practice_log'> | null>(null);
@@ -106,18 +108,27 @@ const RiffPractice = ({
       .eq('id', practiceLog.id);
 
     if (error) {
-      // toast({ title: "Error", description: "Could not save practice log." });
+      console.error("Error saving practice log:", error);
     } else {
-      // toast({ title: "Success", description: "Practice log saved." });
+      if (lessonExercise) {
+        const maxBpmNum = typeof maxBpm === 'number' ? maxBpm : parseInt(maxBpm as string, 10) || 0;
+        const perfectBpmNum = typeof perfectBpm === 'number' ? perfectBpm : parseInt(perfectBpm as string, 10) || 0;
+        const targetMet = ((lessonExercise.target_type === 'max' || lessonExercise.target_type === 'both') && maxBpmNum >= lessonExercise.target_bpm) ||
+                          ((lessonExercise.target_type === 'perfect' || lessonExercise.target_type === 'both') && perfectBpmNum >= lessonExercise.target_bpm);
+        if (targetMet) {
+          console.log("Target achieved!");
+          // Could add toast or update lesson_exercise status
+        }
+      }
     }
   };
 
   const metronomeSettings: MetronomeSettings = {
     mode,
-    startBpm: metronomeBpm,
-    endBpm: metronomeBpm,
-    measures: 8,
-    measuresPerBpmChange: 4,
+    startBpm: lessonExercise?.starting_bpm || metronomeBpm,
+    endBpm: lessonExercise?.target_bpm || metronomeBpm,
+    measures: lessonExercise ? (lessonExercise.increments || 1) * (lessonExercise.measures_per_bpm || 4) : 8,
+    measuresPerBpmChange: lessonExercise?.measures_per_bpm || 4,
   };
 
   const metronome = useMetronome({
@@ -315,6 +326,7 @@ const RiffPractice = ({
             currentPosition={currentTime}
             enableListening={pitchDetectionEnabled && !metronome.state.isPlaying}
             className="h-full"
+            mode={lessonExercise?.display_view === 'tab' ? 'tablature' : lessonExercise?.display_view === 'grid' ? 'grid' : 'tablature'}
           />
           {/* Mobile portrait instructions */}
           <div className="portrait:absolute portrait:bottom-4 portrait:left-1/2 portrait:transform portrait:-translate-x-1/2 portrait:text-center portrait:text-muted-foreground portrait:text-sm landscape:hidden hidden">
@@ -384,16 +396,16 @@ const RiffPractice = ({
                 ? metronome.state.currentBpm
                 : metronomeBpm
             }
-            endBpm={metronomeBpm}
-            measures={8}
-            measuresPerBpmChange={4}
-            onModeChange={setMode}
+            endBpm={lessonExercise?.target_bpm || metronomeBpm}
+            measures={lessonExercise ? (lessonExercise.increments || 1) * (lessonExercise.measures_per_bpm || 4) : 8}
+            measuresPerBpmChange={lessonExercise?.measures_per_bpm || 4}
+            onModeChange={lessonExercise ? () => {} : setMode} // Disable mode change if from lesson
             onPlayPause={handlePlay}
             onStop={handleStop}
             onEndBpmChange={() => {}} // Disabled
             onMeasuresChange={() => {}} // Disabled
             onMeasuresPerBpmChangeChange={() => {}} // Disabled
-            onCurrentBpmChange={handleMetronomeBpmChange}
+            onCurrentBpmChange={lessonExercise ? () => {} : handleMetronomeBpmChange} // Disable bpm change if from lesson
             compact={true}
           />
 

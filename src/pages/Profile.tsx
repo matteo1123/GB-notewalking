@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import ProgressGraphs from '@/components/ProgressGraphs';
 
 type PracticeLogWithExercise = Tables<'practice_log'> & {
   exercises: { name: string } | null;
@@ -152,6 +153,9 @@ const Profile = () => {
               ))}
             </TableBody>
           </Table>
+        </div>
+        <div>
+          <ProgressGraphs />
         </div>
       </div>
     </div>

@@ -11,6 +11,7 @@ import AdminIndex from "./pages/Admin/Index";
 import ScaleShapeEditor from "./pages/Admin/ScaleShapeEditor";
 import ScaleSequenceEditor from "./pages/Admin/ScaleSequenceEditor";
 import AudioSandbox from "./pages/Admin/AudioSandbox";
+import LessonBuilder from "./pages/Admin/LessonBuilder";
 import NotFound from "./pages/NotFound";
 import AdminRoute from "./components/AdminRoute";
 import MainLayout from "./components/MainLayout";
@@ -34,6 +35,7 @@ const App = () => (
               <Route path="/admin/scale-shape-editor" element={<AdminRoute><ScaleShapeEditor /></AdminRoute>} />
               <Route path="/admin/scale-sequence-editor" element={<AdminRoute><ScaleSequenceEditor /></AdminRoute>} />
               <Route path="/admin/audio-sandbox" element={<AdminRoute><AudioSandbox /></AdminRoute>} />
+              <Route path="/admin/lesson-builder" element={<AdminRoute><LessonBuilder /></AdminRoute>} />
             </Route>
             <Route path="/auth" element={<Auth />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

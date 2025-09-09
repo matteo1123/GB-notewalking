@@ -7,11 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "13.0.4"
-  }
   public: {
     Tables: {
       exercises: {
@@ -119,29 +114,108 @@ export type Database = {
         }
         Relationships: []
       }
+      lesson_exercises: {
+        Row: {
+          id: number
+          lesson_id: string
+          order: number
+          scale_id: string | null
+          scale_shape_id: string | null
+          target_bpm: number | null
+        }
+        Insert: {
+          id?: number
+          lesson_id: string
+          order: number
+          scale_id?: string | null
+          scale_shape_id?: string | null
+          target_bpm?: number | null
+        }
+        Update: {
+          id?: number
+          lesson_id?: string
+          order?: number
+          scale_id?: string | null
+          scale_shape_id?: string | null
+          target_bpm?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lesson_exercises_lesson_id_fkey"
+            columns: ["lesson_id"]
+            isOneToOne: false
+            referencedRelation: "lessons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lesson_exercises_scale_id_fkey"
+            columns: ["scale_id"]
+            isOneToOne: false
+            referencedRelation: "scales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lesson_exercises_scale_shape_id_fkey"
+            columns: ["scale_shape_id"]
+            isOneToOne: false
+            referencedRelation: "scale_shapes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lessons: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       practice_log: {
         Row: {
           created_at: string
           duration: number
-          exercise_id: string
+          exercise_id: string | null
           id: number
           max_bpm: number | null
+          perfect_bpm: number | null
+          scale_id: string | null
+          scale_shape_id: string | null
           user_id: string
         }
         Insert: {
           created_at?: string
           duration: number
-          exercise_id: string
+          exercise_id?: string | null
           id?: number
           max_bpm?: number | null
+          perfect_bpm?: number | null
+          scale_id?: string | null
+          scale_shape_id?: string | null
           user_id: string
         }
         Update: {
           created_at?: string
           duration?: number
-          exercise_id?: string
+          exercise_id?: string | null
           id?: number
           max_bpm?: number | null
+          perfect_bpm?: number | null
+          scale_id?: string | null
+          scale_shape_id?: string | null
           user_id?: string
         }
         Relationships: [
@@ -150,6 +224,20 @@ export type Database = {
             columns: ["exercise_id"]
             isOneToOne: false
             referencedRelation: "exercises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "practice_log_scale_id_fkey"
+            columns: ["scale_id"]
+            isOneToOne: false
+            referencedRelation: "scales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "practice_log_scale_shape_id_fkey"
+            columns: ["scale_shape_id"]
+            isOneToOne: false
+            referencedRelation: "scale_shapes"
             referencedColumns: ["id"]
           },
         ]
@@ -181,6 +269,7 @@ export type Database = {
           intervals: number[] | null
           Mode: string | null
           name: string
+          notes: string[] | null
           Position: number | null
           root_fret: number | null
           shape_json: Json
@@ -192,6 +281,7 @@ export type Database = {
           intervals?: number[] | null
           Mode?: string | null
           name: string
+          notes?: string[] | null
           Position?: number | null
           root_fret?: number | null
           shape_json: Json
@@ -203,6 +293,7 @@ export type Database = {
           intervals?: number[] | null
           Mode?: string | null
           name?: string
+          notes?: string[] | null
           Position?: number | null
           root_fret?: number | null
           shape_json?: Json
@@ -222,10 +313,11 @@ export type Database = {
           major_key: string | null
           mode: string | null
           name: string
+          notes: string[] | null
           notes_json: Json
           Position: number | null
           root_note: string | null
-          scale_shape_id: string | null
+          scale_shape: string | null
           tonality: string | null
           Type: Database["public"]["Enums"]["scale_type"] | null
           updated_at: string | null
@@ -240,10 +332,11 @@ export type Database = {
           major_key?: string | null
           mode?: string | null
           name: string
+          notes?: string[] | null
           notes_json: Json
           Position?: number | null
           root_note?: string | null
-          scale_shape_id?: string | null
+          scale_shape?: string | null
           tonality?: string | null
           Type?: Database["public"]["Enums"]["scale_type"] | null
           updated_at?: string | null
@@ -258,15 +351,24 @@ export type Database = {
           major_key?: string | null
           mode?: string | null
           name?: string
+          notes?: string[] | null
           notes_json?: Json
           Position?: number | null
           root_note?: string | null
-          scale_shape_id?: string | null
+          scale_shape?: string | null
           tonality?: string | null
           Type?: Database["public"]["Enums"]["scale_type"] | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "scales_scale_shape_fkey"
+            columns: ["scale_shape"]
+            isOneToOne: false
+            referencedRelation: "scale_shapes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sequences: {
         Row: {
@@ -325,7 +427,9 @@ export type Database = {
     }
     Functions: {
       custom_access_token_hook: {
-        Args: { event: Json }
+        Args: {
+          event: Json
+        }
         Returns: Json
       }
     }
@@ -346,136 +450,97 @@ export type Database = {
   }
 }
 
-type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
-
-type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
-
 export type Tables<
-  DefaultSchemaTableNameOrOptions extends
-    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+  PublicTableNameOrOptions extends
+    | keyof (Database["public"]["Tables"] & Database["public"]["Views"])
+    | { schema: keyof Database },
+  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
+    ? keyof (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
+        Database[PublicTableNameOrOptions["schema"]]["Views"])
+    : never = never
+> = PublicTableNameOrOptions extends { schema: keyof Database }
+  ? (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
+      Database[PublicTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
     ? R
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])
-    ? (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
-        Row: infer R
-      }
-      ? R
-      : never
+  : PublicTableNameOrOptions extends keyof (Database["public"]["Tables"] &
+      Database["public"]["Views"])
+  ? (Database["public"]["Tables"] &
+      Database["public"]["Views"])[PublicTableNameOrOptions] extends {
+      Row: infer R
+    }
+    ? R
     : never
+  : never
 
 export type TablesInsert<
-  DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+  PublicTableNameOrOptions extends
+    | keyof Database["public"]["Tables"]
+    | { schema: keyof Database },
+  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
+    ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
+    : never = never
+> = PublicTableNameOrOptions extends { schema: keyof Database }
+  ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Insert: infer I
     }
     ? I
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Insert: infer I
-      }
-      ? I
-      : never
+  : PublicTableNameOrOptions extends keyof Database["public"]["Tables"]
+  ? Database["public"]["Tables"][PublicTableNameOrOptions] extends {
+      Insert: infer I
+    }
+    ? I
     : never
+  : never
 
 export type TablesUpdate<
-  DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+  PublicTableNameOrOptions extends
+    | keyof Database["public"]["Tables"]
+    | { schema: keyof Database },
+  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
+    ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
+    : never = never
+> = PublicTableNameOrOptions extends { schema: keyof Database }
+  ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Update: infer U
     }
     ? U
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Update: infer U
-      }
-      ? U
-      : never
+  : PublicTableNameOrOptions extends keyof Database["public"]["Tables"]
+  ? Database["public"]["Tables"][PublicTableNameOrOptions] extends {
+      Update: infer U
+    }
+    ? U
     : never
+  : never
 
 export type Enums<
-  DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema["Enums"]
-    | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
-  }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
-> = DefaultSchemaEnumNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
-  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
-    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-    : never
+  PublicEnumNameOrOptions extends
+    | keyof Database["public"]["Enums"]
+    | { schema: keyof Database },
+  EnumName extends PublicEnumNameOrOptions extends { schema: keyof Database }
+    ? keyof Database[PublicEnumNameOrOptions["schema"]]["Enums"]
+    : never = never
+> = PublicEnumNameOrOptions extends { schema: keyof Database }
+  ? Database[PublicEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : PublicEnumNameOrOptions extends keyof Database["public"]["Enums"]
+  ? Database["public"]["Enums"][PublicEnumNameOrOptions]
+  : never
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-    | keyof DefaultSchema["CompositeTypes"]
-    | { schema: keyof DatabaseWithoutInternals },
+    | keyof Database["public"]["CompositeTypes"]
+    | { schema: keyof Database },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
+    schema: keyof Database
   }
-    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
-> = PublicCompositeTypeNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
-  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-    : never
-
-export const Constants = {
-  public: {
-    Enums: {
-      app_role: ["admin", "user"],
-      exercise_difficulty: ["beginner", "intermediate", "advanced"],
-      exercise_type: ["riff", "scale", "arpeggio"],
-      scale_type: [
-        "2 notes per string scale",
-        "3 notes per string scale",
-        "4 notes per string scale",
-        "chord",
-        "arpeggio",
-      ],
-    },
-  },
-} as const
+    ? keyof Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never
+> = PublicCompositeTypeNameOrOptions extends { schema: keyof Database }
+  ? Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof Database["public"]["CompositeTypes"]
+  ? Database["public"]["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+  : never

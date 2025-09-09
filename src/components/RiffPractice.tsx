@@ -12,6 +12,9 @@ import { Play, Pause, Square, RotateCcw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Tables } from "@/integrations/supabase/types";
 import { PostgrestError } from "@supabase/supabase-js";
+import { useAuth } from "@/contexts/AuthContext";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
 // Defaults to quarter notes (1 step per beat) when subdivision is missing
 // Accepts legacy notes with 'duration' in seconds; otherwise duration = 1 step
 
@@ -44,6 +47,7 @@ const RiffPractice = ({
   timeLimit,
   isControlledSession = false,
 }: RiffPracticeProps) => {
+  const { user } = useAuth();
   const [noteIndex, setNoteIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [mode, setMode] = useState<MetronomeMode>("regular");
@@ -52,6 +56,9 @@ const RiffPractice = ({
   const [metronomeBpm, setMetronomeBpm] = useState(80);
   const [pitchDetectionEnabled, setPitchDetectionEnabled] = useState(true);
   const [activeSequence, setActiveSequence] = useState<Tables<"sequences"> | null>(null);
+  const [practiceLog, setPracticeLog] = useState<Tables<'practice_log'> | null>(null);
+  const [maxBpm, setMaxBpm] = useState<number | ''>('');
+  const [perfectBpm, setPerfectBpm] = useState<number | ''>('');
 
   const availableSequences = useMemo(() => {
     const itemType = repertoireItem.Type;
@@ -65,6 +72,45 @@ const RiffPractice = ({
       setActiveSequence(null);
     }
   }, [availableSequences]);
+
+  useEffect(() => {
+    const fetchPracticeLog = async () => {
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('practice_log')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('scale_id', repertoireItem.id)
+        .single();
+
+      if (data) {
+        setPracticeLog(data);
+        setMaxBpm(data.max_bpm || '');
+        setPerfectBpm(data.perfect_bpm || '');
+      }
+    };
+
+    fetchPracticeLog();
+  }, [repertoireItem.id, user]);
+
+  const handleSavePractice = async () => {
+    if (!practiceLog) return;
+
+    const { error } = await supabase
+      .from('practice_log')
+      .update({
+        max_bpm: maxBpm === '' ? null : maxBpm,
+        perfect_bpm: perfectBpm === '' ? null : perfectBpm,
+      })
+      .eq('id', practiceLog.id);
+
+    if (error) {
+      // toast({ title: "Error", description: "Could not save practice log." });
+    } else {
+      // toast({ title: "Success", description: "Practice log saved." });
+    }
+  };
 
   const metronomeSettings: MetronomeSettings = {
     mode,
@@ -205,6 +251,30 @@ const RiffPractice = ({
         </div>
       </div>
 
+      {/* BPM Inputs */}
+      <div className="flex items-center justify-center gap-4">
+        <div>
+          <Label htmlFor="max-bpm">Max BPM</Label>
+          <Input
+            id="max-bpm"
+            type="number"
+            value={maxBpm}
+            onChange={(e) => setMaxBpm(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
+            className="w-24"
+          />
+        </div>
+        <div>
+          <Label htmlFor="perfect-bpm">Perfect BPM</Label>
+          <Input
+            id="perfect-bpm"
+            type="number"
+            value={perfectBpm}
+            onChange={(e) => setPerfectBpm(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
+            className="w-24"
+          />
+        </div>
+        <Button onClick={handleSavePractice}>Save Practice</Button>
+      </div>
 
       {/* Sequence Buttons */}
       <div className="flex flex-wrap items-center justify-center gap-2">

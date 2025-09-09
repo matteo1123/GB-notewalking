@@ -86,6 +86,24 @@ const Premium = () => {
     };
   }, [user?.id]);
 
+  const handleExerciseSelect = async (item: RepertoireItem) => {
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from('practice_log')
+      .insert({
+        user_id: user.id,
+        scale_id: item.category === 'scale' || item.category === 'arpeggio' ? item.id : null,
+        duration: 0, // Default duration
+      });
+
+    if (error) {
+      console.error("Error creating practice log:", error);
+    }
+
+    setSearchParams({ exerciseId: item.id });
+  };
+
   if (!user) {
     return <Paywall />;
   }
@@ -122,7 +140,7 @@ const Premium = () => {
             <ExerciseList
               items={exercises.filter((e) => e.category === "rhythm")}
               defaultSort={{ key: "difficulty", dir: "asc" }}
-              onSelect={(item) => setSearchParams({ exerciseId: item.id })}
+              onSelect={handleExerciseSelect}
             />
           </TabsContent>
 
@@ -130,7 +148,7 @@ const Premium = () => {
             <ExerciseList
               items={exercises.filter((e) => e.category === "scale")}
               defaultSort={{ key: "position", dir: "asc" }}
-              onSelect={(item) => setSearchParams({ exerciseId: item.id })}
+              onSelect={handleExerciseSelect}
             />
           </TabsContent>
 
@@ -138,7 +156,7 @@ const Premium = () => {
             <ExerciseList
               items={exercises.filter((e) => e.category === "arpeggio")}
               defaultSort={{ key: "difficulty", dir: "asc" }}
-              onSelect={(item) => setSearchParams({ exerciseId: item.id })}
+              onSelect={handleExerciseSelect}
             />
           </TabsContent>
 

@@ -21,6 +21,11 @@ const AdminIndex = () => {
             Audio Sandbox
           </Link>
         </li>
+        <li>
+          <Link to="/admin/lesson-builder" className="text-blue-500 hover:underline">
+            Lesson Builder
+          </Link>
+        </li>
       </ul>
     </div>
   );

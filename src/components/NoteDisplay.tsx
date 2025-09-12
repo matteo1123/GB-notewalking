@@ -220,11 +220,11 @@ const isDetectedNote = false;
           </div>
         ) : (
           <Fretboard
-            frets={24}
-            selectedNotes={notes.map(n => ({ ...n, string: n.string - 1}))}
-            onNoteClick={() => {}}
+            selectedNotes={notes}
             highlightedNote={notes.find(n => Math.abs(n.time - currentTime) <= 0.08)}
             degreeMap={degreeMap}
+            showDegreeNumbers={true}
+            rootNote={notes.find(n => getNoteFromFret(n.string, n.fret) === major_key)}
           />
         )}
       </div>

@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { FRET_COUNT, findAllNoteOccurrences, notes as allNotes, getNote, getNoteWithEnharmonicPreference, determineEnharmonicNotes } from '@/lib/musicTheory';
 import { useAuth } from '@/contexts/AuthContext';
 import { Tables } from '@/integrations/supabase/types';
-import FretboardEditor from '@/components/ScaleShapeEditor/FretboardEditor';
+import Fretboard from '@/components/Fretboard';
 import ScaleShapeForm from '@/components/ScaleShapeEditor/ScaleShapeForm';
 import NoteDisplay from '@/components/NoteDisplay';
 
@@ -118,7 +118,7 @@ const ScaleShapeEditor = () => {
     if (scaleType === 'All' && !selectedShapeId && !isSaveAs) {
       toast({ title: "Error", description: "Please select a specific scale type." });
       return;
-    }        9241
+    }
     const shape_json = selectedNotes
       .map(note => ({
         string: note.string,
@@ -365,12 +365,14 @@ const ScaleShapeEditor = () => {
       <div className="flex flex-col gap-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div>
-            <FretboardEditor
+            <Fretboard
               selectedNotes={selectedNotes}
               rootNote={rootNote}
-              highlightedNotes={highlightedNotes}
-              toggleNote={toggleNote}
-              setAsRoot={setAsRoot}
+              highlightedNote={highlightedNotes.find(n => n.string === rootNote?.string && n.fret === rootNote?.fret)}
+              onNoteClick={toggleNote}
+              onNoteRightClick={setAsRoot}
+              isEditable={true}
+              showDegreeNumbers={true}
             />
             <ScaleShapeForm
               scaleName={scaleName}

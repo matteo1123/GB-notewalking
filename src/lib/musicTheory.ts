@@ -79,9 +79,37 @@ export function createDegreeMap(majorKey: string): Map<string, number> {
         const degree = index + 1;
         degreeMap.set(noteName, degree);
     });
-    
+
     return degreeMap;
 }
+
+export function createChromaticDegreeMap(rootNote: string): Map<string, string> {
+    const chromaticDegrees = ['1', 'b2', '2', 'b3', '3', '4', 'b5', '5', 'b6', '6', 'b7', '7'];
+    const rootIndex = CHROMATIC_SCALE.indexOf(rootNote);
+    const degreeMap = new Map<string, string>();
+
+    for (let i = 0; i < 12; i++) {
+        const noteName = CHROMATIC_SCALE[(rootIndex + i) % 12];
+        degreeMap.set(noteName, chromaticDegrees[i]);
+    }
+
+    return degreeMap;
+}
+
+export const CHROMATIC_DEGREE_COLORS = {
+    '1': '#FF6347', // Tomato (Root)
+    'b2': '#FFA500', // Orange
+    '2': '#FFD700', // Gold
+    'b3': '#9ACD32', // YellowGreen
+    '3': '#ADFF2F', // GreenYellow
+    '4': '#40E0D0', // Turquoise
+    'b5': '#00CED1', // DarkTurquoise
+    '5': '#1E90FF', // DodgerBlue
+    'b6': '#4169E1', // RoyalBlue
+    '6': '#9370DB', // MediumPurple
+    'b7': '#8A2BE2', // BlueViolet
+    '7': '#F08080'  // LightCoral
+};
 
 export const KEY_SIGNATURES: { [key: string]: string[] } = {
     'C': ['C', 'D', 'E', 'F', 'G', 'A', 'B'],

@@ -63,7 +63,7 @@ const targetTime = currentTime;
     );
     const totalWidth = el.scrollWidth - el.clientWidth;
     const targetLeft = totalWidth * percentage;
-    el.scrollTo({ left: targetLeft, behavior: "smooth" });
+    el.scrollTo({ left: targetLeft });
   }, [currentTime, maxTime, notes]);
 
   const times = notes.map((n) => n.time).sort((a, b) => a - b);

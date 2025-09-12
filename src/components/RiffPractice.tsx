@@ -52,7 +52,10 @@ const RiffPractice = ({
   const { user } = useAuth();
   const [noteIndex, setNoteIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [mode, setMode] = useState<MetronomeMode>(lessonExercise?.metronome_mode as MetronomeMode || "regular");
+  const [mode, setMode] = useState<MetronomeMode>(
+    (lessonExercise?.metronome_mode as MetronomeMode) || "regular"
+  );
+  const [loop, setLoop] = useState(false);
   const [startTime, setStartTime] = useState<number | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [metronomeBpm, setMetronomeBpm] = useState(lessonExercise?.starting_bpm || 80);
@@ -169,6 +172,10 @@ const RiffPractice = ({
     setStartTime(null);
   }, [metronome]);
 
+  const handleRestart = useCallback(() => {
+    setNoteIndex(0);
+  }, []);
+
   const handleComplete = useCallback(() => {
     handleStop();
     onComplete?.();
@@ -207,6 +214,12 @@ const RiffPractice = ({
       activeSequence.is_triplet
     );
   }, [activeSequence, repertoireItem]);
+
+  useEffect(() => {
+    if (loop && noteIndex >= displayNotes.length - 1) {
+      setNoteIndex(0);
+    }
+  }, [noteIndex, displayNotes.length, loop]);
 
   const currentTime = useMemo(() => {
     if (noteIndex >= displayNotes.length) {
@@ -314,18 +327,19 @@ const RiffPractice = ({
         {/* Metronome and Controls */}
         <div className="flex-shrink-0">
           <div className="bg-card rounded-lg border border-border p-4">
-            <BeatVisualizer
-              currentBeat={metronome.state.currentBeat}
-              isPlaying={metronome.state.isPlaying}
-              currentBpm={
-                metronome.state.isPlaying
-                  ? metronome.state.currentBpm
-                  : metronomeBpm
-              }
-              onBpmChange={handleMetronomeBpmChange}
-              canEdit={true}
-              size="lg"
-            >
+            <div className="flex items-center justify-center gap-4">
+              <BeatVisualizer
+                currentBeat={metronome.state.currentBeat}
+                isPlaying={metronome.state.isPlaying}
+                currentBpm={
+                  metronome.state.isPlaying
+                    ? metronome.state.currentBpm
+                    : metronomeBpm
+                }
+                onBpmChange={handleMetronomeBpmChange}
+                canEdit={true}
+                size="md"
+              />
               <MetronomeControls
                 mode={mode}
                 isPlaying={metronome.state.isPlaying}
@@ -335,18 +349,28 @@ const RiffPractice = ({
                     : metronomeBpm
                 }
                 endBpm={lessonExercise?.target_bpm || metronomeBpm}
-                measures={lessonExercise ? (lessonExercise.increments || 1) * (lessonExercise.measures_per_bpm || 4) : 8}
+                measures={
+                  lessonExercise
+                    ? (lessonExercise.increments || 1) *
+                      (lessonExercise.measures_per_bpm || 4)
+                    : 8
+                }
                 measuresPerBpmChange={lessonExercise?.measures_per_bpm || 4}
                 onModeChange={lessonExercise ? () => {} : setMode}
                 onPlayPause={handlePlay}
                 onStop={handleStop}
+                onRestart={handleRestart}
+                loop={loop}
+                onLoopChange={setLoop}
                 onEndBpmChange={() => {}}
                 onMeasuresChange={() => {}}
                 onMeasuresPerBpmChangeChange={() => {}}
-                onCurrentBpmChange={lessonExercise ? () => {} : handleMetronomeBpmChange}
-                compact={false}
+                onCurrentBpmChange={
+                  lessonExercise ? () => {} : handleMetronomeBpmChange
+                }
+                compact={true}
               />
-            </BeatVisualizer>
+            </div>
           </div>
         </div>
       </main>

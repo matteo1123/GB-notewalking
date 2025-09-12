@@ -1,4 +1,5 @@
 import { useRef } from "react";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,7 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
-import { Play, Pause, Square } from "lucide-react";
+import { Play, Pause, Square, Repeat, RotateCcw } from "lucide-react";
 import { useNumberInputControls } from "@/hooks/useNumberInputControls";
 export type MetronomeMode = "regular" | "speed-trainer" | "progressive";
 interface MetronomeControlsProps {
@@ -24,6 +25,9 @@ interface MetronomeControlsProps {
   onModeChange: (mode: MetronomeMode) => void;
   onPlayPause: () => void;
   onStop: () => void;
+  onRestart: () => void;
+  loop: boolean;
+  onLoopChange: (loop: boolean) => void;
   onEndBpmChange: (bpm: number) => void;
   onMeasuresChange: (measures: number) => void;
   onMeasuresPerBpmChangeChange: (measures: number) => void;
@@ -42,6 +46,9 @@ export function MetronomeControls({
   onModeChange,
   onPlayPause,
   onStop,
+  onRestart,
+  loop,
+  onLoopChange,
   onEndBpmChange,
   onMeasuresChange,
   onMeasuresPerBpmChangeChange,
@@ -89,7 +96,12 @@ export function MetronomeControls({
   });
 
   return (
-    <div className="space-y-2 text-xs">
+    <div
+      className={cn(
+        "space-y-2 text-xs",
+        compact ? "flex items-center gap-2" : ""
+      )}
+    >
       {/* Mode Selection and Play/Stop */}
       <div className="flex items-center gap-2">
         <Select value={mode} onValueChange={onModeChange}>
@@ -108,15 +120,27 @@ export function MetronomeControls({
           size="sm"
           className="h-8"
         >
-          {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+          {isPlaying ? (
+            <Pause className="h-4 w-4" />
+          ) : (
+            <Play className="h-4 w-4" />
+          )}
         </Button>
-        <Button variant="outline" onClick={onStop} size="sm" className="h-8">
-          <Square className="h-3 w-3" />
+        <Button variant="outline" onClick={onRestart} size="sm" className="h-8">
+          <Repeat className="h-4 w-4" />
+        </Button>
+        <Button
+          variant={loop ? "secondary" : "outline"}
+          onClick={() => onLoopChange(!loop)}
+          size="sm"
+          className="h-8"
+        >
+          <RotateCcw className="h-4 w-4" />
         </Button>
       </div>
 
       {/* Speed Trainer Controls */}
-      {mode !== "regular" && (
+      {mode !== "regular" && !compact && (
         <div className="grid grid-cols-2 gap-2">
           <div className="space-y-1">
             <Label>End BPM</Label>

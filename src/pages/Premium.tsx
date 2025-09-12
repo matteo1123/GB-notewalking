@@ -173,11 +173,12 @@ const Premium = () => {
       <div className="max-w-6xl mx-auto space-y-8">
         {/* Content */}
         <Tabs defaultValue="sessions" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="sessions">Lessons</TabsTrigger>
             <TabsTrigger value="rhythms">Rhythms</TabsTrigger>
             <TabsTrigger value="scales">Scales</TabsTrigger>
             <TabsTrigger value="arpeggios">Arpeggios</TabsTrigger>
+            <TabsTrigger value="ear-training">Ear Training</TabsTrigger>
           </TabsList>
 
           <TabsContent value="rhythms" className="space-y-4">
@@ -199,6 +200,14 @@ const Premium = () => {
           <TabsContent value="arpeggios" className="space-y-4">
             <ExerciseList
               items={exercises.filter((e) => e.category === "arpeggio")}
+              defaultSort={{ key: "difficulty", dir: "asc" }}
+              onSelect={handleExerciseSelect}
+            />
+          </TabsContent>
+
+          <TabsContent value="ear-training" className="space-y-4">
+            <ExerciseList
+              items={exercises.filter((e) => e.category === "ear-training")}
               defaultSort={{ key: "difficulty", dir: "asc" }}
               onSelect={handleExerciseSelect}
             />

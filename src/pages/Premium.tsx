@@ -148,7 +148,7 @@ const Premium = () => {
   if (selectedRiff) {
     return (
       <div className="min-h-screen bg-background p-4 bpm-control-area">
-        <div className="max-w-6xl mx-auto space-y-6">
+        <div className="space-y-6">
           {/* Riff Practice */}
           <RiffPractice
             repertoireItem={selectedRiff}

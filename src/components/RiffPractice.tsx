@@ -8,6 +8,13 @@ import { MetronomeControls, MetronomeMode } from "./MetronomeControls";
 import ExerciseHierarchy from "./ExerciseHierarchy";
 import { Button } from "./ui/button";
 import { Progress } from "./ui/progress";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
 import { Play, Pause, Square, RotateCcw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Tables } from "@/integrations/supabase/types";
@@ -248,131 +255,128 @@ const RiffPractice = ({
 
   return (
     <div className="flex flex-col h-screen bg-background text-foreground overflow-hidden">
-      {/* Header */}
-      <header className="flex-shrink-0 bg-card border-b border-border p-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <h2 className="text-lg font-bold">{repertoireItem.name}</h2>
-            <div className="flex items-center gap-2 text-xs">
-              <span className="px-2 py-0.5 bg-secondary rounded-full text-secondary-foreground">
-                {repertoireItem.category}
-              </span>
-              <span className="px-2 py-0.5 bg-secondary rounded-full text-secondary-foreground">
-                {repertoireItem.difficulty}/10
-              </span>
+      <div className="flex-shrink-0 bg-card border-b border-border p-4">
+        <div className="flex justify-between items-start">
+          {/* Left side: Exercise Info and Controls */}
+          <div className="flex flex-col space-y-4">
+            <div>
+              <h2 className="text-2xl font-bold">{repertoireItem.name}</h2>
+              <div className="flex items-center gap-2 text-sm mt-1">
+                <span className="px-2 py-0.5 bg-secondary rounded-full text-secondary-foreground">
+                  {repertoireItem.category}
+                </span>
+                <span className="px-2 py-0.5 bg-secondary rounded-full text-secondary-foreground">
+                  {repertoireItem.difficulty}/10
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Label htmlFor="max-bpm" className="text-sm">Max BPM</Label>
+                <Input
+                  id="max-bpm"
+                  type="number"
+                  value={maxBpm}
+                  onChange={(e) => setMaxBpm(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
+                  className="w-24 h-10 text-center"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="perfect-bpm" className="text-sm">Perfect BPM</Label>
+                <Input
+                  id="perfect-bpm"
+                  type="number"
+                  value={perfectBpm}
+                  onChange={(e) => setPerfectBpm(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
+                  className="w-24 h-10 text-center"
+                />
+              </div>
+              <Button onClick={handleSavePractice} size="lg">Save</Button>
+            </div>
+            <div>
+              <Select
+                value={activeSequence?.id.toString()}
+                onValueChange={(value) => {
+                  const selectedSequence = availableSequences.find(
+                    (s) => s.id.toString() === value
+                  );
+                  if (selectedSequence) {
+                    setActiveSequence(selectedSequence);
+                  }
+                }}
+              >
+                <SelectTrigger className="w-[280px]">
+                  <SelectValue placeholder="Select an exercise" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableSequences.map((sequence) => (
+                    <SelectItem key={sequence.id} value={sequence.id.toString()}>
+                      {sequence.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
-          {onExerciseSelect && (
-            <ExerciseHierarchy
-              currentExercise={repertoireItem}
-              onExerciseSelect={onExerciseSelect}
-            />
-          )}
-        </div>
-      </header>
 
-      {/* Controls */}
-      <div className="flex-shrink-0 bg-card border-b border-border p-2">
-        <div className="flex items-center justify-center gap-4">
-          <div className="flex items-center gap-2">
-            <Label htmlFor="max-bpm" className="text-xs">Max BPM</Label>
-            <Input
-              id="max-bpm"
-              type="number"
-              value={maxBpm}
-              onChange={(e) => setMaxBpm(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
-              className="w-20 h-8 text-center"
+          {/* Right side: Metronome */}
+          <div className="flex flex-col items-center space-y-2">
+            <BeatVisualizer
+              currentBeat={metronome.state.currentBeat}
+              isPlaying={metronome.state.isPlaying}
+              currentBpm={
+                metronome.state.isPlaying
+                  ? metronome.state.currentBpm
+                  : metronomeBpm
+              }
+              onBpmChange={handleMetronomeBpmChange}
+              canEdit={true}
+              size="lg"
             />
-          </div>
-          <div className="flex items-center gap-2">
-            <Label htmlFor="perfect-bpm" className="text-xs">Perfect BPM</Label>
-            <Input
-              id="perfect-bpm"
-              type="number"
-              value={perfectBpm}
-              onChange={(e) => setPerfectBpm(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
-              className="w-20 h-8 text-center"
+            <MetronomeControls
+              mode={mode}
+              isPlaying={metronome.state.isPlaying}
+              currentBpm={
+                metronome.state.isPlaying
+                  ? metronome.state.currentBpm
+                  : metronomeBpm
+              }
+              endBpm={lessonExercise?.target_bpm || metronomeBpm}
+              measures={
+                lessonExercise
+                  ? (lessonExercise.increments || 1) *
+                    (lessonExercise.measures_per_bpm || 4)
+                  : 8
+              }
+              measuresPerBpmChange={lessonExercise?.measures_per_bpm || 4}
+              onModeChange={lessonExercise ? () => {} : setMode}
+              onPlayPause={handlePlay}
+              onStop={handleStop}
+              onRestart={handleRestart}
+              loop={loop}
+              onLoopChange={setLoop}
+              onEndBpmChange={() => {}}
+              onMeasuresChange={() => {}}
+              onMeasuresPerBpmChangeChange={() => {}}
+              onCurrentBpmChange={
+                lessonExercise ? () => {} : handleMetronomeBpmChange
+              }
+              compact={true}
             />
-          </div>
-          <Button onClick={handleSavePractice} size="sm">Save</Button>
-          <div className="flex flex-wrap items-center justify-center gap-2">
-            {availableSequences.map((sequence) => (
-              <Button
-                key={sequence.id}
-                onClick={() => setActiveSequence(sequence)}
-                variant={activeSequence?.id === sequence.id ? 'secondary' : 'outline'}
-                size="sm"
-              >
-                {sequence.name}
-              </Button>
-            ))}
           </div>
         </div>
       </div>
 
-      {/* Main Content */}
-      <main className="flex-grow flex flex-col gap-4 p-4 overflow-hidden">
-        {/* Fretboard/Note Display */}
-        <div className="flex-grow">
-          <NoteDisplay
-            notes={displayNotes}
-            major_key={repertoireItem.major_key}
-            currentPosition={currentTime}
-            enableListening={pitchDetectionEnabled && !metronome.state.isPlaying}
-            className="h-full w-full"
-            mode={lessonExercise?.display_view === 'tab' ? 'tablature' : lessonExercise?.display_view === 'grid' ? 'grid' : 'tablature'}
-          />
-        </div>
-
-        {/* Metronome and Controls */}
-        <div className="flex-shrink-0">
-          <div className="bg-card rounded-lg border border-border p-4">
-            <div className="flex items-center justify-center gap-4">
-              <BeatVisualizer
-                currentBeat={metronome.state.currentBeat}
-                isPlaying={metronome.state.isPlaying}
-                currentBpm={
-                  metronome.state.isPlaying
-                    ? metronome.state.currentBpm
-                    : metronomeBpm
-                }
-                onBpmChange={handleMetronomeBpmChange}
-                canEdit={true}
-                size="md"
-              />
-              <MetronomeControls
-                mode={mode}
-                isPlaying={metronome.state.isPlaying}
-                currentBpm={
-                  metronome.state.isPlaying
-                    ? metronome.state.currentBpm
-                    : metronomeBpm
-                }
-                endBpm={lessonExercise?.target_bpm || metronomeBpm}
-                measures={
-                  lessonExercise
-                    ? (lessonExercise.increments || 1) *
-                      (lessonExercise.measures_per_bpm || 4)
-                    : 8
-                }
-                measuresPerBpmChange={lessonExercise?.measures_per_bpm || 4}
-                onModeChange={lessonExercise ? () => {} : setMode}
-                onPlayPause={handlePlay}
-                onStop={handleStop}
-                onRestart={handleRestart}
-                loop={loop}
-                onLoopChange={setLoop}
-                onEndBpmChange={() => {}}
-                onMeasuresChange={() => {}}
-                onMeasuresPerBpmChangeChange={() => {}}
-                onCurrentBpmChange={
-                  lessonExercise ? () => {} : handleMetronomeBpmChange
-                }
-                compact={true}
-              />
-            </div>
-          </div>
-        </div>
+      {/* Fretboard/Note Display */}
+      <main className="flex-grow">
+        <NoteDisplay
+          notes={displayNotes}
+          major_key={repertoireItem.major_key}
+          currentPosition={currentTime}
+          enableListening={pitchDetectionEnabled && !metronome.state.isPlaying}
+          className="h-full w-full"
+          mode={lessonExercise?.display_view === 'tab' ? 'tablature' : lessonExercise?.display_view === 'grid' ? 'grid' : 'tablature'}
+        />
       </main>
     </div>
   );

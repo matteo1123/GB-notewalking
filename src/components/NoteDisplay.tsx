@@ -244,7 +244,7 @@ const isDetectedNote = false;
           </span>
         )}
       </div>
-      <div className="mt-4 flex justify-center space-x-4 text-xs">
+      <div className="mt-4 flex justify-center space-x-4 text-xs absolute bottom-4 left-1/2 -translate-x-1/2">
         {Object.entries(DEGREE_COLORS).map(([degree, color]) => (
           <div key={degree} className="flex items-center">
             <span

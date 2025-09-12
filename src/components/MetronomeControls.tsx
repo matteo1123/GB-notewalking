@@ -126,7 +126,13 @@ export function MetronomeControls({
             <Play className="h-4 w-4" />
           )}
         </Button>
-        <Button variant="outline" onClick={onRestart} size="sm" className="h-8">
+        <Button
+          variant="outline"
+          onClick={onRestart}
+          size="sm"
+          className="h-8"
+          title="Restart"
+        >
           <Repeat className="h-4 w-4" />
         </Button>
         <Button
@@ -134,14 +140,20 @@ export function MetronomeControls({
           onClick={() => onLoopChange(!loop)}
           size="sm"
           className="h-8"
+          title="Loop"
         >
           <RotateCcw className="h-4 w-4" />
         </Button>
       </div>
 
       {/* Speed Trainer Controls */}
-      {mode !== "regular" && !compact && (
-        <div className="grid grid-cols-2 gap-2">
+      {mode !== "regular" && (
+        <div
+          className={cn(
+            "grid grid-cols-2 gap-2",
+            compact ? "grid-cols-1" : ""
+          )}
+        >
           <div className="space-y-1">
             <Label>End BPM</Label>
             <Input

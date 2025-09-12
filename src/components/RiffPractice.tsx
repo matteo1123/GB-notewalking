@@ -72,6 +72,11 @@ const RiffPractice = ({
   const [practiceLog, setPracticeLog] = useState<Tables<'practice_log'> | null>(null);
   const [maxBpm, setMaxBpm] = useState<number | ''>('');
   const [perfectBpm, setPerfectBpm] = useState<number | ''>('');
+  const [isLearning, setIsLearning] = useState(false);
+  const [learnRepetitions, setLearnRepetitions] = useState(5);
+  const [learnTimeline, setLearnTimeline] = useState<{label: string | number, startIndex: number}[]>([]);
+  const [learnNotes, setLearnNotes] = useState<Note[]>([]);
+  const [currentLearnIndex, setCurrentLearnIndex] = useState(0);
 
   const availableSequences = useMemo(() => {
     const itemType = repertoireItem.Type;
@@ -199,7 +204,56 @@ const RiffPractice = ({
     setIsPlaying(!metronome.state.isPlaying);
   }, [metronome]);
 
+  const generateLearnSequence = useCallback(() => {
+    const baseNotes = repertoireItem.notes;
+    const chunks = [];
+    for (let i = 0; i < baseNotes.length; i += 5) {
+      chunks.push(baseNotes.slice(i, i + 5));
+    }
+
+    const newNotes: Note[] = [];
+    const timeline: {label: string | number, startIndex: number}[] = [];
+    let time = 0;
+
+    for (let i = 0; i < chunks.length; i++) {
+      // Part 1: Practice current chunk
+      timeline.push({ label: i + 1, startIndex: newNotes.length });
+      for (let r = 0; r < learnRepetitions; r++) {
+        chunks[i].forEach(note => {
+          newNotes.push({ ...note, time: time++, duration: 1 });
+        });
+      }
+
+      if (i > 0) {
+        // Part 2: Practice previous and current chunk combined
+        timeline.push({ label: `${i}-${i + 1}`, startIndex: newNotes.length });
+        const combined = [...chunks[i - 1], ...chunks[i]];
+        for (let r = 0; r < learnRepetitions; r++) {
+          combined.forEach(note => {
+            newNotes.push({ ...note, time: time++, duration: 1 });
+          });
+        }
+      }
+    }
+
+    setLearnNotes(newNotes);
+    setLearnTimeline(timeline);
+  }, [repertoireItem.notes, learnRepetitions]);
+
+  useEffect(() => {
+    if (isLearning) {
+      generateLearnSequence();
+    } else {
+      setLearnNotes([]);
+      setLearnTimeline([]);
+    }
+  }, [isLearning, generateLearnSequence]);
+
   const displayNotes = useMemo(() => {
+    if (isLearning) {
+      return learnNotes;
+    }
+
     if (!activeSequence) {
       return repertoireItem.notes.map((note, index) => ({
         ...note,
@@ -221,7 +275,7 @@ const RiffPractice = ({
       activeSequence.note_value,
       activeSequence.is_triplet
     );
-  }, [activeSequence, repertoireItem]);
+  }, [activeSequence, repertoireItem, isLearning, learnNotes]);
 
   useEffect(() => {
     if (loop && noteIndex >= displayNotes.length - 1) {
@@ -261,6 +315,24 @@ const RiffPractice = ({
           {/* Left side: Exercise Info and Controls */}
           <div className="flex flex-col space-y-4">
             <div>
+              {isLearning && (
+                <div className="flex space-x-2 mb-2">
+                  {learnTimeline.map((item, index) => (
+                    <div
+                      key={index}
+                      className={`p-2 rounded cursor-pointer ${
+                        index === currentLearnIndex ? "bg-blue-500" : "bg-gray-700"
+                      }`}
+                      onClick={() => {
+                        setNoteIndex(item.startIndex);
+                        setCurrentLearnIndex(index);
+                      }}
+                    >
+                      {item.label}
+                    </div>
+                  ))}
+                </div>
+              )}
               <h2 className="text-2xl font-bold">{repertoireItem.name}</h2>
               <div className="flex items-center gap-2 text-sm mt-1">
                 <span className="px-2 py-0.5 bg-secondary rounded-full text-secondary-foreground">
@@ -393,6 +465,10 @@ const RiffPractice = ({
           enableListening={pitchDetectionEnabled && !metronome.state.isPlaying}
           className="h-full w-full"
           mode={lessonExercise?.display_view === 'tab' ? 'tablature' : lessonExercise?.display_view === 'grid' ? 'grid' : 'tablature'}
+          isLearning={isLearning}
+          setIsLearning={setIsLearning}
+          learnRepetitions={learnRepetitions}
+          setLearnRepetitions={setLearnRepetitions}
         />
       </main>
     </div>

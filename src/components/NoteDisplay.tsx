@@ -9,14 +9,21 @@ import { usePitchDetection } from "@/hooks/usePitchDetection";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Fretboard from "./Fretboard";
+import { Switch } from "./ui/switch";
+import { Label } from "./ui/label";
+import { Input } from "./ui/input";
 
 interface NoteDisplayProps {
-   notes: Note[];
-   major_key?: string;
-   className?: string;
-   currentPosition?: number; // Current time position for highlighting
-   enableListening?: boolean;
-   mode?: 'tablature' | 'grid' | 'fretboard'; // Display mode
+  notes: Note[];
+  major_key?: string;
+  className?: string;
+  currentPosition?: number; // Current time position for highlighting
+  enableListening?: boolean;
+  mode?: 'tablature' | 'grid' | 'fretboard'; // Display mode
+  isLearning?: boolean;
+  setIsLearning?: (isLearning: boolean) => void;
+  learnRepetitions?: number;
+  setLearnRepetitions?: (repetitions: number) => void;
 }
 
 const NoteDisplay = ({
@@ -26,6 +33,10 @@ const NoteDisplay = ({
    currentPosition = 0,
    enableListening = false,
    mode = 'fretboard',
+  isLearning,
+  setIsLearning,
+  learnRepetitions,
+  setLearnRepetitions,
 }: NoteDisplayProps) => {
   const strings = [1, 2, 3, 4, 5, 6]; // High E to Low E
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -35,6 +46,7 @@ const NoteDisplay = ({
     fret: number;
   } | null>(null);
   const [displayMode, setDisplayMode] = useState<'tablature' | 'grid' | 'fretboard'>(mode);
+  const [showSingleNote, setShowSingleNote] = useState(false);
 
 // Pitch detection is disabled for performance reasons
 const isListening = false;
@@ -91,13 +103,25 @@ const targetTime = currentTime;
     <div className={`bg-card rounded-lg border border-border ${displayMode === 'fretboard' ? 'p-0' : 'p-4'} ${className}`}>
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-lg font-semibold capitalize">{displayMode}</h3>
-        <Tabs value={displayMode} onValueChange={(value) => setDisplayMode(value as 'tablature' | 'grid' | 'fretboard')} className="w-auto">
-          <TabsList>
-            <TabsTrigger value="tablature">Tablature</TabsTrigger>
-            <TabsTrigger value="grid">Grid</TabsTrigger>
-            <TabsTrigger value="fretboard">Fretboard</TabsTrigger>
-          </TabsList>
-        </Tabs>
+        <div className="flex items-center gap-4">
+          {displayMode === 'fretboard' && (
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="single-note-mode"
+                checked={showSingleNote}
+                onCheckedChange={setShowSingleNote}
+              />
+              <Label htmlFor="single-note-mode">Single Note Mode</Label>
+            </div>
+          )}
+          <Tabs value={displayMode} onValueChange={(value) => setDisplayMode(value as 'tablature' | 'grid' | 'fretboard')} className="w-auto">
+            <TabsList>
+              <TabsTrigger value="tablature">Tablature</TabsTrigger>
+              <TabsTrigger value="grid">Grid</TabsTrigger>
+              <TabsTrigger value="fretboard">Fretboard</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
       </div>
       <div
         ref={containerRef}
@@ -219,13 +243,32 @@ const isDetectedNote = false;
             ))}
           </div>
         ) : (
-          <Fretboard
-            selectedNotes={notes}
-            highlightedNote={notes.find(n => Math.abs(n.time - currentTime) <= 0.08)}
-            degreeMap={degreeMap}
-            showDegreeNumbers={true}
-            rootNote={notes.find(n => getNoteFromFret(n.string, n.fret) === major_key)}
-          />
+          <>
+            <div className="flex items-center gap-4 mb-4">
+              <Button onClick={() => setIsLearning && setIsLearning(!isLearning)}>
+                {isLearning ? "Stop Learning" : "Help Me Learn"}
+              </Button>
+              {isLearning && (
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="repetitions">Repetitions</Label>
+                  <Input
+                    id="repetitions"
+                    type="number"
+                    value={learnRepetitions}
+                    onChange={(e) => setLearnRepetitions && setLearnRepetitions(parseInt(e.target.value, 10))}
+                    className="w-20"
+                  />
+                </div>
+              )}
+            </div>
+            <Fretboard
+              selectedNotes={showSingleNote ? (notes.find(n => Math.abs(n.time - currentTime) <= 0.08) ? [notes.find(n => Math.abs(n.time - currentTime) <= 0.08)!] : []) : notes}
+              highlightedNote={notes.find(n => Math.abs(n.time - currentTime) <= 0.08)}
+              degreeMap={degreeMap}
+              showDegreeNumbers={true}
+              rootNote={notes.find(n => getNoteFromFret(n.string, n.fret) === major_key)}
+            />
+          </>
         )}
       </div>
       <div className="mt-4 text-xs text-muted-foreground text-center">

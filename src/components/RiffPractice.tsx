@@ -21,6 +21,7 @@ import { Tables } from "@/integrations/supabase/types";
 import { PostgrestError } from "@supabase/supabase-js";
 import { useAuth } from "@/contexts/AuthContext";
 import { Input } from "./ui/input";
+import { SpeedTrainerControls } from "./SpeedTrainerControls";
 import { Label } from "./ui/label";
 // Defaults to quarter notes (1 step per beat) when subdivision is missing
 // Accepts legacy notes with 'duration' in seconds; otherwise duration = 1 step
@@ -62,7 +63,7 @@ const RiffPractice = ({
   const [mode, setMode] = useState<MetronomeMode>(
     (lessonExercise?.metronome_mode as MetronomeMode) || "regular"
   );
-  const [loop, setLoop] = useState(false);
+  const [loop, setLoop] = useState(true);
   const [startTime, setStartTime] = useState<number | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [metronomeBpm, setMetronomeBpm] = useState(lessonExercise?.starting_bpm || 80);
@@ -320,27 +321,9 @@ const RiffPractice = ({
           </div>
 
           {/* Right side: Metronome */}
-          <div className="flex flex-col items-center space-y-2">
-            <BeatVisualizer
-              currentBeat={metronome.state.currentBeat}
-              isPlaying={metronome.state.isPlaying}
-              currentBpm={
-                metronome.state.isPlaying
-                  ? metronome.state.currentBpm
-                  : metronomeBpm
-              }
-              onBpmChange={handleMetronomeBpmChange}
-              canEdit={true}
-              size="lg"
-            />
-            <MetronomeControls
+          <div className="flex items-start space-x-4">
+            <SpeedTrainerControls
               mode={mode}
-              isPlaying={metronome.state.isPlaying}
-              currentBpm={
-                metronome.state.isPlaying
-                  ? metronome.state.currentBpm
-                  : metronomeBpm
-              }
               endBpm={lessonExercise?.target_bpm || metronomeBpm}
               measures={
                 lessonExercise
@@ -349,26 +332,60 @@ const RiffPractice = ({
                   : 8
               }
               measuresPerBpmChange={lessonExercise?.measures_per_bpm || 4}
-              onModeChange={lessonExercise ? () => {} : setMode}
-              onPlayPause={handlePlay}
-              onStop={handleStop}
-              onRestart={handleRestart}
-              loop={loop}
-              onLoopChange={setLoop}
               onEndBpmChange={() => {}}
               onMeasuresChange={() => {}}
               onMeasuresPerBpmChangeChange={() => {}}
-              onCurrentBpmChange={
-                lessonExercise ? () => {} : handleMetronomeBpmChange
-              }
-              compact={true}
             />
+            <div className="flex flex-col items-center space-y-2">
+              <BeatVisualizer
+                currentBeat={metronome.state.currentBeat}
+                isPlaying={metronome.state.isPlaying}
+                currentBpm={
+                  metronome.state.isPlaying
+                    ? metronome.state.currentBpm
+                    : metronomeBpm
+                }
+                onBpmChange={handleMetronomeBpmChange}
+                canEdit={true}
+                size="lg"
+              />
+              <MetronomeControls
+                mode={mode}
+                isPlaying={metronome.state.isPlaying}
+                currentBpm={
+                  metronome.state.isPlaying
+                    ? metronome.state.currentBpm
+                    : metronomeBpm
+                }
+                endBpm={lessonExercise?.target_bpm || metronomeBpm}
+                measures={
+                  lessonExercise
+                    ? (lessonExercise.increments || 1) *
+                      (lessonExercise.measures_per_bpm || 4)
+                    : 8
+                }
+                measuresPerBpmChange={lessonExercise?.measures_per_bpm || 4}
+                onModeChange={lessonExercise ? () => {} : setMode}
+                onPlayPause={handlePlay}
+                onStop={handleStop}
+                onRestart={handleRestart}
+                loop={loop}
+                onLoopChange={setLoop}
+                onEndBpmChange={() => {}}
+                onMeasuresChange={() => {}}
+                onMeasuresPerBpmChangeChange={() => {}}
+                onCurrentBpmChange={
+                  lessonExercise ? () => {} : handleMetronomeBpmChange
+                }
+                compact={true}
+              />
+            </div>
           </div>
         </div>
       </div>
 
       {/* Fretboard/Note Display */}
-      <main className="flex-grow">
+      <main className="flex-grow h-[calc(100vh-10rem)]">
         <NoteDisplay
           notes={displayNotes}
           major_key={repertoireItem.major_key}

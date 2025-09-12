@@ -1,12 +1,18 @@
 .fretboard {
   display: flex;
   flex-direction: column;
-  border: 1px solid #ccc;
+  background-color: #000;
+  border: 1px solid #444;
+  width: 100%;
+  height: 100%;
+  min-height: 240px; /* Adjusted height */
+  padding: 10px 0; /* Vertical padding */
 }
 
 .string {
   display: flex;
-  border-bottom: 1px solid #ccc;
+  border-bottom: 1px solid #555;
+  flex-grow: 1;
 }
 
 .string:last-child {
@@ -14,11 +20,20 @@
 }
 
 .fret {
-  width: 50px;
-  height: 30px;
-  border-right: 1px solid #ccc;
+  flex-grow: 1;
+  border-right: 1px solid #555;
   cursor: pointer;
   position: relative;
+}
+
+.fret::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 100%;
+  background-color: #555;
 }
 
 .fret:last-child {
@@ -26,12 +41,18 @@
 }
 
 .dot {
-  width: 20px;
-  height: 20px;
-  background-color: black;
+  width: 18px; /* Slightly smaller dots */
+  height: 18px;
+  background-color: white;
   border-radius: 50%;
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
+  transition: all 0.2s ease-in-out;
+}
+
+.dot.highlighted {
+  transform: translate(-50%, -50%) scale(1.5);
+  box-shadow: 0 0 15px 5px rgba(255, 255, 255, 0.7);
 }

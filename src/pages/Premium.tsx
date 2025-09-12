@@ -29,10 +29,16 @@ const Premium = () => {
       const exercise = exercises.find((e) => e.id === exerciseId);
       if (exercise) {
         setSelectedRiff(exercise);
+        document.body.classList.add("overflow-hidden");
       }
     } else {
       setSelectedRiff(null);
+      document.body.classList.remove("overflow-hidden");
     }
+
+    return () => {
+      document.body.classList.remove("overflow-hidden");
+    };
   }, [exerciseId, exercises]);
 
   useEffect(() => {
@@ -147,7 +153,7 @@ const Premium = () => {
 
   if (selectedRiff) {
     return (
-      <div className="min-h-screen bg-background p-4 bpm-control-area">
+      <div className="bg-background p-4 bpm-control-area">
         <div className="space-y-6">
           {/* Riff Practice */}
           <RiffPractice

@@ -7,6 +7,8 @@ import {
 } from "@/lib/musicTheory";
 import { usePitchDetection } from "@/hooks/usePitchDetection";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import Fretboard from "./Fretboard";
 
 interface NoteDisplayProps {
    notes: Note[];
@@ -14,7 +16,7 @@ interface NoteDisplayProps {
    className?: string;
    currentPosition?: number; // Current time position for highlighting
    enableListening?: boolean;
-   mode?: 'tablature' | 'grid'; // Display mode
+   mode?: 'tablature' | 'grid' | 'fretboard'; // Display mode
 }
 
 const NoteDisplay = ({
@@ -23,7 +25,7 @@ const NoteDisplay = ({
    className = "",
    currentPosition = 0,
    enableListening = false,
-   mode = 'tablature',
+   mode = 'fretboard',
 }: NoteDisplayProps) => {
   const strings = [1, 2, 3, 4, 5, 6]; // High E to Low E
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -32,7 +34,7 @@ const NoteDisplay = ({
     string: number;
     fret: number;
   } | null>(null);
-  const [displayMode, setDisplayMode] = useState<'tablature' | 'grid'>(mode);
+  const [displayMode, setDisplayMode] = useState<'tablature' | 'grid' | 'fretboard'>(mode);
 
 // Pitch detection is disabled for performance reasons
 const isListening = false;
@@ -86,20 +88,20 @@ const targetTime = currentTime;
   const minFret = notes.length > 0 ? Math.min(...notes.map(n => n.fret)) : 0;
 
   return (
-    <div className={`bg-card rounded-lg border border-border p-4 ${className}`}>
+    <div className={`bg-card rounded-lg border border-border ${displayMode === 'fretboard' ? 'p-0' : 'p-4'} ${className}`}>
       <div className="flex justify-between items-center mb-4">
-        <h3 className="text-lg font-semibold">Fretboard</h3>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setDisplayMode(displayMode === 'tablature' ? 'grid' : 'tablature')}
-        >
-          {displayMode === 'tablature' ? 'Switch to Grid' : 'Switch to Tablature'}
-        </Button>
+        <h3 className="text-lg font-semibold capitalize">{displayMode}</h3>
+        <Tabs value={displayMode} onValueChange={(value) => setDisplayMode(value as 'tablature' | 'grid' | 'fretboard')} className="w-auto">
+          <TabsList>
+            <TabsTrigger value="tablature">Tablature</TabsTrigger>
+            <TabsTrigger value="grid">Grid</TabsTrigger>
+            <TabsTrigger value="fretboard">Fretboard</TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
       <div
         ref={containerRef}
-        className="overflow-x-auto overflow-y-hidden max-h-96 animated-scrollbar"
+        className="overflow-x-auto overflow-y-hidden animated-scrollbar h-full"
       >
         {displayMode === 'tablature' ? (
           <div
@@ -157,7 +159,7 @@ const isDetectedNote = false;
               </div>
             ))}
           </div>
-        ) : (
+        ) : displayMode === 'grid' ? (
           <div className="grid-view">
             <div className="mb-2 text-sm text-muted-foreground">
               Pattern starts at fret {minFret}
@@ -216,6 +218,14 @@ const isDetectedNote = false;
               </div>
             ))}
           </div>
+        ) : (
+          <Fretboard
+            frets={24}
+            selectedNotes={notes.map(n => ({ ...n, string: n.string - 1}))}
+            onNoteClick={() => {}}
+            highlightedNote={notes.find(n => Math.abs(n.time - currentTime) <= 0.08)}
+            degreeMap={degreeMap}
+          />
         )}
       </div>
       <div className="mt-4 text-xs text-muted-foreground text-center">
@@ -244,17 +254,19 @@ const isDetectedNote = false;
           </span>
         )}
       </div>
-      <div className="mt-4 flex justify-center space-x-4 text-xs absolute bottom-4 left-1/2 -translate-x-1/2">
-        {Object.entries(DEGREE_COLORS).map(([degree, color]) => (
-          <div key={degree} className="flex items-center">
-            <span
-              className="inline-block w-3 h-3 rounded mr-1"
-              style={{ backgroundColor: color }}
-            ></span>
-            <span>{degree}</span>
-          </div>
-        ))}
-      </div>
+      {displayMode !== 'fretboard' && (
+        <div className="mt-4 flex justify-center space-x-4 text-xs absolute bottom-4 left-1/2 -translate-x-1/2">
+          {Object.entries(DEGREE_COLORS).map(([degree, color]) => (
+            <div key={degree} className="flex items-center">
+              <span
+                className="inline-block w-3 h-3 rounded mr-1"
+                style={{ backgroundColor: color }}
+              ></span>
+              <span>{degree}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

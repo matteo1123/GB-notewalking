@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 import RiffPractice from "@/components/RiffPractice";
 import ExerciseList from "@/components/ExerciseList";
 import { RepertoireItem } from "@/types/repertoire";
@@ -14,6 +15,10 @@ const Premium = () => {
   const [selectedRiff, setSelectedRiff] = useState<RepertoireItem | null>(null);
   const [exercises, setExercises] = useState<RepertoireItem[]>([]);
   const [sequences, setSequences] = useState<Tables<"sequences">[]>([]);
+  const [lessons, setLessons] = useState<Tables<"lessons">[]>([]);
+  const [selectedLesson, setSelectedLesson] = useState<Tables<"lessons"> | null>(null);
+  const [lessonExercises, setLessonExercises] = useState<Tables<"lesson_exercises">[]>([]);
+  const [selectedLessonExercise, setSelectedLessonExercise] = useState<Tables<"lesson_exercises"> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -77,6 +82,17 @@ const Premium = () => {
         setSequences(sequencesData as Tables<"sequences">[]);
       }
 
+      const { data: lessonsData, error: lessonsError } = await supabase
+        .from("lessons")
+        .select("*");
+
+      if (lessonsError) {
+        setError(lessonsError.message);
+        setLessons([]);
+      } else {
+        setLessons(lessonsData as Tables<"lessons">[]);
+      }
+
       setError(null);
       setLoading(false);
     }
@@ -104,6 +120,27 @@ const Premium = () => {
     setSearchParams({ exerciseId: item.id });
   };
 
+  const handleLessonSelect = async (lesson: Tables<"lessons">) => {
+    const { data, error } = await supabase
+      .from('lesson_exercises')
+      .select('*')
+      .eq('lesson_id', lesson.id);
+
+    if (error) {
+      console.error("Error fetching lesson exercises:", error);
+      return;
+    }
+
+    setSelectedLesson(lesson);
+    setLessonExercises(data as Tables<"lesson_exercises">[]);
+  };
+
+  const handleBackToLessons = () => {
+    setSelectedLesson(null);
+    setLessonExercises([]);
+    setSelectedLessonExercise(null);
+  };
+
   if (!user) {
     return <Paywall />;
   }
@@ -118,6 +155,7 @@ const Premium = () => {
             sequences={sequences}
             onComplete={() => setSearchParams({})}
             onExerciseSelect={(exercise) => setSearchParams({ exerciseId: exercise.id })}
+            lessonExercise={selectedLessonExercise}
           />
         </div>
       </div>
@@ -161,15 +199,58 @@ const Premium = () => {
           </TabsContent>
 
           <TabsContent value="sessions" className="space-y-4">
-            <div className="text-center py-12">
-              <h3 className="text-xl font-semibold mb-4">
-                Lessons Coming Soon
-              </h3>
-              <p className="text-muted-foreground">
-                Structured practice routines that automatically guide you
-                through multiple exercises.
-              </p>
-            </div>
+            {selectedLesson ? (
+              <div className="space-y-4">
+                <div className="flex items-center gap-4">
+                  <Button variant="outline" onClick={handleBackToLessons}>
+                    Back to Lessons
+                  </Button>
+                  <h3 className="text-xl font-semibold">{selectedLesson.name}</h3>
+                </div>
+                <div className="grid gap-4">
+                  {lessonExercises.map((le) => {
+                    const exercise = exercises.find((e) => e.id === le.scale_id);
+                    if (!exercise) return null;
+                    return (
+                      <Button
+                        key={le.id}
+                        variant="outline"
+                        className="justify-start"
+                        onClick={() => {
+                          setSelectedLessonExercise(le);
+                          handleExerciseSelect(exercise);
+                        }}
+                      >
+                        {exercise.name} - {exercise.category}
+                      </Button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div className="grid gap-4">
+                {lessons.map((lesson) => (
+                  <Button
+                    key={lesson.id}
+                    variant="outline"
+                    className="justify-start"
+                    onClick={() => handleLessonSelect(lesson)}
+                  >
+                    {lesson.name}
+                  </Button>
+                ))}
+                {lessons.length === 0 && (
+                  <div className="text-center py-12">
+                    <h3 className="text-xl font-semibold mb-4">
+                      No Lessons Yet
+                    </h3>
+                    <p className="text-muted-foreground">
+                      Create lessons in the Admin section to get started.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       </div>

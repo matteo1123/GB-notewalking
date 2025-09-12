@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from "@/components/ui/use-toast"
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -34,7 +35,23 @@ const LessonBuilder = () => {
   }, []);
 
   const addExerciseToLesson = (exercise, type) => {
-    setLessonExercises([...lessonExercises, { ...exercise, type, target_bpm: 120 }]);
+    setLessonExercises([...lessonExercises, {
+      ...exercise,
+      type,
+      target_bpm: 120,
+      metronome_mode: 'standard',
+      starting_bpm: 60,
+      increments: 4,
+      measures_per_bpm: 4,
+      display_view: 'tab',
+      target_type: 'max'
+    }]);
+  };
+
+  const updateExercise = (index, field, value) => {
+    const updated = [...lessonExercises];
+    updated[index][field] = value;
+    setLessonExercises(updated);
   };
 
   const handleSaveLesson = async () => {
@@ -64,6 +81,12 @@ const LessonBuilder = () => {
       scale_id: exercise.type === 'scale' ? exercise.id : null,
       scale_shape_id: exercise.type === 'scale_shape' ? exercise.id : null,
       target_bpm: exercise.target_bpm,
+      metronome_mode: exercise.metronome_mode,
+      starting_bpm: exercise.starting_bpm,
+      increments: exercise.increments,
+      measures_per_bpm: exercise.measures_per_bpm,
+      display_view: exercise.display_view,
+      target_type: exercise.target_type,
       order: index,
     }));
 
@@ -113,11 +136,70 @@ const LessonBuilder = () => {
         </div>
         <div className="mt-4">
           <h3 className="text-lg font-bold">Exercises in this Lesson</h3>
-          <ul>
+          <div className="space-y-4">
             {lessonExercises.map((exercise, index) => (
-              <li key={index}>{exercise.name}</li>
+              <div key={index} className="border p-4 rounded">
+                <h4 className="font-semibold">{exercise.name}</h4>
+                <div className="grid grid-cols-2 gap-4 mt-2">
+                  <div>
+                    <Label>Metronome Mode</Label>
+                    <Select value={exercise.metronome_mode} onValueChange={(value) => updateExercise(index, 'metronome_mode', value)}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="standard">Standard</SelectItem>
+                        <SelectItem value="speed_builder">Speed Builder</SelectItem>
+                        <SelectItem value="progressive">Progressive</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Starting BPM</Label>
+                    <Input type="number" value={exercise.starting_bpm} onChange={(e) => updateExercise(index, 'starting_bpm', parseInt(e.target.value))} />
+                  </div>
+                  <div>
+                    <Label>Target BPM</Label>
+                    <Input type="number" value={exercise.target_bpm} onChange={(e) => updateExercise(index, 'target_bpm', parseInt(e.target.value))} />
+                  </div>
+                  <div>
+                    <Label>Increments</Label>
+                    <Input type="number" value={exercise.increments} onChange={(e) => updateExercise(index, 'increments', parseInt(e.target.value))} />
+                  </div>
+                  <div>
+                    <Label>Measures per BPM</Label>
+                    <Input type="number" value={exercise.measures_per_bpm} onChange={(e) => updateExercise(index, 'measures_per_bpm', parseInt(e.target.value))} />
+                  </div>
+                  <div>
+                    <Label>Display View</Label>
+                    <Select value={exercise.display_view} onValueChange={(value) => updateExercise(index, 'display_view', value)}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="tab">Tab</SelectItem>
+                        <SelectItem value="grid">Grid</SelectItem>
+                        <SelectItem value="fretboard">Fretboard</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Target Type</Label>
+                    <Select value={exercise.target_type} onValueChange={(value) => updateExercise(index, 'target_type', value)}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="max">Max BPM</SelectItem>
+                        <SelectItem value="perfect">Perfect BPM</SelectItem>
+                        <SelectItem value="both">Both</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
             ))}
-          </ul>
+          </div>
         </div>
         <Button className="mt-4" onClick={handleSaveLesson}>Save Lesson</Button>
       </div>

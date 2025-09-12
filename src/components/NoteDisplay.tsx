@@ -34,17 +34,8 @@ const NoteDisplay = ({
   } | null>(null);
   const [displayMode, setDisplayMode] = useState<'tablature' | 'grid'>(mode);
 
-  const { isListening } = usePitchDetection({
-    isEnabled: enableListening,
-    onNoteDetected: (result) => {
-      setDetectedNote({ string: result.string, fret: result.fret });
-      if (notes.length > 0) {
-        setNoteIndex((prevIndex) => (prevIndex + 1) % notes.length);
-      }
-      setTimeout(() => setDetectedNote(null), 200);
-    },
-    sensitivity: 0.6,
-  });
+// Pitch detection is disabled for performance reasons
+const isListening = false;
 
   const degreeMap = useMemo(
     () => (major_key ? createDegreeMap(major_key) : null),
@@ -60,25 +51,12 @@ const NoteDisplay = ({
   const minWidthPerNote = 60;
   const minWidth = Math.max(800, noteCount * minWidthPerNote);
 
-  const currentTime = useMemo(() => {
-    if (enableListening) {
-        if (noteIndex >= notes.length) {
-            return 0;
-        }
-        return notes[noteIndex].time;
-    }
-    return currentPosition;
-  }, [noteIndex, notes, enableListening, currentPosition]);
+const currentTime = currentPosition;
 
   useEffect(() => {
     if (!containerRef.current) return;
     const el = containerRef.current;
-    const targetTime = detectedNote
-      ? notes.find(
-          (n) =>
-            n.string === detectedNote.string && n.fret === detectedNote.fret
-        )?.time ?? currentTime
-      : currentTime;
+const targetTime = currentTime;
     const percentage = Math.min(
       1,
       Math.max(0, targetTime / Math.max(1, maxTime))
@@ -86,7 +64,7 @@ const NoteDisplay = ({
     const totalWidth = el.scrollWidth - el.clientWidth;
     const targetLeft = totalWidth * percentage;
     el.scrollTo({ left: targetLeft, behavior: "smooth" });
-  }, [currentTime, detectedNote, maxTime, notes]);
+  }, [currentTime, maxTime, notes]);
 
   const times = notes.map((n) => n.time).sort((a, b) => a - b);
   let closestTime = currentTime;
@@ -110,7 +88,7 @@ const NoteDisplay = ({
   return (
     <div className={`bg-card rounded-lg border border-border p-4 ${className}`}>
       <div className="flex justify-between items-center mb-4">
-        <h3 className="text-lg font-semibold">Note Display</h3>
+        <h3 className="text-lg font-semibold">Fretboard</h3>
         <Button
           variant="outline"
           size="sm"
@@ -124,7 +102,10 @@ const NoteDisplay = ({
         className="overflow-x-auto overflow-y-hidden max-h-96 animated-scrollbar"
       >
         {displayMode === 'tablature' ? (
-          <div className="space-y-2" style={{ minWidth: `${minWidth}px` }}>
+          <div
+            className="space-y-2"
+            style={{ minWidth: `${minWidth}px` }}
+          >
             {strings.map((string) => (
               <div key={string} className="flex items-center space-x-2">
                 <div className="w-6 text-sm text-muted-foreground font-mono shrink-0 sticky left-0 bg-card z-10">
@@ -139,11 +120,8 @@ const NoteDisplay = ({
                         const position = (note.time / maxTime) * 100;
                         const isHighlighted = note.accent || note.highlight;
                         const isCurrentNote =
-                          Math.abs(note.time - closestTime) <= 0.08;
-                        const isDetectedNote =
-                          detectedNote &&
-                          detectedNote.string === note.string &&
-                          detectedNote.fret === note.fret;
+                          Math.abs(note.time - currentTime) <= 0.08;
+const isDetectedNote = false;
 
                         const noteName = getNoteFromFret(note.string, note.fret);
                         const degree = degreeMap ? degreeMap.get(noteName) : null;
@@ -201,8 +179,8 @@ const NoteDisplay = ({
                   const fret = fretIndex + minFret;
                   const note = notes.find(n => n.string === string && n.fret === fret);
                   const isHighlighted = note ? (note.accent || note.highlight) : false;
-                  const isCurrentNote = note ? Math.abs(note.time - closestTime) <= 0.08 : false;
-                  const isDetectedNote = detectedNote && detectedNote.string === string && detectedNote.fret === fret;
+                  const isCurrentNote = note ? Math.abs(note.time - currentTime) <= 0.08 : false;
+const isDetectedNote = false;
 
                   let noteName = '';
                   let color = null;

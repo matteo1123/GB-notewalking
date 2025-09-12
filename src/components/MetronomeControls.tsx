@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,6 +11,7 @@ import {
 } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
 import { Play, Pause, Square } from "lucide-react";
+import { useNumberInputControls } from "@/hooks/useNumberInputControls";
 export type MetronomeMode = "regular" | "speed-trainer" | "progressive";
 interface MetronomeControlsProps {
   compact?: boolean;
@@ -47,133 +49,135 @@ export function MetronomeControls({
   progressiveStepBpm,
   onProgressiveStepBpmChange,
 }: MetronomeControlsProps) {
-  return (
-    <Card
-      className={`${
-        compact ? "p-3" : "p-6"
-      } bg-gradient-to-br from-card to-card/50 border-border/50`}
-    >
-      <div className={compact ? "space-y-3" : "space-y-6"}>
-        {/* Mode Selection */}
-        <div className="space-y-2">
-          <Label className="text-sm font-medium">Mode</Label>
-          <Select value={mode} onValueChange={onModeChange}>
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="regular">Regular</SelectItem>
-              <SelectItem value="speed-trainer">Speed Trainer</SelectItem>
-              <SelectItem value="progressive">Progressive</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+  // Refs for input controls
+  const endBpmRef = useRef<HTMLInputElement>(null);
+  const incrementsRef = useRef<HTMLInputElement>(null);
+  const measuresPerBpmRef = useRef<HTMLInputElement>(null);
+  const progressiveStepRef = useRef<HTMLInputElement>(null);
 
-        {/* BPM Controls */}
-        {mode !== "regular" && (
-          <div className="space-y-2">
-            <Label className="text-sm font-medium">End BPM</Label>
+  // Input controls hooks
+  useNumberInputControls({
+    inputRef: endBpmRef,
+    value: endBpm,
+    onChange: onEndBpmChange,
+    min: 40,
+    max: 300,
+  });
+
+  useNumberInputControls({
+    inputRef: incrementsRef,
+    value: measures,
+    onChange: onMeasuresChange,
+    min: 2,
+    max: 100,
+  });
+
+  useNumberInputControls({
+    inputRef: measuresPerBpmRef,
+    value: measuresPerBpmChange,
+    onChange: onMeasuresPerBpmChangeChange,
+    min: 1,
+    max: 20,
+  });
+
+  useNumberInputControls({
+    inputRef: progressiveStepRef,
+    value: progressiveStepBpm ?? 5,
+    onChange: (value) => onProgressiveStepBpmChange?.(value),
+    min: 1,
+    max: 30,
+  });
+
+  return (
+    <div className="space-y-2 text-xs">
+      {/* Mode Selection and Play/Stop */}
+      <div className="flex items-center gap-2">
+        <Select value={mode} onValueChange={onModeChange}>
+          <SelectTrigger className="h-8">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="regular">Regular</SelectItem>
+            <SelectItem value="speed-trainer">Speed Trainer</SelectItem>
+            <SelectItem value="progressive">Progressive</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button
+          variant={isPlaying ? "secondary" : "default"}
+          onClick={onPlayPause}
+          size="sm"
+          className="h-8"
+        >
+          {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+        </Button>
+        <Button variant="outline" onClick={onStop} size="sm" className="h-8">
+          <Square className="h-3 w-3" />
+        </Button>
+      </div>
+
+      {/* Speed Trainer Controls */}
+      {mode !== "regular" && (
+        <div className="grid grid-cols-2 gap-2">
+          <div className="space-y-1">
+            <Label>End BPM</Label>
             <Input
+              ref={endBpmRef}
               type="number"
               value={endBpm}
               onChange={(e) => onEndBpmChange(Number(e.target.value))}
               min={40}
               max={300}
-              className="text-center"
+              className="h-8 text-center"
             />
           </div>
-        )}
-
-        {/* Measures Control (for speed trainer and progressive modes) */}
-        {mode !== "regular" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2 mx-0 my-0 py-[18px]">
-              <Label className="text-sm font-medium"># of increments</Label>
-              <Input
-                type="number"
-                value={measures}
-                onChange={(e) =>
-                  onMeasuresChange(Math.max(2, Number(e.target.value)))
-                }
-                min={2}
-                max={100}
-                className="text-center"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">
-                Measures per BPM Change
-              </Label>
-              <Input
-                type="number"
-                value={measuresPerBpmChange}
-                onChange={(e) =>
-                  onMeasuresPerBpmChangeChange(Number(e.target.value))
-                }
-                min={1}
-                max={20}
-                className="text-center"
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Progressive step size (configurable) */}
-        {mode === "progressive" && (
-          <div className="space-y-2">
-            <Label className="text-sm font-medium">
-              Progressive Step (BPM)
-            </Label>
+          <div className="space-y-1">
+            <Label># Increments</Label>
             <Input
+              ref={incrementsRef}
               type="number"
-              value={progressiveStepBpm ?? 5}
+              value={measures}
               onChange={(e) =>
-                onProgressiveStepBpmChange?.(
-                  Math.max(1, Number(e.target.value))
-                )
+                onMeasuresChange(Math.max(2, Number(e.target.value)))
+              }
+              min={2}
+              max={100}
+              className="h-8 text-center"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label>Measures/Inc</Label>
+            <Input
+              ref={measuresPerBpmRef}
+              type="number"
+              value={measuresPerBpmChange}
+              onChange={(e) =>
+                onMeasuresPerBpmChangeChange(Number(e.target.value))
               }
               min={1}
-              max={30}
-              className="text-center"
+              max={20}
+              className="h-8 text-center"
             />
           </div>
-        )}
-
-        {/* Control Buttons */}
-        <div className="flex gap-3 justify-center">
-          <Button
-            variant={isPlaying ? "secondary" : "default"}
-            onClick={onPlayPause}
-            className="flex items-center gap-2"
-          >
-            {isPlaying ? (
-              <Pause className="h-4 w-4" />
-            ) : (
-              <Play className="h-4 w-4" />
-            )}
-            {isPlaying ? "Pause" : "Play"}
-          </Button>
-          <Button
-            variant="outline"
-            onClick={onStop}
-            className="flex items-center gap-2"
-          >
-            <Square className="h-3 w-3" />
-            Stop
-          </Button>
+          {mode === "progressive" && (
+            <div className="space-y-1">
+              <Label>Step BPM</Label>
+              <Input
+                ref={progressiveStepRef}
+                type="number"
+                value={progressiveStepBpm ?? 5}
+                onChange={(e) =>
+                  onProgressiveStepBpmChange?.(
+                    Math.max(1, Number(e.target.value))
+                  )
+                }
+                min={1}
+                max={30}
+                className="h-8 text-center"
+              />
+            </div>
+          )}
         </div>
-
-        {/* Mode Description */}
-        <div className="text-xs text-muted-foreground text-center">
-          {mode === "regular" && "Constant tempo metronome"}
-          {mode === "speed-trainer" &&
-            "Gradually increases from start to end BPM over the specified measures"}
-          {mode === "progressive" &&
-            `Like speed trainer, but restarts ${
-              progressiveStepBpm ?? 5
-            } BPM higher each cycle`}
-        </div>
-      </div>
-    </Card>
+      )}
+    </div>
   );
 }

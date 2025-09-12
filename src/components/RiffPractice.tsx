@@ -234,110 +234,86 @@ const RiffPractice = ({
     displayNotes.length > 0 ? (noteIndex / displayNotes.length) * 100 : 0;
 
   return (
-    <div className="space-y-6 bpm-control-area">
-      {/* Exercise Hierarchy */}
-      {onExerciseSelect && (
-        <ExerciseHierarchy
-          currentExercise={repertoireItem}
-          onExerciseSelect={onExerciseSelect}
-        />
-      )}
-
+    <div className="flex flex-col h-screen bg-background text-foreground overflow-hidden">
       {/* Header */}
-      <div className="text-center space-y-2">
-        <h2 className="text-2xl font-bold text-foreground">
-          {repertoireItem.name}
-        </h2>
-        <p className="text-muted-foreground">{repertoireItem.description}</p>
-        <div className="flex items-center justify-center gap-4 text-sm">
-          <span className="px-3 py-1 bg-secondary rounded-full text-secondary-foreground">
-            {repertoireItem.category}
-          </span>
-          <span className="px-3 py-1 bg-secondary rounded-full text-secondary-foreground">
-            {repertoireItem.difficulty}/10
-          </span>
-          <span className="px-3 py-1 bg-secondary rounded-full text-secondary-foreground">
-            Highest Clean BPM: —
-          </span>
-        </div>
-      </div>
-
-      {/* BPM Inputs */}
-      <div className="flex items-center justify-center gap-4">
-        <div>
-          <Label htmlFor="max-bpm">Max BPM</Label>
-          <Input
-            id="max-bpm"
-            type="number"
-            value={maxBpm}
-            onChange={(e) => setMaxBpm(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
-            className="w-24"
-          />
-        </div>
-        <div>
-          <Label htmlFor="perfect-bpm">Perfect BPM</Label>
-          <Input
-            id="perfect-bpm"
-            type="number"
-            value={perfectBpm}
-            onChange={(e) => setPerfectBpm(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
-            className="w-24"
-          />
-        </div>
-        <Button onClick={handleSavePractice}>Save Practice</Button>
-      </div>
-
-      {/* Sequence Buttons */}
-      <div className="flex flex-wrap items-center justify-center gap-2">
-        {availableSequences.map((sequence) => (
-          <Button
-            key={sequence.id}
-            onClick={() => setActiveSequence(sequence)}
-            variant={activeSequence?.id === sequence.id ? 'secondary' : 'outline'}
-          >
-            {sequence.name}
-          </Button>
-        ))}
-      </div>
-
-
-      {/* Progress */}
-      {(timeLimit || !isControlledSession) && (
-        <div className="space-y-2">
-          <div className="flex justify-between text-sm text-muted-foreground">
-            <span>Progress</span>
-            <span>
-              {timeLimit
-                ? `${Math.floor(elapsedTime)}s / ${timeLimit}s`
-                : `${noteIndex} / ${displayNotes.length}`}
-            </span>
+      <header className="flex-shrink-0 bg-card border-b border-border p-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <h2 className="text-lg font-bold">{repertoireItem.name}</h2>
+            <div className="flex items-center gap-2 text-xs">
+              <span className="px-2 py-0.5 bg-secondary rounded-full text-secondary-foreground">
+                {repertoireItem.category}
+              </span>
+              <span className="px-2 py-0.5 bg-secondary rounded-full text-secondary-foreground">
+                {repertoireItem.difficulty}/10
+              </span>
+            </div>
           </div>
-          <Progress value={Math.min(progress, 100)} className="h-2" />
+          {onExerciseSelect && (
+            <ExerciseHierarchy
+              currentExercise={repertoireItem}
+              onExerciseSelect={onExerciseSelect}
+            />
+          )}
         </div>
-      )}
+      </header>
 
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Tablature - Takes up more space on desktop, full screen on mobile portrait */}
-        <div className="lg:col-span-2 portrait:fixed portrait:inset-0 portrait:z-50 portrait:bg-background portrait:p-4 portrait:overflow-auto landscape:relative landscape:z-auto landscape:bg-transparent">
+      {/* Controls */}
+      <div className="flex-shrink-0 bg-card border-b border-border p-2">
+        <div className="flex items-center justify-center gap-4">
+          <div className="flex items-center gap-2">
+            <Label htmlFor="max-bpm" className="text-xs">Max BPM</Label>
+            <Input
+              id="max-bpm"
+              type="number"
+              value={maxBpm}
+              onChange={(e) => setMaxBpm(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
+              className="w-20 h-8 text-center"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <Label htmlFor="perfect-bpm" className="text-xs">Perfect BPM</Label>
+            <Input
+              id="perfect-bpm"
+              type="number"
+              value={perfectBpm}
+              onChange={(e) => setPerfectBpm(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
+              className="w-20 h-8 text-center"
+            />
+          </div>
+          <Button onClick={handleSavePractice} size="sm">Save</Button>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            {availableSequences.map((sequence) => (
+              <Button
+                key={sequence.id}
+                onClick={() => setActiveSequence(sequence)}
+                variant={activeSequence?.id === sequence.id ? 'secondary' : 'outline'}
+                size="sm"
+              >
+                {sequence.name}
+              </Button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <main className="flex-grow flex flex-col gap-4 p-4 overflow-hidden">
+        {/* Fretboard/Note Display */}
+        <div className="flex-grow">
           <NoteDisplay
             notes={displayNotes}
             major_key={repertoireItem.major_key}
             currentPosition={currentTime}
             enableListening={pitchDetectionEnabled && !metronome.state.isPlaying}
-            className="h-full"
+            className="h-full w-full"
             mode={lessonExercise?.display_view === 'tab' ? 'tablature' : lessonExercise?.display_view === 'grid' ? 'grid' : 'tablature'}
           />
-          {/* Mobile portrait instructions */}
-          <div className="portrait:absolute portrait:bottom-4 portrait:left-1/2 portrait:transform portrait:-translate-x-1/2 portrait:text-center portrait:text-muted-foreground portrait:text-sm landscape:hidden hidden">
-            <p>Swipe up/down to adjust BPM</p>
-          </div>
         </div>
 
-        {/* Controls and Visualizer - Compact on mobile landscape, hidden on portrait */}
-        <div className="space-y-4 portrait:hidden landscape:block">
-          {/* Beat Visualizer */}
-          <div className="flex justify-center">
+        {/* Metronome and Controls */}
+        <div className="flex-shrink-0">
+          <div className="bg-card rounded-lg border border-border p-4">
             <BeatVisualizer
               currentBeat={metronome.state.currentBeat}
               isPlaying={metronome.state.isPlaying}
@@ -348,89 +324,32 @@ const RiffPractice = ({
               }
               onBpmChange={handleMetronomeBpmChange}
               canEdit={true}
-              size="sm"
-            />
-          </div>
-
-          {/* Basic Controls */}
-          {!isControlledSession && (
-            <div className="space-y-3">
-              <div className="flex justify-center gap-2">
-                <Button
-                  onClick={handlePlay}
-                  variant={metronome.state.isPlaying ? "secondary" : "default"}
-                  size="sm"
-                >
-                  {metronome.state.isPlaying ? (
-                    <Pause className="h-4 w-4" />
-                  ) : (
-                    <Play className="h-4 w-4" />
-                  )}
-                </Button>
-                <Button onClick={handleStop} variant="outline" size="sm">
-                  <Square className="h-4 w-4" />
-                </Button>
-                <Button
-                  onClick={() => setNoteIndex(0)}
-                  variant="outline"
-                  size="sm"
-                >
-                  <RotateCcw className="h-4 w-4" />
-                </Button>
-              </div>
-
-              {autoAdvance && (
-                <Button onClick={handleComplete} className="w-full" size="sm">
-                  Complete & Next
-                </Button>
-              )}
-            </div>
-          )}
-
-          {/* Advanced Metronome Controls */}
-          <MetronomeControls
-            mode={mode}
-            isPlaying={metronome.state.isPlaying}
-            currentBpm={
-              metronome.state.isPlaying
-                ? metronome.state.currentBpm
-                : metronomeBpm
-            }
-            endBpm={lessonExercise?.target_bpm || metronomeBpm}
-            measures={lessonExercise ? (lessonExercise.increments || 1) * (lessonExercise.measures_per_bpm || 4) : 8}
-            measuresPerBpmChange={lessonExercise?.measures_per_bpm || 4}
-            onModeChange={lessonExercise ? () => {} : setMode} // Disable mode change if from lesson
-            onPlayPause={handlePlay}
-            onStop={handleStop}
-            onEndBpmChange={() => {}} // Disabled
-            onMeasuresChange={() => {}} // Disabled
-            onMeasuresPerBpmChangeChange={() => {}} // Disabled
-            onCurrentBpmChange={lessonExercise ? () => {} : handleMetronomeBpmChange} // Disable bpm change if from lesson
-            compact={true}
-          />
-
-          {/* Pitch Detection Controls */}
-          <div className="bg-card rounded-lg border border-border p-4">
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-sm font-medium">Guitar Tracking</label>
-              <button
-                onClick={() => setPitchDetectionEnabled(!pitchDetectionEnabled)}
-                className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
-                  pitchDetectionEnabled
-                    ? "bg-green-500 text-white"
-                    : "bg-muted text-muted-foreground"
-                }`}
-              >
-                {pitchDetectionEnabled ? "ON" : "OFF"}
-              </button>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Tracking is automatically disabled while the metronome is playing
-              to avoid false triggers.
-            </p>
+              size="lg"
+            >
+              <MetronomeControls
+                mode={mode}
+                isPlaying={metronome.state.isPlaying}
+                currentBpm={
+                  metronome.state.isPlaying
+                    ? metronome.state.currentBpm
+                    : metronomeBpm
+                }
+                endBpm={lessonExercise?.target_bpm || metronomeBpm}
+                measures={lessonExercise ? (lessonExercise.increments || 1) * (lessonExercise.measures_per_bpm || 4) : 8}
+                measuresPerBpmChange={lessonExercise?.measures_per_bpm || 4}
+                onModeChange={lessonExercise ? () => {} : setMode}
+                onPlayPause={handlePlay}
+                onStop={handleStop}
+                onEndBpmChange={() => {}}
+                onMeasuresChange={() => {}}
+                onMeasuresPerBpmChangeChange={() => {}}
+                onCurrentBpmChange={lessonExercise ? () => {} : handleMetronomeBpmChange}
+                compact={false}
+              />
+            </BeatVisualizer>
           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 };

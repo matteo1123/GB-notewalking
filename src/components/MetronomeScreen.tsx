@@ -156,31 +156,26 @@ export function MetronomeScreen({
       : endBpm;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div className="flex flex-col h-full">
       {/* Beat Visualizer */}
-      <div className="lg:col-span-2 portrait:fixed portrait:inset-0 portrait:z-50 portrait:bg-background portrait:flex portrait:items-center portrait:justify-center landscape:relative landscape:z-auto landscape:bg-transparent">
-        <div className="h-full flex items-center justify-center p-8 landscape:p-4">
-          <BeatVisualizer
-            currentBeat={metronome.state.currentBeat}
-            isPlaying={metronome.state.isPlaying}
-            currentBpm={
-              mode === "regular" || !metronome.state.isPlaying
-                ? startBpm
-                : metronome.state.currentBpm
-            }
-            onBpmChange={handleCurrentBpmChange}
-            canEdit={true}
-            size="lg"
-          />
-        </div>
-        <div className="portrait:absolute portrait:bottom-8 portrait:left-1/2 portrait:transform portrait:-translate-x-1/2 portrait:text-center portrait:text-muted-foreground portrait:text-sm landscape:hidden hidden">
-          <p>Swipe up/down to adjust BPM</p>
-        </div>
+      <div className="flex-grow flex items-center justify-center">
+        <BeatVisualizer
+          currentBeat={metronome.state.currentBeat}
+          isPlaying={metronome.state.isPlaying}
+          currentBpm={
+            mode === "regular" || !metronome.state.isPlaying
+              ? startBpm
+              : metronome.state.currentBpm
+          }
+          onBpmChange={handleCurrentBpmChange}
+          canEdit={true}
+          size="lg"
+        />
       </div>
 
       {/* Controls */}
       {showControls && (
-        <div className="space-y-4 portrait:hidden landscape:block lg:min-w-[320px]">
+        <div className="flex-shrink-0 p-4 space-y-4">
           <MetronomeControls
             mode={mode}
             isPlaying={metronome.state.isPlaying}
@@ -196,9 +191,7 @@ export function MetronomeScreen({
             onPlayPause={metronome.togglePlayPause}
             onStop={() => {
               metronome.stop();
-              if (onStop) {
-                onStop();
-              }
+              onStop?.();
             }}
             onEndBpmChange={setEndBpm}
             onMeasuresChange={setIncrements}
@@ -208,6 +201,7 @@ export function MetronomeScreen({
             onProgressiveStepBpmChange={() => {
               /* parent may control */
             }}
+            compact
           />
 
           <ProgressIndicator

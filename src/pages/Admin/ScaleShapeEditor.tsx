@@ -118,8 +118,7 @@ const ScaleShapeEditor = () => {
     if (scaleType === 'All' && !selectedShapeId && !isSaveAs) {
       toast({ title: "Error", description: "Please select a specific scale type." });
       return;
-    }
-
+    }        9241
     const shape_json = selectedNotes
       .map(note => ({
         string: note.string,

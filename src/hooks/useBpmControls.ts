@@ -28,11 +28,12 @@ export function useBpmControls({
 
     const handleKeyDown = (e: KeyboardEvent) => {
       // Only respond if no input elements are focused
-      const target = e.target as HTMLElement;
+      const activeElement = document.activeElement;
       if (
-        target.tagName === "INPUT" ||
-        target.tagName === "TEXTAREA" ||
-        target.isContentEditable
+        activeElement &&
+        (activeElement.tagName === "INPUT" ||
+         activeElement.tagName === "TEXTAREA" ||
+         (activeElement as HTMLElement).isContentEditable)
       )
         return;
 
@@ -53,6 +54,15 @@ export function useBpmControls({
       const target = e.target as HTMLElement;
       const isInControlArea = target.closest(".bpm-control-area");
       if (!isInControlArea) return;
+
+      // Don't handle wheel if an input is focused
+      const activeElement = document.activeElement;
+      if (
+        activeElement &&
+        (activeElement.tagName === "INPUT" ||
+         activeElement.tagName === "TEXTAREA" ||
+         (activeElement as HTMLElement).isContentEditable)
+      ) return;
 
       e.preventDefault();
       // Make wheel more sensitive

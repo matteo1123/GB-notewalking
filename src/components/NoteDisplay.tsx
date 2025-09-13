@@ -24,6 +24,12 @@ interface NoteDisplayProps {
   setIsLearning?: (isLearning: boolean) => void;
   learnRepetitions?: number;
   setLearnRepetitions?: (repetitions: number) => void;
+  setMetronomeBpm?: (bpm: number) => void;
+  handlePlay?: () => void;
+  learnTimeline?: {label: string | number, startIndex: number, endIndex: number}[];
+  currentLearnIndex?: number;
+  setNoteIndex?: (index: number) => void;
+  setCurrentLearnIndex?: (index: number) => void;
 }
 
 const NoteDisplay = ({
@@ -37,10 +43,15 @@ const NoteDisplay = ({
   setIsLearning,
   learnRepetitions,
   setLearnRepetitions,
+  setMetronomeBpm,
+  handlePlay,
+  learnTimeline,
+  currentLearnIndex,
+  setNoteIndex,
+  setCurrentLearnIndex,
 }: NoteDisplayProps) => {
   const strings = [1, 2, 3, 4, 5, 6]; // High E to Low E
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const [noteIndex, setNoteIndex] = useState(0);
   const [detectedNote, setDetectedNote] = useState<{
     string: number;
     fret: number;
@@ -245,20 +256,50 @@ const isDetectedNote = false;
         ) : (
           <>
             <div className="flex items-center gap-4 mb-4">
-              <Button onClick={() => setIsLearning && setIsLearning(!isLearning)}>
+              <Button
+                onClick={() => {
+                  if (setIsLearning) {
+                    const newIsLearning = !isLearning;
+                    setIsLearning(newIsLearning);
+                    if (newIsLearning) {
+                      setShowSingleNote(true);
+                      if (setMetronomeBpm) setMetronomeBpm(60);
+                      if (handlePlay) handlePlay();
+                    }
+                  }
+                }}
+              >
                 {isLearning ? "Stop Learning" : "Help Me Learn"}
               </Button>
               {isLearning && (
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="repetitions">Repetitions</Label>
-                  <Input
-                    id="repetitions"
-                    type="number"
-                    value={learnRepetitions}
-                    onChange={(e) => setLearnRepetitions && setLearnRepetitions(parseInt(e.target.value, 10))}
-                    className="w-20"
-                  />
-                </div>
+                <>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="repetitions">Repetitions</Label>
+                    <Input
+                      id="repetitions"
+                      type="number"
+                      value={learnRepetitions}
+                      onChange={(e) => setLearnRepetitions && setLearnRepetitions(parseInt(e.target.value, 10))}
+                      className="w-20"
+                    />
+                  </div>
+                  <div className="flex space-x-2">
+                    {learnTimeline?.map((item, index) => (
+                      <div
+                        key={index}
+                        className={`p-2 rounded cursor-pointer ${
+                          index === currentLearnIndex ? "bg-blue-500" : "bg-gray-700"
+                        }`}
+                        onClick={() => {
+                          if (setNoteIndex) setNoteIndex(item.startIndex);
+                          if (setCurrentLearnIndex) setCurrentLearnIndex(index);
+                        }}
+                      >
+                        {item.label}
+                      </div>
+                    ))}
+                  </div>
+                </>
               )}
             </div>
             <Fretboard

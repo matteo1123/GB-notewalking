@@ -16,6 +16,7 @@ interface FretboardProps {
   isEditable?: boolean;
   showDegreeNumbers?: boolean;
   degreeMap?: Map<string, number> | null;
+  hoveredNotes?: Note[];
 }
 
 const Fretboard: React.FC<FretboardProps> = ({
@@ -27,6 +28,7 @@ const Fretboard: React.FC<FretboardProps> = ({
   isEditable = false,
   showDegreeNumbers = false,
   degreeMap,
+  hoveredNotes = [],
 }) => {
   const chromaticDegreeMap = rootNote ? createChromaticDegreeMap(getNoteFromFret(rootNote.string, rootNote.fret)) : null;
 
@@ -56,6 +58,7 @@ const Fretboard: React.FC<FretboardProps> = ({
         const isSelected = selectedNotes.some(n => n.string === s && n.fret === f);
         const isRoot = rootNote && rootNote.string === s && rootNote.fret === f;
         const isHighlighted = highlightedNote && highlightedNote.string === s && highlightedNote.fret === f;
+        const isHovered = hoveredNotes.some(n => n.string === s && n.fret === f);
 
         const noteName = getNoteFromFret(s, f);
         const degree = degreeMap ? degreeMap.get(noteName) : null;
@@ -84,9 +87,9 @@ const Fretboard: React.FC<FretboardProps> = ({
               }
             }}
           >
-            {isSelected && (
+            {(isSelected || isHovered) && (
               <div
-                className={`dot ${isRoot ? 'root' : ''} ${isHighlighted ? 'highlighted' : ''}`}
+                className={`dot ${isRoot ? 'root' : ''} ${isHighlighted ? 'highlighted' : ''} ${isHovered ? 'hovered' : ''}`}
                 style={{ backgroundColor: color }}
               >
                 {showDegreeNumbers && chromaticDegree && (

@@ -56,6 +56,7 @@ const NoteDisplay = ({
     string: number;
     fret: number;
   } | null>(null);
+  const [hoveredNotes, setHoveredNotes] = useState<Note[]>([]);
   const [displayMode, setDisplayMode] = useState<'tablature' | 'grid' | 'fretboard'>(mode);
   const [showSingleNote, setShowSingleNote] = useState(false);
 
@@ -294,6 +295,11 @@ const isDetectedNote = false;
                           if (setNoteIndex) setNoteIndex(item.startIndex);
                           if (setCurrentLearnIndex) setCurrentLearnIndex(index);
                         }}
+                        onMouseEnter={() => {
+                          const sectionNotes = notes.slice(item.startIndex, item.endIndex + 1);
+                          setHoveredNotes(sectionNotes);
+                        }}
+                        onMouseLeave={() => setHoveredNotes([])}
                       >
                         {item.label}
                       </div>
@@ -308,6 +314,7 @@ const isDetectedNote = false;
               degreeMap={degreeMap}
               showDegreeNumbers={true}
               rootNote={notes.find(n => getNoteFromFret(n.string, n.fret) === major_key)}
+              hoveredNotes={hoveredNotes}
             />
           </>
         )}

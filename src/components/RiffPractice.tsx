@@ -204,69 +204,7 @@ const RiffPractice = ({
     setIsPlaying(!metronome.state.isPlaying);
   }, [metronome]);
 
-  const generateLearnSequence = useCallback(() => {
-    const baseNotes = repertoireItem.notes;
-    const chunks = [];
-    for (let i = 0; i < baseNotes.length; i += 5) {
-      chunks.push(baseNotes.slice(i, i + 5));
-    }
-
-    const newNotes: Note[] = [];
-    const timeline: {label: string | number, startIndex: number, endIndex: number}[] = [];
-    let time = 0;
-
-    for (let i = 0; i < chunks.length; i++) {
-      if (i === 0) {
-        // First chunk, do nothing
-      } else {
-        // A: previous chunk
-        const prevChunkStartIndex = newNotes.length;
-        for (let r = 0; r < learnRepetitions; r++) {
-          chunks[i-1].forEach(note => {
-            newNotes.push({ ...note, time: time++, duration: 1 });
-          });
-        }
-        timeline.push({ label: "|", startIndex: prevChunkStartIndex, endIndex: newNotes.length - 1 });
-
-        // B: current chunk
-        const currentChunkStartIndex = newNotes.length;
-        for (let r = 0; r < learnRepetitions; r++) {
-          chunks[i].forEach(note => {
-            newNotes.push({ ...note, time: time++, duration: 1 });
-          });
-        }
-        timeline.push({ label: "", startIndex: currentChunkStartIndex, endIndex: newNotes.length - 1 });
-
-        // C: combined
-        const combined = [...chunks[i - 1], ...chunks[i]];
-        const combinedStartIndex = newNotes.length;
-        for (let r = 0; r < learnRepetitions; r++) {
-          combined.forEach(note => {
-            newNotes.push({ ...note, time: time++, duration: 1 });
-          });
-        }
-        timeline.push({ label: "", startIndex: combinedStartIndex, endIndex: newNotes.length - 1 });
-      }
-    }
-
-    setLearnNotes(newNotes);
-    setLearnTimeline(timeline);
-  }, [repertoireItem.notes, learnRepetitions]);
-
-  useEffect(() => {
-    if (isLearning) {
-      generateLearnSequence();
-    } else {
-      setLearnNotes([]);
-      setLearnTimeline([]);
-    }
-  }, [isLearning, generateLearnSequence]);
-
-  const displayNotes = useMemo(() => {
-    if (isLearning) {
-      return learnNotes;
-    }
-
+  const baseExerciseNotes = useMemo(() => {
     if (!activeSequence) {
       return repertoireItem.notes.map((note, index) => ({
         ...note,
@@ -288,7 +226,68 @@ const RiffPractice = ({
       activeSequence.note_value,
       activeSequence.is_triplet
     );
-  }, [activeSequence, repertoireItem, isLearning, learnNotes]);
+  }, [activeSequence, repertoireItem]);
+
+  const generateLearnSequence = useCallback(() => {
+    const baseNotes = baseExerciseNotes;
+    const chunks = [];
+    for (let i = 0; i < baseNotes.length; i += 5) {
+      chunks.push(baseNotes.slice(i, i + 5));
+    }
+
+    const newNotes: Note[] = [];
+    const timeline: {label: string | number, startIndex: number, endIndex: number}[] = [];
+    let time = 0;
+
+    for (let i = 1; i < chunks.length; i++) {
+      // A: previous chunk
+      const prevChunkStartIndex = newNotes.length;
+      for (let r = 0; r < learnRepetitions; r++) {
+        chunks[i-1].forEach(note => {
+          newNotes.push({ ...note, time: time++, duration: 1 });
+        });
+      }
+      timeline.push({ label: "|", startIndex: prevChunkStartIndex, endIndex: newNotes.length - 1 });
+
+      // B: current chunk
+      const currentChunkStartIndex = newNotes.length;
+      for (let r = 0; r < learnRepetitions; r++) {
+        chunks[i].forEach(note => {
+          newNotes.push({ ...note, time: time++, duration: 1 });
+        });
+      }
+      timeline.push({ label: "", startIndex: currentChunkStartIndex, endIndex: newNotes.length - 1 });
+
+      // C: combined
+      const combined = [...chunks[i - 1], ...chunks[i]];
+      const combinedStartIndex = newNotes.length;
+      for (let r = 0; r < learnRepetitions; r++) {
+        combined.forEach(note => {
+          newNotes.push({ ...note, time: time++, duration: 1 });
+        });
+      }
+      timeline.push({ label: "", startIndex: combinedStartIndex, endIndex: newNotes.length - 1 });
+    }
+
+    setLearnNotes(newNotes);
+    setLearnTimeline(timeline);
+  }, [baseExerciseNotes, learnRepetitions]);
+
+  useEffect(() => {
+    if (isLearning) {
+      generateLearnSequence();
+    } else {
+      setLearnNotes([]);
+      setLearnTimeline([]);
+    }
+  }, [isLearning, generateLearnSequence]);
+
+  const displayNotes = useMemo(() => {
+    if (isLearning) {
+      return learnNotes;
+    }
+    return baseExerciseNotes;
+  }, [isLearning, learnNotes, baseExerciseNotes]);
 
   useEffect(() => {
     if (loop && noteIndex >= displayNotes.length - 1) {

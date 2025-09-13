@@ -68,6 +68,10 @@
   justify-content: center;
 }
 
+.dot.out-of-scale {
+  background-color: #333;
+}
+
 .dot.root {
   background-color: #ff0000;
 }
@@ -112,4 +116,9 @@
 
 .dot.hovered {
   animation: blink 0.5s infinite;
+}
+
+.dot.animated {
+  background-color: #ff00ff !important;
+  transform: translate(-50%, -50%) scale(1.5);
 }

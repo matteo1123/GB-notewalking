@@ -57,6 +57,8 @@ const NoteDisplay = ({
     fret: number;
   } | null>(null);
   const [hoveredNotes, setHoveredNotes] = useState<Note[]>([]);
+  const [hoveredNoteIndex, setHoveredNoteIndex] = useState(0);
+  const hoverIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [displayMode, setDisplayMode] = useState<'tablature' | 'grid' | 'fretboard'>(mode);
   const [showSingleNote, setShowSingleNote] = useState(false);
 
@@ -82,14 +84,18 @@ const currentTime = currentPosition;
   useEffect(() => {
     if (!containerRef.current) return;
     const el = containerRef.current;
-const targetTime = currentTime;
+    const targetTime = currentTime;
     const percentage = Math.min(
       1,
       Math.max(0, targetTime / Math.max(1, maxTime))
     );
     const totalWidth = el.scrollWidth - el.clientWidth;
-    const targetLeft = totalWidth * percentage;
-    el.scrollTo({ left: targetLeft });
+    
+    // Introduce an offset to keep the current note from being at the very edge
+    const offset = el.clientWidth * 0.2; // 20% of the container width
+    const targetLeft = totalWidth * percentage - offset;
+
+    el.scrollTo({ left: Math.max(0, targetLeft), behavior: 'smooth' });
   }, [currentTime, maxTime, notes]);
 
   const times = notes.map((n) => n.time).sort((a, b) => a - b);
@@ -172,7 +178,15 @@ const isDetectedNote = false;
                         return (
                           <div
                             key={index}
-                            className={`absolute -translate-y-1/2 top-1/2 -translate-x-1/2 w-7 h-7 rounded text-xs font-mono flex items-center justify-center transition-all duration-150 ${
+                            onClick={() => {
+                              if (setNoteIndex) {
+                                const originalIndex = notes.findIndex(n => n === note);
+                                if (originalIndex !== -1) {
+                                  setNoteIndex(originalIndex);
+                                }
+                              }
+                            }}
+                            className={`absolute -translate-y-1/2 top-1/2 -translate-x-1/2 w-7 h-7 text-xs font-mono flex items-center justify-center transition-all duration-150 cursor-pointer ${
                               isDetectedNote
                                 ? "bg-green-500 text-white border-2 border-green-400 scale-110"
                                 : isCurrentNote
@@ -296,10 +310,23 @@ const isDetectedNote = false;
                           if (setCurrentLearnIndex) setCurrentLearnIndex(index);
                         }}
                         onMouseEnter={() => {
+                          if (hoverIntervalRef.current) {
+                            clearInterval(hoverIntervalRef.current);
+                          }
                           const sectionNotes = notes.slice(item.startIndex, item.endIndex + 1);
                           setHoveredNotes(sectionNotes);
+                          setHoveredNoteIndex(0);
+                          hoverIntervalRef.current = setInterval(() => {
+                            setHoveredNoteIndex(prevIndex => (prevIndex + 1) % sectionNotes.length);
+                          }, 200);
                         }}
-                        onMouseLeave={() => setHoveredNotes([])}
+                        onMouseLeave={() => {
+                          if (hoverIntervalRef.current) {
+                            clearInterval(hoverIntervalRef.current);
+                          }
+                          setHoveredNotes([]);
+                          setHoveredNoteIndex(0);
+                        }}
                       >
                         {item.label}
                       </div>
@@ -314,7 +341,7 @@ const isDetectedNote = false;
               degreeMap={degreeMap}
               showDegreeNumbers={true}
               rootNote={notes.find(n => getNoteFromFret(n.string, n.fret) === major_key)}
-              hoveredNotes={hoveredNotes}
+              animatedNote={hoveredNotes[hoveredNoteIndex]}
             />
           </>
         )}

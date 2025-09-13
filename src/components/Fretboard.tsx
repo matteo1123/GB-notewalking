@@ -16,7 +16,7 @@ interface FretboardProps {
   isEditable?: boolean;
   showDegreeNumbers?: boolean;
   degreeMap?: Map<string, number> | null;
-  hoveredNotes?: Note[];
+  animatedNote?: Note;
 }
 
 const Fretboard: React.FC<FretboardProps> = ({
@@ -28,7 +28,7 @@ const Fretboard: React.FC<FretboardProps> = ({
   isEditable = false,
   showDegreeNumbers = false,
   degreeMap,
-  hoveredNotes = [],
+  animatedNote,
 }) => {
   const chromaticDegreeMap = rootNote ? createChromaticDegreeMap(getNoteFromFret(rootNote.string, rootNote.fret)) : null;
 
@@ -58,7 +58,7 @@ const Fretboard: React.FC<FretboardProps> = ({
         const isSelected = selectedNotes.some(n => n.string === s && n.fret === f);
         const isRoot = rootNote && rootNote.string === s && rootNote.fret === f;
         const isHighlighted = highlightedNote && highlightedNote.string === s && highlightedNote.fret === f;
-        const isHovered = hoveredNotes.some(n => n.string === s && n.fret === f);
+        const isAnimated = animatedNote && animatedNote.string === s && animatedNote.fret === f;
 
         const noteName = getNoteFromFret(s, f);
         const degree = degreeMap ? degreeMap.get(noteName) : null;
@@ -87,16 +87,29 @@ const Fretboard: React.FC<FretboardProps> = ({
               }
             }}
           >
-            {(isSelected || isHovered) && (
-              <div
-                className={`dot ${isRoot ? 'root' : ''} ${isHighlighted ? 'highlighted' : ''} ${isHovered ? 'hovered' : ''}`}
-                style={{ backgroundColor: color }}
-              >
-                {showDegreeNumbers && chromaticDegree && (
-                  <span className="degree-number">{chromaticDegree}</span>
-                )}
-              </div>
-            )}
+            {isSelected && (() => {
+              if (degree) {
+                // This is an in-scale note that is part of the exercise
+                const noteClasses = ['dot'];
+                if (isRoot) noteClasses.push('root');
+                if (isHighlighted) noteClasses.push('highlighted');
+                if (isAnimated) noteClasses.push('animated');
+
+                return (
+                  <div
+                    className={noteClasses.join(' ')}
+                    style={{ backgroundColor: color }}
+                  >
+                    {showDegreeNumbers && chromaticDegree && (
+                      <span className="degree-number">{chromaticDegree}</span>
+                    )}
+                  </div>
+                );
+              } else {
+                // This is an out-of-scale note that is part of the exercise
+                return <div className="dot out-of-scale"></div>;
+              }
+            })()}
           </div>
         );
       }

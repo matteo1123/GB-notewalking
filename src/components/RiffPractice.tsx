@@ -30,6 +30,21 @@ import { Note } from "@/types/repertoire";
 import { applySequenceToScale } from "@/lib/sequenceUtils";
 import { Scale } from "@/types/scales";
 
+const MAJOR_KEYS = [
+  { value: "C", label: "C" },
+  { value: "G", label: "G" },
+  { value: "D", label: "D" },
+  { value: "A", label: "A" },
+  { value: "E", label: "E" },
+  { value: "B", label: "B" },
+  { value: "F#", label: "F♯/G♭" },
+  { value: "Db", label: "D♭" },
+  { value: "Ab", label: "A♭" },
+  { value: "Eb", label: "E♭" },
+  { value: "Bb", label: "B♭" },
+  { value: "F", label: "F" },
+];
+
 type AnyNote = Note & {
   subdivision?: number;
   highlightEvery?: number;
@@ -77,6 +92,11 @@ const RiffPractice = ({
   const [learnTimeline, setLearnTimeline] = useState<{label: string | number, startIndex: number, endIndex: number}[]>([]);
   const [learnNotes, setLearnNotes] = useState<Note[]>([]);
   const [currentLearnIndex, setCurrentLearnIndex] = useState(0);
+  const [harmonicContext, setHarmonicContext] = useState(repertoireItem.major_key);
+
+  useEffect(() => {
+    setHarmonicContext(repertoireItem.major_key);
+  }, [repertoireItem.major_key]);
 
   const availableSequences = useMemo(() => {
     const itemType = repertoireItem.Type;
@@ -334,8 +354,28 @@ const RiffPractice = ({
         <div className="flex justify-between items-start">
           {/* Left side: Exercise Info and Controls */}
           <div className="flex flex-col space-y-4">
-            <div>
+            <div className="flex items-center gap-4">
               <h2 className="text-2xl font-bold">{repertoireItem.name}</h2>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="harmonic-context" className="text-sm">Harmonic Context</Label>
+                <Select
+                  value={harmonicContext}
+                  onValueChange={setHarmonicContext}
+                >
+                  <SelectTrigger className="w-[180px]" id="harmonic-context">
+                    <SelectValue placeholder="Select a key" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MAJOR_KEYS.map((key) => (
+                      <SelectItem key={key.value} value={key.value}>
+                        {key.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div>
               <div className="flex items-center gap-2 text-sm mt-1">
                 <span className="px-2 py-0.5 bg-secondary rounded-full text-secondary-foreground">
                   {repertoireItem.category}
@@ -462,7 +502,7 @@ const RiffPractice = ({
       <main className="flex-grow h-[calc(100vh-10rem)]">
         <NoteDisplay
           notes={displayNotes}
-          major_key={repertoireItem.major_key}
+          major_key={harmonicContext}
           currentPosition={currentTime}
           enableListening={pitchDetectionEnabled && !metronome.state.isPlaying}
           className="h-full w-full"

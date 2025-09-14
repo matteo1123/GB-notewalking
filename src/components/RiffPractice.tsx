@@ -120,6 +120,8 @@ const RiffPractice = ({
         .select('*')
         .eq('user_id', user.id)
         .eq('scale_id', repertoireItem.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
         .single();
 
       if (data) {
@@ -133,19 +135,45 @@ const RiffPractice = ({
   }, [repertoireItem.id, user]);
 
   const handleSavePractice = async () => {
-    if (!practiceLog) return;
+    if (!user) return;
 
-    const { error } = await supabase
-      .from('practice_log')
-      .update({
-        max_bpm: maxBpm === '' ? null : maxBpm,
-        perfect_bpm: perfectBpm === '' ? null : perfectBpm,
-      })
-      .eq('id', practiceLog.id);
+    const practiceData = {
+      max_bpm: maxBpm === '' ? null : Number(maxBpm),
+      perfect_bpm: perfectBpm === '' ? null : Number(perfectBpm),
+    };
+
+    let error: PostgrestError | null = null;
+
+    if (practiceLog) {
+      // Update
+      const { error: updateError } = await supabase
+        .from('practice_log')
+        .update(practiceData)
+        .eq('id', practiceLog.id);
+      error = updateError;
+    } else {
+      // Insert
+      const { data: newLog, error: insertError } = await supabase
+        .from('practice_log')
+        .insert({
+          ...practiceData,
+          user_id: user.id,
+          scale_id: repertoireItem.id,
+          duration: 0, // FIXME: duration is not tracked yet
+        })
+        .select()
+        .single();
+      
+      if (newLog) {
+        setPracticeLog(newLog);
+      }
+      error = insertError;
+    }
 
     if (error) {
       console.error("Error saving practice log:", error);
     } else {
+      console.log("Practice log saved successfully.");
       if (lessonExercise) {
         const maxBpmNum = typeof maxBpm === 'number' ? maxBpm : parseInt(maxBpm as string, 10) || 0;
         const perfectBpmNum = typeof perfectBpm === 'number' ? perfectBpm : parseInt(perfectBpm as string, 10) || 0;
@@ -153,7 +181,6 @@ const RiffPractice = ({
                           ((lessonExercise.target_type === 'perfect' || lessonExercise.target_type === 'both') && perfectBpmNum >= lessonExercise.target_bpm);
         if (targetMet) {
           console.log("Target achieved!");
-          // Could add toast or update lesson_exercise status
         }
       }
     }

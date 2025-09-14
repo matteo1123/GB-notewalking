@@ -6,7 +6,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import NoteDisplay from '@/components/NoteDisplay';
-import MetronomeScreen from '@/components/MetronomeScreen';
+import RiffPractice from '@/components/RiffPractice';
 import { applySequenceToScale } from '@/lib/sequenceUtils';
 
 const ScaleSequenceEditor = () => {
@@ -250,21 +250,21 @@ const ScaleSequenceEditor = () => {
         </div>
       </div>
       <div className="mt-8">
-        <MetronomeScreen
-          initialStartBpm={bpm}
-          onTick={() => {
-            const step = (subdivision / 4) * (isTriplet ? 3 : 1);
-            setSequencePosition((prev) => (prev + step) % (generatedNotes.length || 1));
-          }}
-          onStop={() => setSequencePosition(0)}
-        />
-      </div>
-      <div className="mt-8">
-        <NoteDisplay
-          notes={generatedNotes}
-          major_key={selectedScaleObject?.major_key}
-          currentPosition={generatedNotes[sequencePosition]?.time}
-        />
+        {selectedScaleObject && (
+          <RiffPractice
+            repertoireItem={{
+              ...selectedScaleObject,
+              notes: generatedNotes,
+              id: selectedScaleObject.id,
+              name: selectedScaleObject.name,
+              category: selectedScaleObject.category,
+              difficulty: selectedScaleObject.difficulty,
+              tonic: selectedScaleObject.tonic,
+              tonality: selectedScaleObject.tonality,
+            }}
+            sequences={sequences.filter(s => s.Type === selectedScaleObject.Type)}
+          />
+        )}
       </div>
     </div>
   );

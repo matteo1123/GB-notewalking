@@ -121,6 +121,7 @@ export type Database = {
       }
       lesson_exercises: {
         Row: {
+          description: string | null
           display_view: string | null
           id: number
           increments: number | null
@@ -133,8 +134,10 @@ export type Database = {
           starting_bpm: number | null
           target_bpm: number | null
           target_type: string | null
+          time: number | null
         }
         Insert: {
+          description?: string | null
           display_view?: string | null
           id?: number
           increments?: number | null
@@ -147,8 +150,10 @@ export type Database = {
           starting_bpm?: number | null
           target_bpm?: number | null
           target_type?: string | null
+          time?: number | null
         }
         Update: {
+          description?: string | null
           display_view?: string | null
           id?: number
           increments?: number | null
@@ -161,6 +166,7 @@ export type Database = {
           starting_bpm?: number | null
           target_bpm?: number | null
           target_type?: string | null
+          time?: number | null
         }
         Relationships: [
           {
@@ -359,7 +365,7 @@ export type Database = {
           notes_json: Json
           Position?: number | null
           root_note?: string | null
-          scale_shape: string | null
+          scale_shape?: string | null
           tonality?: string | null
           Type?: Database["public"]["Enums"]["scale_type"] | null
           updated_at?: string | null

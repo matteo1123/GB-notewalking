@@ -155,6 +155,12 @@ const Premium = () => {
     return (
       <div className="bg-background p-4 bpm-control-area">
         <div className="space-y-6">
+          {selectedLessonExercise?.description && (
+            <div
+              className="prose dark:prose-invert"
+              dangerouslySetInnerHTML={{ __html: selectedLessonExercise.description }}
+            />
+          )}
           {/* Riff Practice */}
           <RiffPractice
             repertoireItem={selectedRiff}
@@ -162,6 +168,7 @@ const Premium = () => {
             onComplete={() => setSearchParams({})}
             onExerciseSelect={(exercise) => setSearchParams({ exerciseId: exercise.id })}
             lessonExercise={selectedLessonExercise}
+            timeLimit={selectedLessonExercise?.time}
           />
         </div>
       </div>

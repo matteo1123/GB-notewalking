@@ -12,6 +12,8 @@ const LessonBuilder = () => {
   const { toast } = useToast();
   const [scales, setScales] = useState([]);
   const [scaleShapes, setScaleShapes] = useState([]);
+  const [lessons, setLessons] = useState([]);
+  const [selectedLesson, setSelectedLesson] = useState(null);
   const [lessonName, setLessonName] = useState('');
   const [lessonExercises, setLessonExercises] = useState([]);
 
@@ -29,6 +31,12 @@ const LessonBuilder = () => {
         toast({ title: "Error fetching scale shapes", description: scaleShapesError.message });
       } else {
         setScaleShapes(scaleShapesData);
+      }
+      const { data: lessonsData, error: lessonsError } = await supabase.from('lessons').select('*, lesson_exercises(*)');
+      if (lessonsError) {
+        toast({ title: "Error fetching lessons", description: lessonsError.message });
+      } else {
+        setLessons(lessonsData);
       }
     };
     fetchData();
@@ -52,6 +60,31 @@ const LessonBuilder = () => {
     const updated = [...lessonExercises];
     updated[index][field] = value;
     setLessonExercises(updated);
+  };
+
+  const removeExercise = (index) => {
+    const updated = [...lessonExercises];
+    updated.splice(index, 1);
+    setLessonExercises(updated);
+  };
+
+  const handleSelectLesson = (lesson) => {
+    setSelectedLesson(lesson);
+    setLessonName(lesson.name);
+    setLessonExercises(lesson.lesson_exercises.map(le => {
+      const exercise = le.scale_id ? scales.find(s => s.id === le.scale_id) : scaleShapes.find(s => s.id === le.scale_shape_id);
+      return {
+        ...exercise,
+        ...le,
+        type: le.scale_id ? 'scale' : 'scale_shape'
+      };
+    }));
+  };
+
+  const handleCreateNew = () => {
+    setSelectedLesson(null);
+    setLessonName('');
+    setLessonExercises([]);
   };
 
   const handleSaveLesson = async () => {
@@ -88,7 +121,25 @@ const LessonBuilder = () => {
       display_view: exercise.display_view,
       target_type: exercise.target_type,
       order: index,
+      time: exercise.time,
+      description: exercise.description,
     }));
+
+    if (selectedLesson) {
+      // Update
+      const { error: updateError } = await supabase
+        .from('lessons')
+        .update({ name: lessonName })
+        .eq('id', selectedLesson.id);
+
+      if (updateError) {
+        toast({ title: "Error updating lesson", description: updateError.message });
+        return;
+      }
+
+      // Delete existing exercises and re-insert
+      await supabase.from('lesson_exercises').delete().eq('lesson_id', selectedLesson.id);
+    }
 
     const { error: lessonExercisesError } = await supabase
       .from('lesson_exercises')
@@ -98,15 +149,32 @@ const LessonBuilder = () => {
       toast({ title: "Error saving lesson exercises", description: lessonExercisesError.message });
     } else {
       toast({ title: "Success", description: "Lesson saved successfully." });
-      setLessonName('');
-      setLessonExercises([]);
+      handleCreateNew();
+      const { data: lessonsData, error: lessonsError } = await supabase.from('lessons').select('*, lesson_exercises(*)');
+      if (lessonsError) {
+        toast({ title: "Error fetching lessons", description: lessonsError.message });
+      } else {
+        setLessons(lessonsData);
+      }
     }
   };
 
   return (
     <div className="p-4 grid grid-cols-3 gap-4">
       <div>
-        <h2 className="text-xl font-bold mb-4">Available Exercises</h2>
+        <h2 className="text-xl font-bold mb-4">Lessons</h2>
+        <Button onClick={handleCreateNew} className="mb-4">Create New Lesson</Button>
+        <div className="max-h-96 overflow-y-auto">
+          <ul>
+            {lessons.map(lesson => (
+              <li key={lesson.id} className="flex justify-between items-center">
+                {lesson.name}
+                <Button onClick={() => handleSelectLesson(lesson)}>Edit</Button>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <h2 className="text-xl font-bold mb-4 mt-8">Available Exercises</h2>
         <div className="max-h-96 overflow-y-auto">
           <h3 className="text-lg font-bold">Scales</h3>
           <ul>
@@ -141,6 +209,14 @@ const LessonBuilder = () => {
               <div key={index} className="border p-4 rounded">
                 <h4 className="font-semibold">{exercise.name}</h4>
                 <div className="grid grid-cols-2 gap-4 mt-2">
+                  <div>
+                    <Label>Time (seconds)</Label>
+                    <Input type="number" value={exercise.time || ''} onChange={(e) => updateExercise(index, 'time', parseInt(e.target.value))} />
+                  </div>
+                  <div>
+                    <Label>Description (HTML)</Label>
+                    <Input value={exercise.description || ''} onChange={(e) => updateExercise(index, 'description', e.target.value)} />
+                  </div>
                   <div>
                     <Label>Metronome Mode</Label>
                     <Select value={exercise.metronome_mode} onValueChange={(value) => updateExercise(index, 'metronome_mode', value)}>
@@ -197,6 +273,7 @@ const LessonBuilder = () => {
                     </Select>
                   </div>
                 </div>
+                <Button variant="destructive" size="sm" className="mt-2" onClick={() => removeExercise(index)}>Remove</Button>
               </div>
             ))}
           </div>

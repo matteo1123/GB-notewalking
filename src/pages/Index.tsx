@@ -1,14 +1,14 @@
-import { useState } from "react";
-import { MetronomeMode } from "@/components/MetronomeControls";
 import { MetronomeScreen } from "@/components/MetronomeScreen";
+import Header from "@/components/Header";
 
 const Index = () => {
   return (
-    <div className="h-screen w-screen flex flex-col bpm-control-area overflow-hidden">
-      <main className="flex-grow p-4">
+    <div className="h-screen w-screen flex flex-col overflow-hidden bg-background text-foreground">
+      <Header />
+      <main className="flex-grow flex items-center justify-center bpm-control-area">
         <MetronomeScreen initialMode="regular" />
       </main>
-      <footer className="flex-shrink-0 p-4 bg-card/50 border-t border-border/50">
+      <footer className="flex-shrink-0 p-4 bg-card/50 border-t border-border/50 text-center">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
           <div className="text-center">
             <div className="font-semibold text-primary mb-1">Regular Mode</div>

@@ -21,7 +21,6 @@ import { Tables } from "@/integrations/supabase/types";
 import { PostgrestError } from "@supabase/supabase-js";
 import { useAuth } from "@/contexts/AuthContext";
 import { Input } from "./ui/input";
-import { SpeedTrainerControls } from "./SpeedTrainerControls";
 import { Label } from "./ui/label";
 // Defaults to quarter notes (1 step per beat) when subdivision is missing
 // Accepts legacy notes with 'duration' in seconds; otherwise duration = 1 step
@@ -463,20 +462,6 @@ const RiffPractice = ({
 
           {/* Right side: Metronome */}
           <div className="flex items-start space-x-4">
-            <SpeedTrainerControls
-              mode={mode}
-              endBpm={lessonExercise?.target_bpm || metronomeBpm}
-              measures={
-                lessonExercise
-                  ? (lessonExercise.increments || 1) *
-                    (lessonExercise.measures_per_bpm || 4)
-                  : 8
-              }
-              measuresPerBpmChange={lessonExercise?.measures_per_bpm || 4}
-              onEndBpmChange={() => {}}
-              onMeasuresChange={() => {}}
-              onMeasuresPerBpmChangeChange={() => {}}
-            />
             <div className="flex flex-col items-center space-y-2">
               <BeatVisualizer
                 currentBeat={metronome.state.currentBeat}
@@ -491,34 +476,25 @@ const RiffPractice = ({
                 size="lg"
               />
               <MetronomeControls
-                mode={mode}
                 isPlaying={metronome.state.isPlaying}
-                currentBpm={
-                  metronome.state.isPlaying
-                    ? metronome.state.currentBpm
-                    : metronomeBpm
-                }
-                endBpm={lessonExercise?.target_bpm || metronomeBpm}
-                measures={
-                  lessonExercise
-                    ? (lessonExercise.increments || 1) *
-                      (lessonExercise.measures_per_bpm || 4)
-                    : 8
-                }
-                measuresPerBpmChange={lessonExercise?.measures_per_bpm || 4}
-                onModeChange={lessonExercise ? () => {} : setMode}
                 onPlayPause={handlePlay}
-                onStop={handleStop}
                 onRestart={handleRestart}
-                loop={loop}
-                onLoopChange={setLoop}
-                onEndBpmChange={() => {}}
-                onMeasuresChange={() => {}}
-                onMeasuresPerBpmChangeChange={() => {}}
-                onCurrentBpmChange={
-                  lessonExercise ? () => {} : handleMetronomeBpmChange
-                }
-                compact={true}
+                onStateChange={(newState) => {
+                  setMode(newState.mode);
+                  setMetronomeBpm(newState.startBpm);
+                  setLoop(newState.loop);
+                }}
+                initialState={{
+                  mode,
+                  startBpm: metronomeBpm,
+                  endBpm: lessonExercise?.target_bpm || metronomeBpm,
+                  increments: lessonExercise?.increments || 8,
+                  measuresPerIncrement: lessonExercise?.measures_per_bpm || 4,
+                  loop,
+                  progressiveStepBpm:
+                    lessonExercise?.progressive_step_bpm || 5,
+                }}
+                compact
               />
             </div>
           </div>

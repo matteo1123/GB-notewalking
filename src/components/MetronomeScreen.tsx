@@ -52,13 +52,26 @@ export function MetronomeScreen({
   onTick,
   onStop,
 }: MetronomeScreenProps) {
-  const [mode, setMode] = useState<MetronomeMode>(initialMode);
-  const [startBpm, setStartBpm] = useState<number>(initialStartBpm);
-  const [endBpm, setEndBpm] = useState<number>(initialEndBpm);
-  const [increments, setIncrements] = useState<number>(initialIncrements);
-  const [measuresPerIncrement, setMeasuresPerIncrement] = useState<number>(
-    initialMeasuresPerIncrement
-  );
+  const [
+    {
+      mode,
+      startBpm,
+      endBpm,
+      increments,
+      measuresPerIncrement,
+      progressiveStepBpm: currentProgressiveStepBpm,
+      loop,
+    },
+    setSettings,
+  ] = useState({
+    mode: initialMode,
+    startBpm: initialStartBpm,
+    endBpm: initialEndBpm,
+    increments: initialIncrements,
+    measuresPerIncrement: initialMeasuresPerIncrement,
+    progressiveStepBpm: progressiveStepBpm,
+    loop: false,
+  });
 
   const metronome = useMetronome({
     mode,
@@ -66,22 +79,14 @@ export function MetronomeScreen({
     endBpm,
     measures: increments,
     measuresPerBpmChange: measuresPerIncrement,
-    progressiveStepBpm,
+    progressiveStepBpm: currentProgressiveStepBpm,
     onTick,
   });
-
-  const handleModeChange = useCallback(
-    (newMode: MetronomeMode) => {
-      metronome.stop();
-      setMode(newMode);
-    },
-    [metronome]
-  );
 
   const handleCurrentBpmChange = useCallback(
     (bpm: number) => {
       const wasPlaying = metronome.state.isPlaying;
-      setStartBpm(bpm);
+      setSettings((prev) => ({ ...prev, startBpm: bpm }));
       if (mode !== "regular" && wasPlaying) {
         metronome.stop();
         setTimeout(() => {
@@ -92,14 +97,12 @@ export function MetronomeScreen({
     [metronome, mode]
   );
 
-  // Global BPM adjustment controls - always adjust the base/start BPM
   useBpmControls({
     currentBpm: startBpm,
     onBpmChange: handleCurrentBpmChange,
     isEnabled: true,
   });
 
-  // Optional progress callback for parent controllers (Exercise/Lesson)
   useEffect(() => {
     if (!onProgress) return;
     onProgress({
@@ -118,7 +121,6 @@ export function MetronomeScreen({
     onProgress,
   ]);
 
-  // Expose control functions to parent
   useEffect(() => {
     if (!exposeControlsRef) return;
     exposeControlsRef.current = {
@@ -138,7 +140,6 @@ export function MetronomeScreen({
     metronome.togglePlayPause,
   ]);
 
-  // Auto start if requested
   useEffect(() => {
     if (autoStart) {
       metronome.start();
@@ -149,15 +150,16 @@ export function MetronomeScreen({
   const effectiveStartBpm =
     mode === "regular"
       ? startBpm
-      : startBpm + (metronome.state.progressiveRound - 1) * progressiveStepBpm;
+      : startBpm +
+        (metronome.state.progressiveRound - 1) * currentProgressiveStepBpm;
   const effectiveTargetBpm =
     mode === "progressive"
-      ? endBpm + (metronome.state.progressiveRound - 1) * progressiveStepBpm
+      ? endBpm +
+        (metronome.state.progressiveRound - 1) * currentProgressiveStepBpm
       : endBpm;
 
   return (
     <div className="flex flex-col h-full">
-      {/* Beat Visualizer */}
       <div className="flex-grow flex items-center justify-center">
         <BeatVisualizer
           currentBeat={metronome.state.currentBeat}
@@ -173,34 +175,24 @@ export function MetronomeScreen({
         />
       </div>
 
-      {/* Controls */}
       {showControls && (
         <div className="flex-shrink-0 p-4 space-y-4">
           <MetronomeControls
-            mode={mode}
             isPlaying={metronome.state.isPlaying}
-            currentBpm={
-              mode === "regular" || !metronome.state.isPlaying
-                ? startBpm
-                : metronome.state.currentBpm
-            }
-            endBpm={endBpm}
-            measures={increments}
-            measuresPerBpmChange={measuresPerIncrement}
-            onModeChange={handleModeChange}
+            initialState={{
+              mode,
+              startBpm,
+              endBpm,
+              increments,
+              measuresPerIncrement,
+              progressiveStepBpm: currentProgressiveStepBpm,
+              loop,
+            }}
             onPlayPause={metronome.togglePlayPause}
-            onStop={() => {
-              metronome.stop();
-              onStop?.();
-            }}
-            onEndBpmChange={setEndBpm}
-            onMeasuresChange={setIncrements}
-            onMeasuresPerBpmChangeChange={setMeasuresPerIncrement}
-            onCurrentBpmChange={handleCurrentBpmChange}
-            progressiveStepBpm={progressiveStepBpm}
-            onProgressiveStepBpmChange={() => {
-              /* parent may control */
-            }}
+            onRestart={metronome.restart}
+            onStateChange={(newState) =>
+              setSettings((prev) => ({ ...prev, ...newState }))
+            }
             compact
           />
 
@@ -212,7 +204,7 @@ export function MetronomeScreen({
             currentBpm={metronome.state.currentBpm}
             targetBpm={effectiveTargetBpm}
             startBpmBase={startBpm}
-            progressiveStepBpm={progressiveStepBpm}
+            progressiveStepBpm={currentProgressiveStepBpm}
             isPlaying={metronome.state.isPlaying}
           />
         </div>

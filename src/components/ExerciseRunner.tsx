@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import MetronomeScreen from "@/components/MetronomeScreen";
 import { ExerciseSettings, ExerciseStatus } from "@/types/practice";
 
@@ -25,11 +25,6 @@ export function ExerciseRunner({
   } | null>(null);
   const [completed, setCompleted] = useState(false);
 
-  const totalPlannedMeasures = useMemo(
-    () => settings.increments * settings.measuresPerIncrement,
-    [settings.increments, settings.measuresPerIncrement]
-  );
-
   useEffect(() => {
     if (!autoStart || !controlsRef.current) return;
     controlsRef.current.start();
@@ -37,8 +32,6 @@ export function ExerciseRunner({
 
   const handleProgress = (info: ExerciseStatus) => {
     onStatus?.(info);
-    // Completion rules: when we exceed the planned measures for a cycle (for speed-trainer) we linger;
-    // Parent may decide the limit using onStatus. If we want auto-complete when planned measures are done, do it here:
     if (!completed && settings.mode !== "regular") {
       if (info.currentMeasure > info.totalPlannedMeasures) {
         setCompleted(true);
@@ -57,7 +50,14 @@ export function ExerciseRunner({
       progressiveStepBpm={settings.progressiveStepBpm}
       showControls={!hideControls}
       autoStart={autoStart}
-      exposeControlsRef={controlsRef as any}
+      exposeControlsRef={
+        controlsRef as React.MutableRefObject<{
+          start: () => void;
+          pause: () => void;
+          stop: () => void;
+          togglePlayPause: () => void;
+        } | null>
+      }
       onProgress={handleProgress}
     />
   );

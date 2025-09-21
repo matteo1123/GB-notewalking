@@ -16,6 +16,7 @@ export interface MetronomeSettings {
   measuresPerBpmChange?: number;
   progressiveStepBpm?: number;
   onTick?: (state: MetronomeState) => void;
+  loop?: boolean;
 }
 
 export const DEFAULT_PROGRESSIVE_STEP_BPM = 5;
@@ -160,7 +161,7 @@ export function useMetronome(settings: MetronomeSettings) {
       if (settings.mode !== "regular") {
         const totalPlannedMeasures = settings.measures * measuresPerBpmChange;
         if (measureCountRef.current > totalPlannedMeasures) {
-          if (settings.mode === "progressive") {
+          if (settings.mode === "progressive" || settings.loop) {
             // Next progressive round
             progressiveRoundRef.current++;
             measureCountRef.current = 1;
@@ -244,11 +245,18 @@ export function useMetronome(settings: MetronomeSettings) {
     }
   }, [state.isPlaying, start, pause]);
 
+  const restart = useCallback(() => {
+    stop();
+    // Delay start to allow state to settle
+    setTimeout(start, 50);
+  }, [stop, start]);
+
   return {
     state,
     start,
     pause,
     stop,
+    restart,
     togglePlayPause,
     stats: {
       beatsPerIncrement: measuresPerBpmChange * 4,

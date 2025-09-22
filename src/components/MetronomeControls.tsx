@@ -64,6 +64,8 @@ export function MetronomeControls({
     ...initialState,
   });
 
+  const syncingFromPropsRef = useRef(false);
+
   const endBpmRef = useRef<HTMLInputElement>(null);
   const incrementsRef = useRef<HTMLInputElement>(null);
   const measuresPerBpmRef = useRef<HTMLInputElement>(null);
@@ -74,6 +76,74 @@ export function MetronomeControls({
   };
 
   useEffect(() => {
+    setState((prevState) => {
+      let changed = false;
+      const nextState: MetronomeSettings = { ...prevState };
+
+      if (initialState.mode !== undefined && initialState.mode !== prevState.mode) {
+        nextState.mode = initialState.mode as MetronomeMode;
+        changed = true;
+      }
+      if (
+        initialState.startBpm !== undefined &&
+        initialState.startBpm !== prevState.startBpm
+      ) {
+        nextState.startBpm = initialState.startBpm;
+        changed = true;
+      }
+      if (initialState.endBpm !== undefined && initialState.endBpm !== prevState.endBpm) {
+        nextState.endBpm = initialState.endBpm;
+        changed = true;
+      }
+      if (
+        initialState.increments !== undefined &&
+        initialState.increments !== prevState.increments
+      ) {
+        nextState.increments = initialState.increments;
+        changed = true;
+      }
+      if (
+        initialState.measuresPerIncrement !== undefined &&
+        initialState.measuresPerIncrement !== prevState.measuresPerIncrement
+      ) {
+        nextState.measuresPerIncrement = initialState.measuresPerIncrement;
+        changed = true;
+      }
+      if (
+        initialState.progressiveStepBpm !== undefined &&
+        initialState.progressiveStepBpm !== prevState.progressiveStepBpm
+      ) {
+        nextState.progressiveStepBpm = initialState.progressiveStepBpm;
+        changed = true;
+      }
+      if (initialState.loop !== undefined && initialState.loop !== prevState.loop) {
+        nextState.loop = initialState.loop;
+        changed = true;
+      }
+
+      if (changed) {
+        syncingFromPropsRef.current = true;
+        return nextState;
+      }
+
+      return prevState;
+    });
+  }, [
+    initialState.mode,
+    initialState.startBpm,
+    initialState.endBpm,
+    initialState.increments,
+    initialState.measuresPerIncrement,
+    initialState.progressiveStepBpm,
+    initialState.loop,
+  ]);
+
+  useEffect(() => {
+    if (syncingFromPropsRef.current) {
+      syncingFromPropsRef.current = false;
+      return;
+    }
+
     onStateChange({
       mode,
       startBpm,

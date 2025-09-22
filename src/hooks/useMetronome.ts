@@ -21,6 +21,12 @@ export interface MetronomeSettings {
 
 export const DEFAULT_PROGRESSIVE_STEP_BPM = 5;
 
+function clamp(value: number, min: number, max: number) {
+  if (value < min) return min;
+  if (value > max) return max;
+  return value;
+}
+
 export function useMetronome(settings: MetronomeSettings) {
   const [state, setState] = useState<MetronomeState>({
     isPlaying: false,
@@ -31,16 +37,31 @@ export function useMetronome(settings: MetronomeSettings) {
   });
 
   const audioContextRef = useRef<AudioContext | null>(null);
-  const nextBeatTimeRef = useRef<number>(0);
+  const timeoutRef = useRef<number | null>(null);
+  const isPlayingRef = useRef(false);
   const beatCountRef = useRef<number>(0);
   const measureCountRef = useRef<number>(1);
   const progressiveRoundRef = useRef<number>(1);
-  const intervalRef = useRef<number | null>(null);
-  const measuresPerBpmChange = settings.measuresPerBpmChange || 1;
-  const progressiveStepBpm =
-    settings.progressiveStepBpm ?? DEFAULT_PROGRESSIVE_STEP_BPM;
+  const settingsRef = useRef(settings);
 
-  // Initialize audio context
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
+
+  const clearScheduledBeat = useCallback(() => {
+    if (timeoutRef.current !== null) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      isPlayingRef.current = false;
+      clearScheduledBeat();
+    };
+  }, [clearScheduledBeat]);
+
   const initAudioContext = useCallback(() => {
     if (!audioContextRef.current) {
       audioContextRef.current = new (window.AudioContext ||
@@ -49,54 +70,61 @@ export function useMetronome(settings: MetronomeSettings) {
     return audioContextRef.current;
   }, []);
 
-  // Play click sound
   const playClick = useCallback(
     (isDownbeat = false) => {
       const audioContext = initAudioContext();
-      const oscillator = audioContext.createOscillator();
-      const gainNode = audioContext.createGain();
+      if (!audioContext) return;
 
-      oscillator.connect(gainNode);
-      gainNode.connect(audioContext.destination);
+      try {
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
 
-      // Higher pitch for downbeat (beat 1)
-      oscillator.frequency.setValueAtTime(
-        isDownbeat ? 1000 : 800,
-        audioContext.currentTime
-      );
-      oscillator.type = "square";
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
 
-      gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(
-        0.01,
-        audioContext.currentTime + 0.1
-      );
+        oscillator.frequency.setValueAtTime(
+          isDownbeat ? 1000 : 800,
+          audioContext.currentTime
+        );
+        oscillator.type = "square";
 
-      oscillator.start(audioContext.currentTime);
-      oscillator.stop(audioContext.currentTime + 0.1);
+        gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(
+          0.01,
+          audioContext.currentTime + 0.1
+        );
+
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.1);
+      } catch (error) {
+        console.error("Metronome click failed", error);
+      }
     },
     [initAudioContext]
   );
 
-  // Calculate current BPM based on mode and progress
   const calculateCurrentBpm = useCallback(
     (beat: number, measure: number, round: number) => {
-      if (settings.mode === "regular") {
-        return settings.startBpm;
+      const currentSettings = settingsRef.current;
+      const measuresPerBpmChange = currentSettings.measuresPerBpmChange || 1;
+      const progressiveStepBpm =
+        currentSettings.progressiveStepBpm ?? DEFAULT_PROGRESSIVE_STEP_BPM;
+
+      if (currentSettings.mode === "regular") {
+        return currentSettings.startBpm;
       }
 
-      let baseBpm = settings.startBpm;
-      let targetBpm = settings.endBpm;
+      let baseBpm = currentSettings.startBpm;
+      let targetBpm = currentSettings.endBpm;
 
-      if (settings.mode === "progressive") {
-        baseBpm = settings.startBpm + (round - 1) * progressiveStepBpm;
-        targetBpm = settings.endBpm + (round - 1) * progressiveStepBpm;
+      if (currentSettings.mode === "progressive") {
+        baseBpm = currentSettings.startBpm + (round - 1) * progressiveStepBpm;
+        targetBpm = currentSettings.endBpm + (round - 1) * progressiveStepBpm;
       }
 
-      // Both speed-trainer and progressive use the same logic
       if (
-        settings.mode === "speed-trainer" ||
-        settings.mode === "progressive"
+        currentSettings.mode === "speed-trainer" ||
+        currentSettings.mode === "progressive"
       ) {
         const totalBeatsElapsed = (measure - 1) * 4 + (beat - 1);
         const beatsPerIncrement = measuresPerBpmChange * 4;
@@ -104,124 +132,140 @@ export function useMetronome(settings: MetronomeSettings) {
           totalBeatsElapsed / beatsPerIncrement
         );
 
-        // settings.measures is number of increments
-        const numberOfIncrements = settings.measures;
-        // Allow reaching the target on the final increment; include the end step
-        const clampedIncrement = Math.min(currentIncrement, numberOfIncrements);
+        const numberOfIncrements = currentSettings.measures;
+        const clampedIncrement = clamp(currentIncrement, 0, numberOfIncrements);
         const bpmIncrementSize =
           numberOfIncrements > 0
             ? (targetBpm - baseBpm) / numberOfIncrements
             : 0;
+
         let currentBpmValue = baseBpm + clampedIncrement * bpmIncrementSize;
-        // Clamp within [min(base, target), max(base, target)] so we never dip below base on first tick
-        const low = Math.min(baseBpm, targetBpm);
-        const high = Math.max(baseBpm, targetBpm);
-        if (currentBpmValue < low) currentBpmValue = low;
-        if (currentBpmValue > high) currentBpmValue = high;
+        currentBpmValue = clamp(
+          currentBpmValue,
+          Math.min(baseBpm, targetBpm),
+          Math.max(baseBpm, targetBpm)
+        );
 
         return Number(currentBpmValue.toFixed(2));
       }
 
-      // Regular mode fallback
       return baseBpm;
     },
-    [settings, measuresPerBpmChange]
+    []
   );
 
-  // Process beat
   const scheduleNextBeat = useCallback(() => {
+    if (!isPlayingRef.current) {
+      return;
+    }
+
+    const currentSettings = settingsRef.current;
+    const measuresPerBpmChange = currentSettings.measuresPerBpmChange || 1;
+
+    const beat = (beatCountRef.current % 4) + 1;
     const currentBpm = calculateCurrentBpm(
-      (beatCountRef.current % 4) + 1,
+      beat,
       measureCountRef.current,
       progressiveRoundRef.current
     );
 
-    const currentBeat = (beatCountRef.current % 4) + 1;
-    const isDownbeat = currentBeat === 1;
+    playClick(beat === 1);
 
-    // Play the click sound
-    playClick(isDownbeat);
-
-    // Update state
-    setState((prev) => ({
-      ...prev,
+    const nextState: MetronomeState = {
+      isPlaying: true,
       currentBpm,
-      currentBeat,
+      currentBeat: beat,
       currentMeasure: measureCountRef.current,
       progressiveRound: progressiveRoundRef.current,
-    }));
+    };
 
-    // Advance counters
-    beatCountRef.current++;
+    setState(nextState);
+
+    if (currentSettings.onTick) {
+      currentSettings.onTick(nextState);
+    }
+
+    beatCountRef.current += 1;
 
     if (beatCountRef.current % 4 === 0) {
-      measureCountRef.current++;
+      measureCountRef.current += 1;
 
-      // After completing all planned increments, either loop (progressive) or linger (speed-trainer)
-      if (settings.mode !== "regular") {
-        const totalPlannedMeasures = settings.measures * measuresPerBpmChange;
-        if (measureCountRef.current > totalPlannedMeasures) {
-          if (settings.mode === "progressive" || settings.loop) {
-            // Next progressive round
-            progressiveRoundRef.current++;
+      if (currentSettings.mode !== "regular") {
+        const plannedMeasures =
+          (currentSettings.measures || 0) * measuresPerBpmChange;
+
+        if (
+          plannedMeasures > 0 &&
+          measureCountRef.current > plannedMeasures
+        ) {
+          if (currentSettings.mode === "progressive" || currentSettings.loop) {
+            progressiveRoundRef.current += 1;
             measureCountRef.current = 1;
             beatCountRef.current = 0;
-          } else {
-            // speed-trainer: linger at final tempo; do nothing
           }
         }
       }
     }
-    if (settings.onTick) {
-      settings.onTick(state);
-    }
-  }, [calculateCurrentBpm, playClick, settings, state]);
 
-  // Main metronome loop using setInterval instead of requestAnimationFrame
-  useEffect(() => {
-    // Clear any existing interval first to prevent multiple intervals
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
+    if (!isPlayingRef.current) {
+      return;
     }
 
-    if (state.isPlaying) {
-      const currentBpm = calculateCurrentBpm(
-        (beatCountRef.current % 4) + 1,
-        measureCountRef.current,
-        progressiveRoundRef.current
-      );
+    const nextBeat = (beatCountRef.current % 4) + 1;
+    const nextBpm = calculateCurrentBpm(
+      nextBeat,
+      measureCountRef.current,
+      progressiveRoundRef.current
+    );
+    const beatLength = (60 / nextBpm) * 1000;
 
-      const beatLength = (60 / currentBpm) * 1000; // Convert to milliseconds
-
-      intervalRef.current = window.setInterval(() => {
-        scheduleNextBeat();
-      }, beatLength);
-    }
-
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-    };
-  }, [state.isPlaying, state.currentBpm, calculateCurrentBpm, scheduleNextBeat]);
+    clearScheduledBeat();
+    timeoutRef.current = window.setTimeout(scheduleNextBeat, beatLength);
+  }, [calculateCurrentBpm, playClick, clearScheduledBeat]);
 
   const start = useCallback(() => {
-    initAudioContext();
-    setState((prev) => ({ ...prev, isPlaying: true }));
-  }, [initAudioContext]);
+    const audioContext = initAudioContext();
+    if (audioContext?.state === "suspended") {
+      audioContext.resume().catch((error) => {
+        console.error("Unable to resume audio context", error);
+      });
+    }
+
+    if (isPlayingRef.current) {
+      return;
+    }
+
+    isPlayingRef.current = true;
+
+    beatCountRef.current = 0;
+    measureCountRef.current = 1;
+    progressiveRoundRef.current = 1;
+
+    setState((prev) => ({
+      ...prev,
+      isPlaying: true,
+      currentBpm: settingsRef.current.startBpm,
+      currentBeat: 1,
+      currentMeasure: 1,
+      progressiveRound: 1,
+    }));
+
+    clearScheduledBeat();
+    scheduleNextBeat();
+  }, [initAudioContext, scheduleNextBeat, clearScheduledBeat]);
 
   const pause = useCallback(() => {
+    if (!isPlayingRef.current) {
+      return;
+    }
+    isPlayingRef.current = false;
+    clearScheduledBeat();
     setState((prev) => ({ ...prev, isPlaying: false }));
-  }, []);
+  }, [clearScheduledBeat]);
 
   const stop = useCallback(() => {
-    // Clear the interval first
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
+    isPlayingRef.current = false;
+    clearScheduledBeat();
 
     setState((prev) => ({
       ...prev,
@@ -229,27 +273,54 @@ export function useMetronome(settings: MetronomeSettings) {
       currentBeat: 1,
       currentMeasure: 1,
       progressiveRound: 1,
-      currentBpm: settings.startBpm,
+      currentBpm: settingsRef.current.startBpm,
     }));
+
     beatCountRef.current = 0;
     measureCountRef.current = 1;
     progressiveRoundRef.current = 1;
-    nextBeatTimeRef.current = 0;
-  }, [settings.startBpm]);
+  }, [clearScheduledBeat]);
 
   const togglePlayPause = useCallback(() => {
-    if (state.isPlaying) {
+    if (isPlayingRef.current) {
       pause();
     } else {
       start();
     }
-  }, [state.isPlaying, start, pause]);
+  }, [start, pause]);
 
   const restart = useCallback(() => {
     stop();
-    // Delay start to allow state to settle
     setTimeout(start, 50);
   }, [stop, start]);
+
+  useEffect(() => {
+    if (!isPlayingRef.current) {
+      setState((prev) => ({
+        ...prev,
+        currentBpm: settings.startBpm,
+      }));
+    }
+  }, [settings.startBpm]);
+
+  useEffect(() => {
+    if (!isPlayingRef.current) {
+      return;
+    }
+
+    clearScheduledBeat();
+    timeoutRef.current = window.setTimeout(scheduleNextBeat, 0);
+  }, [
+    settings.mode,
+    settings.startBpm,
+    settings.endBpm,
+    settings.measures,
+    settings.measuresPerBpmChange,
+    settings.progressiveStepBpm,
+    settings.loop,
+    scheduleNextBeat,
+    clearScheduledBeat,
+  ]);
 
   return {
     state,
@@ -259,10 +330,12 @@ export function useMetronome(settings: MetronomeSettings) {
     restart,
     togglePlayPause,
     stats: {
-      beatsPerIncrement: measuresPerBpmChange * 4,
+      beatsPerIncrement: (settings.measuresPerBpmChange || 1) * 4,
       totalPlannedIncrements: settings.measures,
-      totalPlannedMeasures: settings.measures * measuresPerBpmChange,
-      progressiveStepBpm,
+      totalPlannedMeasures:
+        (settings.measuresPerBpmChange || 1) * settings.measures,
+      progressiveStepBpm:
+        settings.progressiveStepBpm ?? DEFAULT_PROGRESSIVE_STEP_BPM,
     },
   };
 }

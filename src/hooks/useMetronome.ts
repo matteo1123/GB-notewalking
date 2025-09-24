@@ -329,6 +329,7 @@ export function useMetronome(settings: MetronomeSettings) {
     stop,
     restart,
     togglePlayPause,
+    audioContext: audioContextRef.current,
     stats: {
       beatsPerIncrement: (settings.measuresPerBpmChange || 1) * 4,
       totalPlannedIncrements: settings.measures,

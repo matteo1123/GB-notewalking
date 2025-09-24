@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { RepertoireItem } from "@/types/repertoire";
 import { useMetronome, MetronomeSettings } from "@/hooks/useMetronome";
+import { useNotePlayer } from "@/hooks/useNotePlayer";
 import { useBpmControls } from "@/hooks/useBpmControls";
 import NoteDisplay from "./NoteDisplay";
 import { BeatVisualizer } from "./BeatVisualizer";
@@ -22,6 +23,7 @@ import { PostgrestError } from "@supabase/supabase-js";
 import { useAuth } from "@/contexts/AuthContext";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
+import { Checkbox } from "./ui/checkbox";
 // Defaults to quarter notes (1 step per beat) when subdivision is missing
 // Accepts legacy notes with 'duration' in seconds; otherwise duration = 1 step
 
@@ -92,6 +94,8 @@ const RiffPractice = ({
   const [learnNotes, setLearnNotes] = useState<Note[]>([]);
   const [currentLearnIndex, setCurrentLearnIndex] = useState(0);
   const [harmonicContext, setHarmonicContext] = useState(repertoireItem.major_key);
+  const [playContextNote, setPlayContextNote] = useState(false);
+  const tickCountRef = useRef(0);
 
   useEffect(() => {
     setHarmonicContext(repertoireItem.major_key);
@@ -198,9 +202,25 @@ const RiffPractice = ({
     onTick: () => {
       if (isPlaying) {
         setNoteIndex((prevIndex) => prevIndex + 1);
+        if (playContextNote) {
+          tickCountRef.current += 1;
+          if (tickCountRef.current % 4 === 0) {
+            const note = harmonicContext.replace("#", "s").replace("♭", "b");
+            playNote(`${note}3`);
+          }
+        }
       }
     },
   });
+
+  const { playNote } = useNotePlayer(metronome.audioContext);
+
+  useEffect(() => {
+    if (playContextNote && isPlaying) {
+      const note = harmonicContext.replace("#", "s").replace("♭", "b");
+      playNote(`${note}3`);
+    }
+  }, [playContextNote, isPlaying, harmonicContext, playNote]);
 
   // BPM control functionality
   const handleMetronomeBpmChange = useCallback(
@@ -226,6 +246,7 @@ const RiffPractice = ({
   const handleStop = useCallback(() => {
     metronome.stop();
     setIsPlaying(false);
+    tickCountRef.current = 0;
     setNoteIndex(0);
     setElapsedTime(0);
     setStartTime(null);
@@ -233,6 +254,7 @@ const RiffPractice = ({
 
   const handleRestart = useCallback(() => {
     setNoteIndex(0);
+    tickCountRef.current = 0;
   }, []);
 
   const handleComplete = useCallback(() => {
@@ -399,6 +421,14 @@ const RiffPractice = ({
                     ))}
                   </SelectContent>
                 </Select>
+                <div className="flex items-center space-x-2 ml-4">
+                  <Checkbox
+                    id="play-context-note"
+                    checked={playContextNote}
+                    onCheckedChange={(checked) => setPlayContextNote(Boolean(checked))}
+                  />
+                  <Label htmlFor="play-context-note">Play Context Note</Label>
+                </div>
               </div>
             </div>
             <div>

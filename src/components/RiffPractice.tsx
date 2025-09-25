@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { RepertoireItem } from "@/types/repertoire";
 import { useMetronome, MetronomeSettings } from "@/hooks/useMetronome";
 import { useNotePlayer } from "@/hooks/useNotePlayer";
+import { useRecorder } from "@/hooks/useRecorder";
 import { useBpmControls } from "@/hooks/useBpmControls";
 import NoteDisplay from "./NoteDisplay";
 import { BeatVisualizer } from "./BeatVisualizer";
@@ -24,6 +25,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Checkbox } from "./ui/checkbox";
+import { RecordingControls } from "./RecordingControls";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
+import { useToast } from "./ui/use-toast";
 // Defaults to quarter notes (1 step per beat) when subdivision is missing
 // Accepts legacy notes with 'duration' in seconds; otherwise duration = 1 step
 
@@ -74,6 +78,7 @@ const RiffPractice = ({
   lessonExercise,
 }: RiffPracticeProps) => {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [noteIndex, setNoteIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [mode, setMode] = useState<MetronomeMode>(
@@ -96,6 +101,14 @@ const RiffPractice = ({
   const [harmonicContext, setHarmonicContext] = useState(repertoireItem.major_key);
   const [playContextNote, setPlayContextNote] = useState(false);
   const tickCountRef = useRef(0);
+  const [isRecordingArmed, setIsRecordingArmed] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [autoRecord, setAutoRecord] = useState(false);
+  const autoRecordStartClickRef = useRef<number | null>(null);
+  const recorder = useRecorder();
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [autoRecordCountdown, setAutoRecordCountdown] = useState<number | null>(null);
+  const [hasRecorded, setHasRecorded] = useState(false);
 
   useEffect(() => {
     setHarmonicContext(repertoireItem.major_key);
@@ -137,56 +150,78 @@ const RiffPractice = ({
     fetchPracticeLog();
   }, [repertoireItem.id, user]);
 
-  const handleSavePractice = async () => {
-    if (!user) return;
+  useEffect(() => {
+    const fetchSettings = async () => {
+      if (!user) return;
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("settings")
+        .eq("id", user.id)
+        .maybeSingle();
 
-    const practiceData = {
-      max_bpm: maxBpm === '' ? null : Number(maxBpm),
-      perfect_bpm: perfectBpm === '' ? null : Number(perfectBpm),
+      if (error) {
+        console.error("Error fetching settings:", error);
+      } else if (data && data.settings) {
+        const settings = data.settings as { autoRecord: boolean };
+        setAutoRecord(settings.autoRecord);
+      }
     };
 
-    let error: PostgrestError | null = null;
+    fetchSettings();
+  }, [user]);
 
-    if (practiceLog) {
-      // Update
-      const { error: updateError } = await supabase
-        .from('practice_log')
-        .update(practiceData)
-        .eq('id', practiceLog.id);
-      error = updateError;
-    } else {
-      // Insert
-      const { data: newLog, error: insertError } = await supabase
-        .from('practice_log')
-        .insert({
-          ...practiceData,
-          user_id: user.id,
-          scale_id: repertoireItem.id,
-          duration: 0, // FIXME: duration is not tracked yet
-        })
-        .select()
-        .single();
-      
-      if (newLog) {
-        setPracticeLog(newLog);
+  const handleSavePractice = async (audioBlob: Blob | null, duration: number) => {
+    if (!user || !activeSequence) return;
+
+    let audioUrl: string | null = null;
+    if (audioBlob) {
+      const { data, error } = await supabase.storage
+        .from('practice')
+        .upload(`${user.id}/${new Date().toISOString()}.webm`, audioBlob);
+
+      if (error) {
+        console.error('Error uploading recording:', error);
+      } else {
+        audioUrl = data.path;
       }
-      error = insertError;
     }
+
+    const { data: exerciseData, error: exerciseError } = await supabase
+      .from('exercises')
+      .insert({
+        user_id: user.id,
+        scale_id: repertoireItem.id,
+        sequence_id: activeSequence.id,
+        name: `${repertoireItem.name} - ${activeSequence.name}`,
+      })
+      .select()
+      .single();
+
+    if (exerciseError) {
+      console.error("Error creating exercise:", exerciseError);
+      return;
+    }
+
+    const { error } = await supabase.from('practice_log').insert({
+      user_id: user.id,
+      exercise_id: exerciseData.id,
+      scale_id: repertoireItem.id,
+      scale_shape_id: 'scale_shape' in repertoireItem ? repertoireItem.scale_shape as string : null,
+      max_bpm: Number(maxBpm) || null,
+      perfect_bpm: Number(perfectBpm) || null,
+      audio: audioUrl,
+      exercise_category: `${repertoireItem.name} - ${activeSequence.name}`,
+      duration: Math.round(duration),
+    });
 
     if (error) {
       console.error("Error saving practice log:", error);
     } else {
-      console.log("Practice log saved successfully.");
-      if (lessonExercise) {
-        const maxBpmNum = typeof maxBpm === 'number' ? maxBpm : parseInt(maxBpm as string, 10) || 0;
-        const perfectBpmNum = typeof perfectBpm === 'number' ? perfectBpm : parseInt(perfectBpm as string, 10) || 0;
-        const targetMet = ((lessonExercise.target_type === 'max' || lessonExercise.target_type === 'both') && maxBpmNum >= lessonExercise.target_bpm) ||
-                          ((lessonExercise.target_type === 'perfect' || lessonExercise.target_type === 'both') && perfectBpmNum >= lessonExercise.target_bpm);
-        if (targetMet) {
-          console.log("Target achieved!");
-        }
-      }
+      toast({
+        title: "Practice session saved!",
+      });
     }
+    setShowSaveDialog(false);
   };
 
   const metronomeSettings: MetronomeSettings = {
@@ -201,9 +236,40 @@ const RiffPractice = ({
     ...metronomeSettings,
     onTick: () => {
       if (isPlaying) {
+        tickCountRef.current += 1;
         setNoteIndex((prevIndex) => prevIndex + 1);
+
+        if (isRecordingArmed) {
+          if (tickCountRef.current >= 4) {
+            recorder.startRecording();
+            setIsRecording(true);
+            setIsRecordingArmed(false);
+            tickCountRef.current = 0; // Reset for recording duration
+          }
+        } else if (isRecording) {
+          const recordDuration = activeSequence?.num_clicks || 16;
+          setAutoRecordCountdown(recordDuration - tickCountRef.current);
+          if (tickCountRef.current >= recordDuration) {
+            recorder.stopRecording();
+            setIsRecording(false);
+            setAutoRecordCountdown(null);
+            setHasRecorded(true);
+            toast({
+              title: "Recording complete!",
+            });
+          }
+        } else if (autoRecord && !hasRecorded && autoRecordStartClickRef.current) {
+          const countdown = autoRecordStartClickRef.current - tickCountRef.current;
+          setAutoRecordCountdown(countdown);
+          if (countdown <= 0) {
+            recorder.startRecording();
+            setIsRecording(true);
+            setAutoRecordCountdown(null);
+            tickCountRef.current = 0;
+          }
+        }
+
         if (playContextNote) {
-          tickCountRef.current += 1;
           if (tickCountRef.current % 4 === 0) {
             const note = harmonicContext.replace("#", "s").replace("♭", "b");
             playNote(`${note}3`);
@@ -265,12 +331,26 @@ const RiffPractice = ({
 
   const handlePlay = useCallback(() => {
     if (!metronome.state.isPlaying) {
+      if (autoRecord && !hasRecorded) {
+        autoRecordStartClickRef.current = Math.floor(Math.random() * (90 - 30 + 1)) + 30;
+      }
       metronome.start();
     } else {
       metronome.pause();
+      if (isRecording) {
+        recorder.stopRecording();
+        setIsRecording(false);
+        setHasRecorded(true);
+        toast({
+          title: "Recording complete!",
+        });
+      }
+      if (tickCountRef.current > 40) {
+        setShowSaveDialog(true);
+      }
     }
     setIsPlaying(!metronome.state.isPlaying);
-  }, [metronome]);
+  }, [metronome, autoRecord, isRecording, recorder, hasRecorded, toast]);
 
   const baseExerciseNotes = useMemo(() => {
     if (!activeSequence) {
@@ -397,162 +477,191 @@ const RiffPractice = ({
     displayNotes.length > 0 ? (noteIndex / displayNotes.length) * 100 : 0;
 
   return (
-    <div className="flex flex-col h-screen bg-background text-foreground overflow-hidden">
-      <div className="flex-shrink-0 bg-card border-b border-border p-4">
-        <div className="flex justify-between items-start">
-          {/* Left side: Exercise Info and Controls */}
-          <div className="flex flex-col space-y-4">
-            <div className="flex items-center gap-4">
-              <h2 className="text-2xl font-bold">{repertoireItem.name}</h2>
-              <div className="flex items-center gap-2">
-                <Label htmlFor="harmonic-context" className="text-sm">Harmonic Context</Label>
+    <>
+      <div className="flex flex-col h-screen bg-background text-foreground overflow-hidden">
+        <div className="flex-shrink-0 bg-card border-b border-border p-4">
+          <div className="flex justify-between items-start">
+            {/* Left side: Exercise Info and Controls */}
+            <div className="flex flex-col space-y-4">
+              <div className="flex items-center gap-4">
+                <h2 className="text-2xl font-bold">{repertoireItem.name}</h2>
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="harmonic-context" className="text-sm">Harmonic Context</Label>
+                  <Select
+                    value={harmonicContext}
+                    onValueChange={setHarmonicContext}
+                  >
+                    <SelectTrigger className="w-[180px]" id="harmonic-context">
+                      <SelectValue placeholder="Select a key" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {MAJOR_KEYS.map((key) => (
+                        <SelectItem key={key.value} value={key.value}>
+                          {key.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="flex items-center space-x-2 ml-4">
+                    <Checkbox
+                      id="play-context-note"
+                      checked={playContextNote}
+                      onCheckedChange={(checked) => setPlayContextNote(Boolean(checked))}
+                    />
+                    <Label htmlFor="play-context-note">Play Context Note</Label>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <div className="flex items-center gap-2 text-sm mt-1">
+                  <span className="px-2 py-0.5 bg-secondary rounded-full text-secondary-foreground">
+                    {repertoireItem.category}
+                  </span>
+                  <span className="px-2 py-0.5 bg-secondary rounded-full text-secondary-foreground">
+                    {repertoireItem.difficulty}/10
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="auto-record"
+                    checked={autoRecord}
+                    onCheckedChange={(checked) => setAutoRecord(Boolean(checked))}
+                  />
+                  <Label htmlFor="auto-record">Auto Record</Label>
+                  {autoRecordCountdown !== null && (
+                    <span className="text-xs text-muted-foreground">
+                      ({autoRecordCountdown})
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div>
                 <Select
-                  value={harmonicContext}
-                  onValueChange={setHarmonicContext}
+                  value={activeSequence?.id.toString()}
+                  onValueChange={(value) => {
+                    const selectedSequence = availableSequences.find(
+                      (s) => s.id.toString() === value
+                    );
+                    if (selectedSequence) {
+                      setActiveSequence(selectedSequence);
+                    }
+                  }}
                 >
-                  <SelectTrigger className="w-[180px]" id="harmonic-context">
-                    <SelectValue placeholder="Select a key" />
+                  <SelectTrigger className="w-[280px]">
+                    <SelectValue placeholder="Select an exercise" />
                   </SelectTrigger>
                   <SelectContent>
-                    {MAJOR_KEYS.map((key) => (
-                      <SelectItem key={key.value} value={key.value}>
-                        {key.label}
+                    {availableSequences.map((sequence) => (
+                      <SelectItem key={sequence.id} value={sequence.id.toString()}>
+                        {sequence.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                <div className="flex items-center space-x-2 ml-4">
-                  <Checkbox
-                    id="play-context-note"
-                    checked={playContextNote}
-                    onCheckedChange={(checked) => setPlayContextNote(Boolean(checked))}
-                  />
-                  <Label htmlFor="play-context-note">Play Context Note</Label>
-                </div>
               </div>
             </div>
-            <div>
-              <div className="flex items-center gap-2 text-sm mt-1">
-                <span className="px-2 py-0.5 bg-secondary rounded-full text-secondary-foreground">
-                  {repertoireItem.category}
-                </span>
-                <span className="px-2 py-0.5 bg-secondary rounded-full text-secondary-foreground">
-                  {repertoireItem.difficulty}/10
-                </span>
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <Label htmlFor="max-bpm" className="text-sm">Max BPM</Label>
-                <Input
-                  id="max-bpm"
-                  type="number"
-                  value={maxBpm}
-                  onChange={(e) => setMaxBpm(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
-                  className="w-24 h-10 text-center"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <Label htmlFor="perfect-bpm" className="text-sm">Perfect BPM</Label>
-                <Input
-                  id="perfect-bpm"
-                  type="number"
-                  value={perfectBpm}
-                  onChange={(e) => setPerfectBpm(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
-                  className="w-24 h-10 text-center"
-                />
-              </div>
-              <Button onClick={handleSavePractice} size="lg">Save</Button>
-            </div>
-            <div>
-              <Select
-                value={activeSequence?.id.toString()}
-                onValueChange={(value) => {
-                  const selectedSequence = availableSequences.find(
-                    (s) => s.id.toString() === value
-                  );
-                  if (selectedSequence) {
-                    setActiveSequence(selectedSequence);
-                  }
-                }}
-              >
-                <SelectTrigger className="w-[280px]">
-                  <SelectValue placeholder="Select an exercise" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableSequences.map((sequence) => (
-                    <SelectItem key={sequence.id} value={sequence.id.toString()}>
-                      {sequence.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
 
-          {/* Right side: Metronome */}
-          <div className="flex items-start space-x-4">
-            <div className="flex flex-col items-center space-y-2">
-              <BeatVisualizer
-                currentBeat={metronome.state.currentBeat}
-                isPlaying={metronome.state.isPlaying}
-                currentBpm={
-                  metronome.state.isPlaying
-                    ? metronome.state.currentBpm
-                    : metronomeBpm
-                }
-                onBpmChange={handleMetronomeBpmChange}
-                canEdit={true}
-                size="lg"
-              />
-              <MetronomeControls
-                isPlaying={metronome.state.isPlaying}
-                onPlayPause={handlePlay}
-                onRestart={handleRestart}
-                onStateChange={(newState) => {
-                  setMode(newState.mode);
-                  setMetronomeBpm(newState.startBpm);
-                  setLoop(newState.loop);
+            {/* Right side: Metronome */}
+            <div className="flex items-start space-x-4">
+              <RecordingControls
+                onSave={async (audioBlob, duration, maxBpm, perfectBpm) => {
+                  if (!user || !repertoireItem || !activeSequence) return;
+                  const { data, error } = await supabase.storage
+                    .from('practice')
+                    .upload(`${user.id}/${new Date().toISOString()}.webm`, audioBlob);
+
+                  if (error) {
+                    console.error('Error uploading recording:', error);
+                    return;
+                  }
+
+                  await supabase.from('practice_log').insert({
+                    user_id: user.id,
+                    exercise_id: activeSequence.id,
+                    scale_id: repertoireItem.id,
+                    scale_shape_id: 'scale_shape' in repertoireItem ? repertoireItem.scale_shape as string : null,
+                    max_bpm: maxBpm,
+                    perfect_bpm: perfectBpm,
+                    audio: data.path,
+                    exercise_category: `${repertoireItem.name} - ${activeSequence.name}`,
+                    duration: Math.round(duration),
+                  });
                 }}
-                initialState={{
-                  mode,
-                  startBpm: metronomeBpm,
-                  endBpm: lessonExercise?.target_bpm || metronomeBpm,
-                  increments: lessonExercise?.increments || 8,
-                  measuresPerIncrement: lessonExercise?.measures_per_bpm || 4,
-                  loop,
-                  progressiveStepBpm:
-                    lessonExercise?.progressive_step_bpm || 5,
-                }}
-                compact
               />
+              <div className="flex flex-col items-center space-y-2">
+                <BeatVisualizer
+                  currentBeat={metronome.state.currentBeat}
+                  isPlaying={metronome.state.isPlaying}
+                  currentBpm={
+                    metronome.state.isPlaying
+                      ? metronome.state.currentBpm
+                      : metronomeBpm
+                  }
+                />
+                <MetronomeControls
+                  isPlaying={isPlaying}
+                  onPlayPause={handlePlay}
+                  onRestart={handleRestart}
+                  onStateChange={(newState) => {
+                    setMode(newState.mode);
+                    setMetronomeBpm(newState.startBpm);
+                    setLoop(newState.loop);
+                  }}
+                  initialState={{
+                    mode,
+                    startBpm: metronomeBpm,
+                    endBpm: lessonExercise?.target_bpm || metronomeBpm,
+                    increments: lessonExercise?.increments || 8,
+                    measuresPerIncrement: lessonExercise?.measures_per_bpm || 4,
+                    loop,
+                    progressiveStepBpm:
+                      lessonExercise?.progressive_step_bpm || 5,
+                  }}
+                  compact
+                />
+              </div>
             </div>
           </div>
         </div>
+        <main className="flex-grow h-[calc(100vh-10rem)]">
+          <NoteDisplay
+            notes={displayNotes}
+            major_key={harmonicContext}
+            currentPosition={currentTime}
+            isLearning={isLearning}
+            setIsLearning={setIsLearning}
+            learnRepetitions={learnRepetitions}
+            setLearnRepetitions={setLearnRepetitions}
+            setMetronomeBpm={setMetronomeBpm}
+            handlePlay={handlePlay}
+            learnTimeline={learnTimeline}
+            currentLearnIndex={currentLearnIndex}
+            setNoteIndex={setNoteIndex}
+            setCurrentLearnIndex={setCurrentLearnIndex}
+          />
+        </main>
       </div>
-
-      {/* Fretboard/Note Display */}
-      <main className="flex-grow h-[calc(100vh-10rem)]">
-        <NoteDisplay
-          notes={displayNotes}
-          major_key={harmonicContext}
-          currentPosition={currentTime}
-          enableListening={pitchDetectionEnabled && !metronome.state.isPlaying}
-          className="h-full w-full"
-          mode={'fretboard'}
-          isLearning={isLearning}
-          setIsLearning={setIsLearning}
-          learnRepetitions={learnRepetitions}
-          setLearnRepetitions={setLearnRepetitions}
-          setMetronomeBpm={setMetronomeBpm}
-          handlePlay={handlePlay}
-          learnTimeline={learnTimeline}
-          currentLearnIndex={currentLearnIndex}
-          setNoteIndex={setNoteIndex}
-          setCurrentLearnIndex={setCurrentLearnIndex}
-        />
-      </main>
-    </div>
+      <Dialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Save Practice Session</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="max-bpm">Max BPM</Label>
+              <Input id="max-bpm" type="number" value={maxBpm} onChange={(e) => setMaxBpm(parseInt(e.target.value, 10))} />
+            </div>
+            <div>
+              <Label htmlFor="perfect-bpm">Perfect BPM</Label>
+              <Input id="perfect-bpm" type="number" value={perfectBpm} onChange={(e) => setPerfectBpm(parseInt(e.target.value, 10))} />
+            </div>
+            <Button onClick={() => handleSavePractice(recorder.recorderState.audioBlob, recorder.recorderState.duration)}>Save</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
 

@@ -7,10 +7,19 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import ProgressGraphs from '@/components/ProgressGraphs';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Link } from 'react-router-dom';
 
 type PracticeLogWithExercise = Tables<'practice_log'> & {
   exercises: { name: string } | null;
 };
+
+interface ProfileSettings {
+  autoRecord?: boolean;
+}
 
 const Profile = () => {
   const { user } = useAuth();
@@ -97,9 +106,13 @@ const Profile = () => {
 
   return (
     <div className="container mx-auto p-4">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        <div>
-          <h1 className="text-2xl font-bold mb-4">Your Profile</h1>
+      <Tabs defaultValue="profile">
+        <TabsList>
+          <TabsTrigger value="profile">Profile</TabsTrigger>
+          <TabsTrigger value="settings">Settings</TabsTrigger>
+          <TabsTrigger value="history">Practice History</TabsTrigger>
+        </TabsList>
+        <TabsContent value="profile">
           <div className="space-y-4">
             <div>
               <label htmlFor="website">Website</label>
@@ -130,34 +143,73 @@ const Profile = () => {
             </div>
             <Button onClick={handleUpdate}>Update Profile</Button>
           </div>
-        </div>
-        <div className="md:col-span-2">
-          <h2 className="text-2xl font-bold mb-4">Practice History</h2>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Exercise</TableHead>
-                <TableHead>Duration (minutes)</TableHead>
-                <TableHead>Max BPM</TableHead>
-                <TableHead>Date</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {practiceLog.map((log) => (
-                <TableRow key={log.id}>
-                  <TableCell>{log.exercises?.name}</TableCell>
-                  <TableCell>{Math.round(log.duration / 60)}</TableCell>
-                  <TableCell>{log.max_bpm}</TableCell>
-                  <TableCell>{new Date(log.created_at).toLocaleDateString()}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-        <div>
-          <ProgressGraphs />
-        </div>
-      </div>
+        </TabsContent>
+        <TabsContent value="settings">
+          <Card>
+            <CardHeader>
+              <CardTitle>Settings</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="auto-record">Default to Auto Record</Label>
+                <Switch
+                  id="auto-record"
+                  checked={(profile?.settings as ProfileSettings)?.autoRecord || false}
+                  onCheckedChange={(value) =>
+                    setProfile((prev) => ({
+                      ...prev,
+                      id: user!.id,
+                      settings: {
+                        ...((prev?.settings as ProfileSettings) || {}),
+                        autoRecord: value,
+                      },
+                    }))
+                  }
+                />
+              </div>
+            </CardContent>
+          </Card>
+          <Button onClick={handleUpdate} className="mt-4">Update Settings</Button>
+        </TabsContent>
+        <TabsContent value="history">
+          <div className="space-y-8">
+            <ProgressGraphs />
+            <div>
+              <h2 className="text-2xl font-bold mb-4">Practice Log</h2>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Exercise</TableHead>
+                    <TableHead>Duration (minutes)</TableHead>
+                    <TableHead>Max BPM</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Recording</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {practiceLog.map((log) => (
+                    <TableRow key={log.id}>
+                      <TableCell>
+                        <Link to={`/premium?exerciseId=${log.scale_id}`} className="hover:underline">
+                          {log.exercise_category}
+                        </Link>
+                      </TableCell>
+                      <TableCell>{Math.round(log.duration / 60)}</TableCell>
+                      <TableCell>{log.max_bpm}</TableCell>
+                      <TableCell>{new Date(log.created_at).toLocaleDateString()}</TableCell>
+                      <TableCell>
+                        {log.audio && (
+                          <audio controls src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/practice/${log.audio}`} />
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

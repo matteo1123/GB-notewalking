@@ -3,6 +3,8 @@ import { useCallback, useRef } from "react";
 export function useNotePlayer(audioContext: AudioContext | null) {
   const audioBufferCache = useRef<Record<string, AudioBuffer>>({});
 
+  const currentSourceRef = useRef<AudioBufferSourceNode | null>(null);
+
   const playNote = useCallback(
     async (note: string) => {
       if (!audioContext) return;
@@ -25,6 +27,7 @@ export function useNotePlayer(audioContext: AudioContext | null) {
         source.buffer = buffer;
         source.connect(audioContext.destination);
         source.start(0);
+        currentSourceRef.current = source;
       } catch (error) {
         console.error(`Failed to play note ${note}`, error);
       }
@@ -32,5 +35,61 @@ export function useNotePlayer(audioContext: AudioContext | null) {
     [audioContext]
   );
 
-  return { playNote };
+  const playSequence = useCallback(
+    async (
+      notes: { string: number; fret: number }[],
+      tempo: number = 1.0,
+      onNoteStart?: (index: number) => void,
+      onComplete?: () => void
+    ) => {
+      if (!audioContext || notes.length === 0) return;
+
+      const getNoteFromFret = (stringNum: number, fret: number): string => {
+        const standardTuning = ["E", "B", "G", "D", "A", "E"];
+        const notes = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+        const openNotes = ["E4", "B3", "G3", "D3", "A2", "E2"];
+
+        const openNote = openNotes[stringNum - 1];
+        const noteMatch = openNote.match(/([A-G]#?)(\d)/);
+        if (!noteMatch) return "C4";
+
+        const [, noteName, octaveStr] = noteMatch;
+        let octave = parseInt(octaveStr);
+        let noteIndex = notes.indexOf(noteName);
+
+        noteIndex = (noteIndex + fret) % 12;
+        octave += Math.floor((notes.indexOf(noteName) + fret) / 12);
+
+        return `${notes[noteIndex]}${octave}`;
+      };
+
+      const noteDuration = 600 / tempo; // Base duration in ms
+
+      for (let i = 0; i < notes.length; i++) {
+        const note = notes[i];
+        const noteName = getNoteFromFret(note.string, note.fret);
+
+        onNoteStart?.(i);
+        await playNote(noteName);
+
+        await new Promise(resolve => setTimeout(resolve, noteDuration));
+      }
+
+      onComplete?.();
+    },
+    [audioContext, playNote]
+  );
+
+  const stop = useCallback(() => {
+    if (currentSourceRef.current) {
+      try {
+        currentSourceRef.current.stop();
+      } catch (e) {
+        // Already stopped
+      }
+      currentSourceRef.current = null;
+    }
+  }, []);
+
+  return { playNote, playSequence, stop };
 }

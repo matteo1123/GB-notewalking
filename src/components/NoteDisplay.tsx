@@ -9,6 +9,7 @@ import { usePitchDetection } from "@/hooks/usePitchDetection";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Fretboard from "./Fretboard";
+import { EarTrainingWrapper } from "@/components/EarTrainingWrapper";
 import { Switch } from "./ui/switch";
 import { Label } from "./ui/label";
 import { Input } from "./ui/input";
@@ -16,6 +17,7 @@ import { Input } from "./ui/input";
 interface NoteDisplayProps {
   notes: Note[];
   major_key?: string;
+  tonalContext?: string;
   className?: string;
   currentPosition?: number; // Current time position for highlighting
   enableListening?: boolean;
@@ -26,19 +28,21 @@ interface NoteDisplayProps {
   setLearnRepetitions?: (repetitions: number) => void;
   setMetronomeBpm?: (bpm: number) => void;
   handlePlay?: () => void;
-  learnTimeline?: {label: string | number, startIndex: number, endIndex: number}[];
+  learnTimeline?: { label: string | number, startIndex: number, endIndex: number }[];
   currentLearnIndex?: number;
   setNoteIndex?: (index: number) => void;
   setCurrentLearnIndex?: (index: number) => void;
+  scaleShapeNotes?: { string: number; fret: number }[]; // Unique notes from scale shape for ear training
 }
 
 const NoteDisplay = ({
-   notes,
-   major_key,
-   className = "",
-   currentPosition = 0,
-   enableListening = false,
-   mode = 'fretboard',
+  notes,
+  major_key,
+  tonalContext,
+  className = "",
+  currentPosition = 0,
+  enableListening = false,
+  mode = 'fretboard',
   isLearning,
   setIsLearning,
   learnRepetitions,
@@ -49,6 +53,7 @@ const NoteDisplay = ({
   currentLearnIndex,
   setNoteIndex,
   setCurrentLearnIndex,
+  scaleShapeNotes,
 }: NoteDisplayProps) => {
   const strings = [1, 2, 3, 4, 5, 6]; // High E to Low E
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -62,8 +67,8 @@ const NoteDisplay = ({
   const [displayMode, setDisplayMode] = useState<'tablature' | 'grid' | 'fretboard'>(mode);
   const [showSingleNote, setShowSingleNote] = useState(false);
 
-// Pitch detection is disabled for performance reasons
-const isListening = false;
+  // Pitch detection is disabled for performance reasons
+  const isListening = false;
 
   const degreeMap = useMemo(
     () => (major_key ? createDegreeMap(major_key) : null),
@@ -79,7 +84,7 @@ const isListening = false;
   const minWidthPerNote = 60;
   const minWidth = Math.max(800, noteCount * minWidthPerNote);
 
-const currentTime = currentPosition;
+  const currentTime = currentPosition;
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -90,7 +95,7 @@ const currentTime = currentPosition;
       Math.max(0, targetTime / Math.max(1, maxTime))
     );
     const totalWidth = el.scrollWidth - el.clientWidth;
-    
+
     // Introduce an offset to keep the current note from being at the very edge
     const offset = el.clientWidth * 0.2; // 20% of the container width
     const targetLeft = totalWidth * percentage - offset;
@@ -165,7 +170,7 @@ const currentTime = currentPosition;
                         const isHighlighted = note.accent || note.highlight;
                         const isCurrentNote =
                           Math.abs(note.time - currentTime) <= 0.08;
-const isDetectedNote = false;
+                        const isDetectedNote = false;
 
                         const noteName = getNoteFromFret(note.string, note.fret);
                         const degree = degreeMap ? degreeMap.get(noteName) : null;
@@ -186,19 +191,17 @@ const isDetectedNote = false;
                                 }
                               }
                             }}
-                            className={`absolute -translate-y-1/2 top-1/2 -translate-x-1/2 w-7 h-7 text-xs font-mono flex items-center justify-center transition-all duration-150 cursor-pointer ${
-                              isDetectedNote
-                                ? "bg-green-500 text-white border-2 border-green-400 scale-110"
-                                : isCurrentNote
+                            className={`absolute -translate-y-1/2 top-1/2 -translate-x-1/2 w-7 h-7 text-xs font-mono flex items-center justify-center transition-all duration-150 cursor-pointer ${isDetectedNote
+                              ? "bg-green-500 text-white border-2 border-green-400 scale-110"
+                              : isCurrentNote
                                 ? "bg-blue-500 text-white"
                                 : isHighlighted
-                                ? "bg-accent text-accent-foreground"
-                                : "bg-muted text-muted-foreground"
-                            }`}
+                                  ? "bg-accent text-accent-foreground"
+                                  : "bg-muted text-muted-foreground"
+                              }`}
                             style={{ left: `${position}%`, ...noteStyle }}
-                            title={`Time: ${note.time}s, Duration: ${
-                              note.duration || 0.5
-                            }s`}
+                            title={`Time: ${note.time}s, Duration: ${note.duration || 0.5
+                              }s`}
                           >
                             {note.fret}
                           </div>
@@ -232,7 +235,7 @@ const isDetectedNote = false;
                   const note = notes.find(n => n.string === string && n.fret === fret);
                   const isHighlighted = note ? (note.accent || note.highlight) : false;
                   const isCurrentNote = note ? Math.abs(note.time - currentTime) <= 0.08 : false;
-const isDetectedNote = false;
+                  const isDetectedNote = false;
 
                   let noteName = '';
                   let color = null;
@@ -247,17 +250,16 @@ const isDetectedNote = false;
                   return (
                     <div
                       key={fret}
-                      className={`w-12 h-12 border border-border flex items-center justify-center text-sm font-mono ${
-                        note
-                          ? isDetectedNote
-                            ? "bg-green-500 text-white border-2 border-green-400"
-                            : isCurrentNote
+                      className={`w-12 h-12 border border-border flex items-center justify-center text-sm font-mono ${note
+                        ? isDetectedNote
+                          ? "bg-green-500 text-white border-2 border-green-400"
+                          : isCurrentNote
                             ? "bg-blue-500 text-white"
                             : isHighlighted
-                            ? "bg-accent text-accent-foreground"
-                            : "bg-muted text-muted-foreground"
-                          : "bg-card"
-                      }`}
+                              ? "bg-accent text-accent-foreground"
+                              : "bg-muted text-muted-foreground"
+                        : "bg-card"
+                        }`}
                       style={note ? noteStyle : {}}
                       title={note ? noteName : ''}
                     >
@@ -302,9 +304,8 @@ const isDetectedNote = false;
                     {learnTimeline?.map((item, index) => (
                       <div
                         key={index}
-                        className={`p-2 rounded cursor-pointer ${
-                          index === currentLearnIndex ? "bg-blue-500" : "bg-gray-700"
-                        }`}
+                        className={`p-2 rounded cursor-pointer ${index === currentLearnIndex ? "bg-blue-500" : "bg-gray-700"
+                          }`}
                         onClick={() => {
                           if (setNoteIndex) setNoteIndex(item.startIndex);
                           if (setCurrentLearnIndex) setCurrentLearnIndex(index);
@@ -335,13 +336,13 @@ const isDetectedNote = false;
                 </>
               )}
             </div>
-            <Fretboard
-              selectedNotes={showSingleNote ? (notes.find(n => Math.abs(n.time - currentTime) <= 0.08) ? [notes.find(n => Math.abs(n.time - currentTime) <= 0.08)!] : []) : notes}
-              highlightedNote={notes.find(n => Math.abs(n.time - currentTime) <= 0.08)}
-              degreeMap={degreeMap}
-              showDegreeNumbers={true}
-              rootNote={notes.find(n => getNoteFromFret(n.string, n.fret) === major_key)}
-              animatedNote={hoveredNotes[hoveredNoteIndex]}
+            {/* Ear Training always gets all notes, not affected by Single Note Mode or Help Me Learn */}
+            <EarTrainingWrapper
+              notes={notes.map((n, idx) => ({ ...n, time: idx }))}
+              major_key={major_key}
+              tonalContext={tonalContext}
+              displayMode="fretboard"
+              scaleShapeNotes={scaleShapeNotes}
             />
           </>
         )}

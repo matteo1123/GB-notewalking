@@ -37,17 +37,32 @@ import { Scale } from "@/types/scales";
 
 const MAJOR_KEYS = [
   { value: "C", label: "C" },
-  { value: "G", label: "G" },
+  { value: "C#", label: "C♯" },
   { value: "D", label: "D" },
-  { value: "A", label: "A" },
+  { value: "D#", label: "D♯" },
   { value: "E", label: "E" },
-  { value: "B", label: "B" },
-  { value: "F#", label: "F♯/G♭" },
-  { value: "Db", label: "D♭" },
-  { value: "Ab", label: "A♭" },
-  { value: "Eb", label: "E♭" },
-  { value: "Bb", label: "B♭" },
   { value: "F", label: "F" },
+  { value: "F#", label: "F♯" },
+  { value: "G", label: "G" },
+  { value: "G#", label: "G♯" },
+  { value: "A", label: "A" },
+  { value: "A#", label: "A♯" },
+  { value: "B", label: "B" },
+  { value: "Db", label: "D♭" },
+  { value: "Eb", label: "E♭" },
+  { value: "Gb", label: "G♭" },
+  { value: "Ab", label: "A♭" },
+  { value: "Bb", label: "B♭" },
+];
+
+const MODES = [
+  { value: "major", label: "Major (Ionian)" },
+  { value: "dorian", label: "Dorian" },
+  { value: "phrygian", label: "Phrygian" },
+  { value: "lydian", label: "Lydian" },
+  { value: "mixolydian", label: "Mixolydian" },
+  { value: "minor", label: "Minor (Aeolian)" },
+  { value: "locrian", label: "Locrian" },
 ];
 
 type AnyNote = Note & {
@@ -95,10 +110,11 @@ const RiffPractice = ({
   const [perfectBpm, setPerfectBpm] = useState<number | ''>('');
   const [isLearning, setIsLearning] = useState(false);
   const [learnRepetitions, setLearnRepetitions] = useState(5);
-  const [learnTimeline, setLearnTimeline] = useState<{label: string | number, startIndex: number, endIndex: number}[]>([]);
+  const [learnTimeline, setLearnTimeline] = useState<{ label: string | number, startIndex: number, endIndex: number }[]>([]);
   const [learnNotes, setLearnNotes] = useState<Note[]>([]);
   const [currentLearnIndex, setCurrentLearnIndex] = useState(0);
   const [harmonicContext, setHarmonicContext] = useState(repertoireItem.major_key);
+  const [tonalContext, setTonalContext] = useState("major");
   const [playContextNote, setPlayContextNote] = useState(false);
   const tickCountRef = useRef(0);
   const [isRecordingArmed, setIsRecordingArmed] = useState(false);
@@ -376,6 +392,13 @@ const RiffPractice = ({
     );
   }, [activeSequence, repertoireItem]);
 
+  // Ear training should use the original scale shape (repertoireItem.notes)
+  // NOT the sequence-applied notes which have duplicates
+  // This is more efficient and architecturally cleaner
+  const scaleShapeNotes = useMemo(() => {
+    return repertoireItem.notes.map(n => ({ string: n.string, fret: n.fret }));
+  }, [repertoireItem.notes]);
+
   const generateLearnSequence = useCallback(() => {
     const baseNotes = baseExerciseNotes;
     const chunks = [];
@@ -384,14 +407,14 @@ const RiffPractice = ({
     }
 
     const newNotes: Note[] = [];
-    const timeline: {label: string | number, startIndex: number, endIndex: number}[] = [];
+    const timeline: { label: string | number, startIndex: number, endIndex: number }[] = [];
     let time = 0;
 
     for (let i = 1; i < chunks.length; i++) {
       // A: previous chunk
       const prevChunkStartIndex = newNotes.length;
       for (let r = 0; r < learnRepetitions; r++) {
-        chunks[i-1].forEach(note => {
+        chunks[i - 1].forEach(note => {
           newNotes.push({ ...note, time: time++, duration: 1 });
         });
       }
@@ -512,6 +535,23 @@ const RiffPractice = ({
                   </div>
                 </div>
               </div>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="tonal-context" className="text-sm">Tonal Context</Label>
+                  <Select value={tonalContext} onValueChange={setTonalContext}>
+                    <SelectTrigger className="w-[180px]" id="tonal-context">
+                      <SelectValue placeholder="Select a mode" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {MODES.map((mode) => (
+                        <SelectItem key={mode.value} value={mode.value}>
+                          {mode.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
               <div>
                 <div className="flex items-center gap-2 text-sm mt-1">
                   <span className="px-2 py-0.5 bg-secondary rounded-full text-secondary-foreground">
@@ -629,6 +669,7 @@ const RiffPractice = ({
           <NoteDisplay
             notes={displayNotes}
             major_key={harmonicContext}
+            tonalContext={tonalContext}
             currentPosition={currentTime}
             isLearning={isLearning}
             setIsLearning={setIsLearning}
@@ -640,6 +681,7 @@ const RiffPractice = ({
             currentLearnIndex={currentLearnIndex}
             setNoteIndex={setNoteIndex}
             setCurrentLearnIndex={setCurrentLearnIndex}
+            scaleShapeNotes={scaleShapeNotes}
           />
         </main>
       </div>

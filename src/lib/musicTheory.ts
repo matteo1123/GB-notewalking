@@ -25,7 +25,8 @@ export const findAllNoteOccurrences = (noteName: string, tuning: string[] = stan
   return occurrences;
 };
 
-export const CHROMATIC_SCALE = ['E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B', 'C', 'C#', 'D', 'D#'];
+export const CHROMATIC_SCALE = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+export const CHROMATIC_SCALE_FLATS = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
 
 // Standard tuning from string 6 (low E) to string 1 (high E)
 export const GUITAR_TUNING = {
@@ -69,18 +70,32 @@ export const getNote = (string: number, fret: number): string => {
   return CHROMATIC_SCALE[noteIndex];
 };
 
-export function createDegreeMap(majorKey: string): Map<string, number> {
-    const majorScaleFormula = [0, 2, 4, 5, 7, 9, 11];
-    const rootIndex = CHROMATIC_SCALE.indexOf(majorKey);
-    const degreeMap = new Map<string, number>();
+export function createDegreeMap(
+  majorKey: string,
+  mode: string = "major"
+): Map<string, number> {
+  const formulas: { [key: string]: number[] } = {
+    major: [0, 2, 4, 5, 7, 9, 11],
+    dorian: [0, 2, 3, 5, 7, 9, 10],
+    phrygian: [0, 1, 3, 5, 7, 8, 10],
+    lydian: [0, 2, 4, 6, 7, 9, 11],
+    mixolydian: [0, 2, 4, 5, 7, 9, 10],
+    minor: [0, 2, 3, 5, 7, 8, 10],
+    locrian: [0, 1, 3, 5, 6, 8, 10],
+  };
 
-    majorScaleFormula.forEach((interval, index) => {
-        const noteName = CHROMATIC_SCALE[(rootIndex + interval) % 12];
-        const degree = index + 1;
-        degreeMap.set(noteName, degree);
-    });
+  const formula = formulas[mode] || formulas.major;
+  const scale = majorKey.includes('b') ? CHROMATIC_SCALE_FLATS : CHROMATIC_SCALE;
+  const rootIndex = scale.indexOf(majorKey);
+  const degreeMap = new Map<string, number>();
 
-    return degreeMap;
+  formula.forEach((interval, index) => {
+    const noteName = scale[(rootIndex + interval) % 12];
+    const degree = index + 1;
+    degreeMap.set(noteName, degree);
+  });
+
+  return degreeMap;
 }
 
 export function createChromaticDegreeMap(rootNote: string): Map<string, string> {

@@ -60,7 +60,14 @@ export function useNotePlayer(audioContext: AudioContext | null) {
         noteIndex = (noteIndex + fret) % 12;
         octave += Math.floor((notes.indexOf(noteName) + fret) / 12);
 
-        return `${notes[noteIndex]}${octave}`;
+        const finalNote = `${notes[noteIndex]}${octave}`;
+
+        // Convert sharps to flats for file naming (# breaks URLs)
+        return finalNote.replace('C#', 'Db')
+          .replace('D#', 'Eb')
+          .replace('F#', 'Gb')
+          .replace('G#', 'Ab')
+          .replace('A#', 'Bb');
       };
 
       const noteDuration = 600 / tempo; // Base duration in ms

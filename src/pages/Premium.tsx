@@ -9,6 +9,8 @@ import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Tables } from "@/integrations/supabase/types";
 import Paywall from "@/components/Premium/Paywall";
+import { ChordProgressionExercise } from "@/components/ChordProgressionExercise";
+import { RhythmTraining } from "@/components/RhythmTraining";
 
 const Premium = () => {
   const { user } = useAuth();
@@ -48,7 +50,7 @@ const Premium = () => {
       const { data: scalesData, error: scalesError } = await supabase
         .from("scales")
         .select("*");
-      
+
       if (!isMounted) return;
 
       if (scalesError) {
@@ -176,27 +178,23 @@ const Premium = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background p-4">
-      <div className="max-w-6xl mx-auto space-y-8">
+    <div className="fixed inset-0 flex flex-col bg-background overflow-hidden">
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden p-4">
         {/* Content */}
-        <Tabs defaultValue="sessions" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+        <Tabs defaultValue="sessions" className="flex-1 flex flex-col min-h-0 overflow-hidden">
+          <TabsList className="grid w-full grid-cols-5 flex-shrink-0 mb-4">
             <TabsTrigger value="sessions">Lessons</TabsTrigger>
             <TabsTrigger value="rhythms">Rhythms</TabsTrigger>
             <TabsTrigger value="scales">Scales</TabsTrigger>
             <TabsTrigger value="arpeggios">Arpeggios</TabsTrigger>
-            <TabsTrigger value="ear-training">Ear Training</TabsTrigger>
+            <TabsTrigger value="ear-training">Notewalking</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="rhythms" className="space-y-4">
-            <ExerciseList
-              items={exercises.filter((e) => e.category === "rhythm")}
-              defaultSort={{ key: "difficulty", dir: "asc" }}
-              onSelect={handleExerciseSelect}
-            />
+          <TabsContent value="rhythms" className="flex-1 min-h-0 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col">
+            <RhythmTraining />
           </TabsContent>
 
-          <TabsContent value="scales" className="space-y-4">
+          <TabsContent value="scales" className="flex-1 min-h-0 overflow-y-auto data-[state=active]:block">
             <ExerciseList
               items={exercises.filter((e) => e.category === "scale")}
               defaultSort={{ key: "position", dir: "asc" }}
@@ -204,7 +202,7 @@ const Premium = () => {
             />
           </TabsContent>
 
-          <TabsContent value="arpeggios" className="space-y-4">
+          <TabsContent value="arpeggios" className="flex-1 min-h-0 overflow-y-auto data-[state=active]:block">
             <ExerciseList
               items={exercises.filter((e) => e.category === "arpeggio")}
               defaultSort={{ key: "difficulty", dir: "asc" }}
@@ -212,15 +210,11 @@ const Premium = () => {
             />
           </TabsContent>
 
-          <TabsContent value="ear-training" className="space-y-4">
-            <ExerciseList
-              items={exercises.filter((e) => e.category === "ear-training")}
-              defaultSort={{ key: "difficulty", dir: "asc" }}
-              onSelect={handleExerciseSelect}
-            />
+          <TabsContent value="ear-training" className="flex-1 min-h-0 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col">
+            <ChordProgressionExercise />
           </TabsContent>
 
-          <TabsContent value="sessions" className="space-y-4">
+          <TabsContent value="sessions" className="flex-1 min-h-0 overflow-y-auto data-[state=active]:block">
             {selectedLesson ? (
               <div className="space-y-4">
                 <div className="flex items-center gap-4">

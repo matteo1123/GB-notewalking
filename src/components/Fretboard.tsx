@@ -55,10 +55,17 @@ const Fretboard: React.FC<FretboardProps> = ({
 
     for (let s = 1; s <= STRING_COUNT; s++) {
       for (let f = fretStart; f <= fretEnd; f++) {
-        const isSelected = selectedNotes.some(n => n.string === s && n.fret === f);
+        const selectedNote = selectedNotes.find(n => n.string === s && n.fret === f);
+        const isSelected = !!selectedNote;
         const isRoot = rootNote && rootNote.string === s && rootNote.fret === f;
         const isHighlighted = highlightedNote && highlightedNote.string === s && highlightedNote.fret === f;
         const isAnimated = animatedNote && animatedNote.string === s && animatedNote.fret === f;
+
+        // Ear training properties
+        const isExpected = selectedNote && (selectedNote as any).isExpected;
+        const isPlaying = selectedNote && (selectedNote as any).isPlaying;
+        const sungCorrect = selectedNote && (selectedNote as any).sungCorrect;
+        const sungIncorrect = selectedNote && (selectedNote as any).sungIncorrect;
 
         const noteName = getNoteFromFret(s, f);
         const degree = degreeMap ? degreeMap.get(noteName) : null;
@@ -74,7 +81,7 @@ const Fretboard: React.FC<FretboardProps> = ({
         notesToRender.push(
           <div
             key={`${s}-${f}`}
-            className={`note-container`}
+            className={`note-container ${isEditable ? 'clickable' : ''}`}
             style={{
               gridColumn: isOpenNotesOnly ? 1 : f,
               gridRow: s,
@@ -94,6 +101,10 @@ const Fretboard: React.FC<FretboardProps> = ({
                 if (isRoot) noteClasses.push('root');
                 if (isHighlighted) noteClasses.push('highlighted');
                 if (isAnimated) noteClasses.push('animated');
+                if (isExpected) noteClasses.push('expected-note');
+                if (isPlaying) noteClasses.push('playing-note');
+                if (sungCorrect) noteClasses.push('sung-correct');
+                if (sungIncorrect) noteClasses.push('sung-incorrect');
 
                 return (
                   <div

@@ -89,8 +89,13 @@ export function EarTrainingWrapper({
 
         const finalNote = `${noteNames[noteIndex]}${octave}`;
 
-        // Convert sharps to flats for file naming
-        const flatNote = finalNote.replace('C#', 'Db').replace('D#', 'Eb').replace('F#', 'Gb').replace('G#', 'Ab').replace('A#', 'Bb');
+        // CRITICAL: Convert sharps to flats for file naming to prevent URL encoding issues
+        // The '#' character breaks URLs
+        const flatNote = finalNote.replace('C#', 'Db')
+            .replace('D#', 'Eb')
+            .replace('F#', 'Gb')
+            .replace('G#', 'Ab')
+            .replace('A#', 'Bb');
 
         await playNote(flatNote);
     }, [audioContext, playNote]);
@@ -110,6 +115,8 @@ export function EarTrainingWrapper({
         fret: number;
         confidence: number;
     }) => {
+        // Show detected pitch on fretboard
+        setDetectedPitch({ string: result.string, fret: result.fret });
         if (earTrainingEnabled && earTraining.isListening && earTrainingSettings.mode === 'sing-back') {
             earTraining.handleDetectedNote(result);
         }
@@ -133,6 +140,27 @@ export function EarTrainingWrapper({
         }
     }, [earTrainingEnabled, earTraining.waitingForClick, earTraining, earTrainingSettings.mode]);
 
+    // Handle general fretboard click for playing notes (always available except during ear training questions)
+    const handleGeneralFretboardClick = useCallback((string: number, fret: number) => {
+        // Don't play if ear training is active and waiting for answer
+        const isEarTrainingQuestion = earTrainingEnabled && (
+            earTraining.waitingForClick ||
+            earTraining.isListening ||
+            earTraining.isPlaying
+        );
+
+        if (isEarTrainingQuestion) {
+            // If in identify mode and waiting for answer, handle as ear training response
+            if (earTrainingSettings.mode === 'identify' && earTraining.waitingForClick) {
+                handleFretboardClick({ string, fret });
+            }
+            return;
+        }
+
+        // Otherwise, just play the note
+        handlePlayNote({ string, fret });
+    }, [earTrainingEnabled, earTraining.waitingForClick, earTraining.isListening, earTraining.isPlaying, earTrainingSettings.mode, handleFretboardClick, handlePlayNote]);
+
     // Filter notes to show only current phrase in ear training mode
     const displayNotes = useMemo(() => {
         if (!earTrainingEnabled || !earTraining.currentPhrase) {
@@ -140,6 +168,9 @@ export function EarTrainingWrapper({
         }
         return earTraining.currentPhrase.notes;
     }, [earTrainingEnabled, earTraining.currentPhrase, simpleNotes]);
+
+    // Track detected pitch for visual feedback
+    const [detectedPitch, setDetectedPitch] = useState<{ string: number; fret: number } | null>(null);
 
     return (
         <div className="space-y-4">
@@ -199,6 +230,27 @@ export function EarTrainingWrapper({
                 />
             )}
 
+            {/* Instructions */}
+            {earTrainingEnabled && (
+                <div className="mb-4 p-4 bg-muted/50 rounded-lg border border-border">
+                    {earTraining.isPlaying && (
+                        <p className="text-center text-lg font-medium">
+                            🎵 Listen to the notes...
+                        </p>
+                    )}
+                    {earTraining.isListening && (
+                        <p className="text-center text-lg font-medium text-green-600">
+                            🎤 Now sing them back! The current note will pulse below.
+                        </p>
+                    )}
+                    {earTraining.waitingForClick && (
+                        <p className="text-center text-lg font-medium text-blue-600">
+                            👆 Click the note you just heard on the fretboard!
+                        </p>
+                    )}
+                </div>
+            )}
+
             {/* Fretboard with ear training visual feedback */}
             {displayMode === "fretboard" && (
                 <Fretboard
@@ -206,6 +258,8 @@ export function EarTrainingWrapper({
                         const phraseLocalIndex = idx;
                         const isPlayingNote =
                             earTrainingEnabled && earTraining.playingNoteIndex === phraseLocalIndex;
+                        const isExpectedNote =
+                            earTrainingEnabled && earTraining.isListening && earTraining.currentNoteIndex === phraseLocalIndex;
                         const sungResult =
                             earTrainingEnabled && phraseLocalIndex >= 0
                                 ? earTraining.sungResults[phraseLocalIndex]
@@ -215,19 +269,19 @@ export function EarTrainingWrapper({
                             ...n,
                             // Add visual feedback classes via custom rendering
                             isPlaying: isPlayingNote,
+                            isExpected: isExpectedNote, // NEW: Highlight the note user should sing
                             sungCorrect: sungResult?.isCorrect,
                             sungIncorrect: sungResult && !sungResult.isCorrect,
                         };
                     })}
                     degreeMap={degreeMap}
                     showDegreeNumbers={true}
-                    isEditable={earTrainingSettings.mode === 'identify' && earTraining.waitingForClick}
+                    highlightedNote={detectedPitch} // NEW: Show detected pitch
+                    isEditable={true} // Always editable for click-to-play
                     rootNote={simpleNotes.find(
                         (n) => getNoteFromFret(n.string, n.fret) === major_key
                     )}
-                    onNoteClick={earTrainingSettings.mode === 'identify' && earTraining.waitingForClick
-                        ? (string, fret) => handleFretboardClick({ string, fret })
-                        : undefined}
+                    onNoteClick={handleGeneralFretboardClick}
                 />
             )}
         </div>

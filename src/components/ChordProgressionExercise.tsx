@@ -109,15 +109,6 @@ export function ChordProgressionExercise() {
         setTimeout(() => metronome.start(), 100);
     }, [metronome]);
 
-    const handleBpmChange = useCallback((newBpm: number) => {
-        const wasPlaying = metronome.state.isPlaying;
-        setBpm(newBpm);
-        if (wasPlaying) {
-            metronome.stop();
-            setTimeout(() => metronome.start(), 100);
-        }
-    }, [metronome]);
-
     // Cleanup on unmount
     useEffect(() => {
         return () => {
@@ -127,21 +118,16 @@ export function ChordProgressionExercise() {
 
     return (
         <div className="flex flex-col h-full">
-            <div className="flex-1 flex flex-col p-3 min-h-0 overflow-hidden">
-                {/* Header */}
-                <div className="flex-shrink-0 flex justify-between items-center mb-3">
-                    <h1 className="text-2xl font-bold">Notewalking</h1>
-                    <BeatVisualizer
-                        currentBeat={metronome.state.currentBeat}
-                        isPlaying={metronome.state.isPlaying}
-                        currentBpm={metronome.state.isPlaying ? metronome.state.currentBpm : bpm}
-                    />
+            <div className="flex-1 flex flex-col p-2 min-h-0 overflow-hidden gap-2">
+                {/* Header - just title */}
+                <div className="flex-shrink-0">
+                    <h1 className="text-xl font-bold">Notewalking</h1>
                 </div>
 
                 {/* Main Content */}
-                <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-3 min-h-0">
-                    {/* Left Column: Controls */}
-                    <div className="flex flex-col gap-3 min-h-0">
+                <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-2 min-h-0">
+                    {/* Left Column: Controls only */}
+                    <div className="flex flex-col min-h-0">
                         <div className="flex-1 overflow-y-auto min-h-0">
                             <ChordProgressionControls
                                 settings={settings}
@@ -151,32 +137,11 @@ export function ChordProgressionExercise() {
                                 currentBpm={bpm}
                             />
                         </div>
-                        <div className="flex-shrink-0">
-                            <MetronomeControls
-                                isPlaying={isPlaying}
-                                onPlayPause={handlePlayPause}
-                                onRestart={handleRestart}
-                                onStateChange={(newState) => {
-                                    setMode(newState.mode);
-                                    setBpm(newState.startBpm);
-                                    setLoop(newState.loop);
-                                }}
-                                initialState={{
-                                    mode,
-                                    startBpm: bpm,
-                                    endBpm: bpm,
-                                    increments: 8,
-                                    measuresPerIncrement: 4,
-                                    loop,
-                                    progressiveStepBpm: 5,
-                                }}
-                                compact
-                            />
-                        </div>
                     </div>
 
-                    {/* Right Column: Matrix and Tuner */}
-                    <div className="lg:col-span-2 flex flex-col gap-3 min-h-0">
+                    {/* Right Column: Matrix, Tuner, and Metronome */}
+                    <div className="lg:col-span-2 flex flex-col gap-2 min-h-0">
+                        {/* Interval Matrix */}
                         <div className="flex-shrink-0">
                             <IntervalMatrix
                                 selectedKey={settings.key}
@@ -184,12 +149,53 @@ export function ChordProgressionExercise() {
                                 currentChordIndex={chordProgression.currentChordIndex}
                             />
                         </div>
-                        <div className="flex-1 min-h-0 flex">
-                            <DegreeTuner
-                                currentChord={chordProgression.currentChord}
-                                detectedNote={detectedNote}
-                                confidence={pitchConfidence}
-                            />
+
+                        {/* Degree Tuner and Metronome side by side */}
+                        <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-3 gap-2">
+                            {/* Degree Tuner - takes 2/3 */}
+                            <div className="lg:col-span-2 min-h-0 flex">
+                                <DegreeTuner
+                                    currentChord={chordProgression.currentChord}
+                                    detectedNote={detectedNote}
+                                    confidence={pitchConfidence}
+                                />
+                            </div>
+
+                            {/* Consolidated Metronome - takes 1/3 */}
+                            <div className="flex flex-col gap-2 bg-card border border-border rounded-lg p-3">
+                                {/* Beat Visualizer */}
+                                <div className="flex-shrink-0">
+                                    <BeatVisualizer
+                                        currentBeat={metronome.state.currentBeat}
+                                        isPlaying={metronome.state.isPlaying}
+                                        currentBpm={metronome.state.isPlaying ? metronome.state.currentBpm : bpm}
+                                    />
+                                </div>
+
+                                {/* Metronome Controls */}
+                                <div className="flex-shrink-0">
+                                    <MetronomeControls
+                                        isPlaying={isPlaying}
+                                        onPlayPause={handlePlayPause}
+                                        onRestart={handleRestart}
+                                        onStateChange={(newState) => {
+                                            setMode(newState.mode);
+                                            setBpm(newState.startBpm);
+                                            setLoop(newState.loop);
+                                        }}
+                                        initialState={{
+                                            mode,
+                                            startBpm: bpm,
+                                            endBpm: bpm,
+                                            increments: 8,
+                                            measuresPerIncrement: 4,
+                                            loop,
+                                            progressiveStepBpm: 5,
+                                        }}
+                                        compact
+                                    />
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

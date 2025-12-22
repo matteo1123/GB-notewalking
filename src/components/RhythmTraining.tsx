@@ -1,18 +1,18 @@
 import { useState, useCallback } from "react";
-import { generateRhythmPattern, rhythmToNotation, type RhythmPattern } from "@/lib/rhythmGenerator";
+import { generateRhythmPattern, patternToNotation, getSubdivisionLabels, type RhythmPattern } from "@/lib/rhythmGenerator";
 import { useMetronome, MetronomeSettings } from "@/hooks/useMetronome";
 import { MetronomeControls, MetronomeMode } from "./MetronomeControls";
 import { BeatVisualizer } from "./BeatVisualizer";
 import { Button } from "./ui/button";
 import { Slider } from "./ui/slider";
 import { Label } from "./ui/label";
-import { SkipForward } from "lucide-react";
+import { SkipForward, ChevronLeft, ChevronRight } from "lucide-react";
 
 export function RhythmTraining() {
-    const [level, setLevel] = useState(1);
-    const [pattern, setPattern] = useState<RhythmPattern>(() => generateRhythmPattern(1));
+    const [level, setLevel] = useState(0);
+    const [pattern, setPattern] = useState<RhythmPattern>(() => generateRhythmPattern(0));
     const [isPlaying, setIsPlaying] = useState(false);
-    const [bpm, setBpm] = useState(80);
+    const [bpm, setBpm] = useState(60); // Start slower for rhythm practice
     const [mode, setMode] = useState<MetronomeMode>("regular");
     const [loop, setLoop] = useState(true);
 
@@ -62,6 +62,17 @@ export function RhythmTraining() {
         setPattern(generateRhythmPattern(newLevel));
     }, []);
 
+    // Navigate levels
+    const handlePreviousLevel = useCallback(() => {
+        if (level > 0) {
+            handleLevelChange(level - 1);
+        }
+    }, [level, handleLevelChange]);
+
+    const handleNextLevel = useCallback(() => {
+        handleLevelChange(level + 1);
+    }, [level, handleLevelChange]);
+
     return (
         <div className="flex flex-col h-full">
             <div className="flex-1 flex flex-col p-3 min-h-0 overflow-hidden">
@@ -70,7 +81,7 @@ export function RhythmTraining() {
                     <div>
                         <h1 className="text-2xl font-bold">Rhythm Training</h1>
                         <p className="text-sm text-muted-foreground">
-                            Practice increasingly complex rhythm patterns
+                            Master 16th note strumming patterns
                         </p>
                     </div>
                     <BeatVisualizer
@@ -81,19 +92,39 @@ export function RhythmTraining() {
                 </div>
 
                 {/* Pattern Display - takes remaining space */}
-                <div className="flex-1 bg-card border border-border rounded-lg p-6 mb-3 flex flex-col items-center justify-center min-h-0">
-                    <div className="text-center mb-4">
-                        <h2 className="text-xl font-semibold mb-2">{pattern.name}</h2>
-                        <p className="text-sm text-muted-foreground">{pattern.description}</p>
+                <div className="flex-1 bg-card border border-border rounded-lg p-6 mb-3 flex flex-col items-center justify-center min-h-0 overflow-auto">
+                    <div className="text-center mb-6">
+                        <h2 className="text-2xl font-semibold mb-2">{pattern.name}</h2>
+                        <p className="text-base text-muted-foreground">{pattern.description}</p>
+                        <p className="text-sm text-muted-foreground mt-2">
+                            Level {pattern.level} • {pattern.deviationCount} {pattern.deviationCount === 1 ? 'deviation' : 'deviations'}
+                        </p>
+                    </div>
+
+                    {/* Subdivision Labels */}
+                    <div className="text-xl font-mono text-muted-foreground mb-2 tracking-wider">
+                        {getSubdivisionLabels()}
                     </div>
 
                     {/* Rhythm Notation */}
-                    <div className="text-6xl font-mono mb-6">
-                        {rhythmToNotation(pattern)}
+                    <div className="text-5xl font-mono mb-6 tracking-wider font-bold">
+                        {patternToNotation(pattern)}
                     </div>
 
-                    <div className="text-sm text-muted-foreground">
-                        {pattern.measures} measure{pattern.measures > 1 ? "s" : ""} • Level {pattern.level}
+                    {/* Legend */}
+                    <div className="flex gap-6 text-sm text-muted-foreground">
+                        <div className="flex items-center gap-2">
+                            <span className="text-2xl">↓</span>
+                            <span>Down strum</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <span className="text-2xl">↑</span>
+                            <span>Up strum</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <span className="text-2xl">·</span>
+                            <span>Skip (rest)</span>
+                        </div>
                     </div>
                 </div>
 
@@ -101,19 +132,42 @@ export function RhythmTraining() {
                 <div className="flex-shrink-0 grid grid-cols-1 lg:grid-cols-2 gap-3">
                     {/* Left: Level Control */}
                     <div className="bg-card border border-border rounded-lg p-4 space-y-4">
+                        {/* Level slider with prev/next buttons */}
                         <div>
                             <div className="flex items-center justify-between mb-2">
                                 <Label>Difficulty Level</Label>
                                 <span className="text-sm font-semibold">{level}</span>
                             </div>
-                            <Slider
-                                min={1}
-                                max={20}
-                                step={1}
-                                value={[level]}
-                                onValueChange={([value]) => handleLevelChange(value)}
-                                className="w-full"
-                            />
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={handlePreviousLevel}
+                                    disabled={level === 0}
+                                    className="h-8 w-8"
+                                >
+                                    <ChevronLeft className="h-4 w-4" />
+                                </Button>
+                                <Slider
+                                    min={0}
+                                    max={50}
+                                    step={1}
+                                    value={[level]}
+                                    onValueChange={([value]) => handleLevelChange(value)}
+                                    className="flex-1"
+                                />
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={handleNextLevel}
+                                    className="h-8 w-8"
+                                >
+                                    <ChevronRight className="h-4 w-4" />
+                                </Button>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-2">
+                                {level === 0 ? "Start here: all 16 strums" : `${pattern.deviationCount} skip${pattern.deviationCount > 1 ? 's' : ''} to master`}
+                            </p>
                         </div>
 
                         <Button

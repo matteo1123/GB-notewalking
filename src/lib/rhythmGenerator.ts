@@ -1,152 +1,157 @@
 /**
- * Rhythm Training - Algorithmic rhythm pattern generator
- * Progressively increases complexity from whole notes to complex mixed patterns
+ * Rhythm Training - Progressive strumming patterns for guitarists
+ * Based on 16th notes (1 y and a, 2 y and a, 3 y and a, 4 y and a)
+ * Introduces complexity through "skips" (rests on specific strums)
  */
 
-export type RhythmUnit = "whole" | "half" | "quarter" | "eighth" | "triplet" | "sixteenth";
-
-export interface RhythmNote {
-    subdivision: number;  // Subdivision within measure (0-15 for sixteenth notes)
-    duration: number;     // Duration in sixteenth note units
-    isRest: boolean;
+export interface StumPattern {
+    beat: number;        // Which beat (1-4)
+    subdivision: string; // Which subdivision: "1", "y", "and", "a"
+    strum: boolean;      // true = play, false = skip (rest)
+    direction: "down" | "up"; // Strum direction
 }
 
 export interface RhythmPattern {
     id: string;
-    level: number;        // Difficulty level (1-10+)
-    measures: number;     // Number of measures
-    notes: RhythmNote[];
+    level: number;
     name: string;
     description: string;
+    pattern: StumPattern[];
+    deviationCount: number; // How many skips from the basic pattern
+}
+
+// Map subdivision positions to names
+const SUBDIVISIONS = ["1", "y", "and", "a"] as const;
+
+/**
+ * Generate the basic 16th note strumming pattern (no skips)
+ * Down-up-down-up on each beat
+ */
+function generateBasicPattern(): StumPattern[] {
+    const pattern: StumPattern[] = [];
+
+    for (let beat = 1; beat <= 4; beat++) {
+        for (let subIndex = 0; subIndex < 4; subIndex++) {
+            pattern.push({
+                beat,
+                subdivision: SUBDIVISIONS[subIndex],
+                strum: true,
+                direction: subIndex % 2 === 0 ? "down" : "up", // Down on 1 and "and", up on "y" and "a"
+            });
+        }
+    }
+
+    return pattern;
 }
 
 /**
- * Generate a rhythm pattern based on difficulty level
- * Levels 1-10 progressively introduce complexity
+ * Generate a rhythm pattern based on level
+ * Level 0: No skips (all 16 strums)
+ * Level 1-16: One skip at different positions
+ * Level 17-32: Two skips at different positions
+ * etc.
  */
 export function generateRhythmPattern(level: number): RhythmPattern {
-    const measuresCount = Math.min(Math.floor(level / 3) + 1, 4); // 1-4 measures
-    const notes: RhythmNote[] = [];
+    const basicPattern = generateBasicPattern();
 
-    // Level 1-2: Whole and half notes
-    if (level <= 2) {
-        if (level === 1) {
-            // Whole notes - one note per measure
-            for (let m = 0; m < measuresCount; m++) {
-                notes.push({ subdivision: m * 16, duration: 16, isRest: false });
-            }
-        } else {
-            // Half notes - two notes per measure
-            for (let m = 0; m < measuresCount; m++) {
-                notes.push({ subdivision: m * 16, duration: 8, isRest: false });
-                notes.push({ subdivision: m * 16 + 8, duration: 8, isRest: false });
-            }
-        }
+    // Level 0 = no deviations
+    if (level === 0) {
+        return {
+            id: `rhythm-l0-${Date.now()}`,
+            level: 0,
+            name: "Basic 16ths",
+            description: "All strums: 1 y and a, 2 y and a, 3 y and a, 4 y and a",
+            pattern: basicPattern,
+            deviationCount: 0,
+        };
     }
-    // Level 3-4: Quarter notes
-    else if (level <= 4) {
-        for (let m = 0; m < measuresCount; m++) {
-            for (let beat = 0; beat < 4; beat++) {
-                notes.push({ subdivision: m * 16 + beat * 4, duration: 4, isRest: false });
-            }
+
+    // Calculate number of skips based on level
+    const deviationCount = Math.floor((level - 1) / 16) + 1;
+
+    // Clone the basic pattern
+    const pattern = basicPattern.map(s => ({ ...s }));
+
+    // Determine which positions to skip
+    // Use a deterministic pattern based on level so the same level always gives the same pattern
+    const skipPositions: number[] = [];
+    let remaining = deviationCount;
+    let position = ((level - 1) % 16);
+
+    while (remaining > 0 && skipPositions.length < 16) {
+        if (!skipPositions.includes(position)) {
+            skipPositions.push(position);
+            remaining--;
         }
+        position = (position + 7) % 16; // Jump by 7 to spread out skips
     }
-    // Level 5-6: Eighth notes
-    else if (level <= 6) {
-        const includeRests = level === 6;
-        for (let m = 0; m < measuresCount; m++) {
-            for (let eighth = 0; eighth < 8; eighth++) {
-                const isRest = includeRests && Math.random() < 0.2; // 20% rests at level 6
-                notes.push({ subdivision: m * 16 + eighth * 2, duration: 2, isRest });
-            }
-        }
-    }
-    // Level 7-8: Triplets and mixed
-    else if (level <= 8) {
-        // Mix of quarters, eighths, and some triplets
-        for (let m = 0; m < measuresCount; m++) {
-            let position = m * 16;
-            while (position < (m + 1) * 16) {
-                const roll = Math.random();
-                if (roll < 0.3) {
-                    // Quarter note
-                    notes.push({ subdivision: position, duration: 4, isRest: false });
-                    position += 4;
-                } else if (roll < 0.7) {
-                    // Two eighth notes
-                    notes.push({ subdivision: position, duration: 2, isRest: false });
-                    notes.push({ subdivision: position + 2, duration: 2, isRest: false });
-                    position += 4;
-                } else {
-                    // Triplet (approximate with sixteenths for simplicity)
-                    for (let i = 0; i < 3; i++) {
-                        notes.push({ subdivision: position + i * 1.33, duration: 1.33, isRest: false });
-                    }
-                    position += 4;
-                }
-            }
-        }
-    }
-    // Level 9-10: Sixteenth notes and complex
-    else {
-        for (let m = 0; m < measuresCount; m++) {
-            for (let sixteenth = 0; sixteenth < 16; sixteenth++) {
-                const isRest = Math.random() < 0.3; // 30% rests
-                notes.push({ subdivision: m * 16 + sixteenth, duration: 1, isRest });
-            }
-        }
-    }
+
+    // Apply skips
+    skipPositions.forEach(pos => {
+        pattern[pos].strum = false;
+    });
 
     return {
         id: `rhythm-l${level}-${Date.now()}`,
         level,
-        measures: measuresCount,
-        notes,
-        name: getRhythmLevelName(level),
-        description: getRhythmLevelDescription(level),
+        name: getPatternName(deviationCount),
+        description: getPatternDescription(pattern, deviationCount),
+        pattern,
+        deviationCount,
     };
 }
 
-function getRhythmLevelName(level: number): string {
-    if (level === 1) return "Whole Notes";
-    if (level === 2) return "Half Notes";
-    if (level <= 4) return "Quarter Notes";
-    if (level <= 6) return "Eighth Notes";
-    if (level <= 8) return "Mixed Rhythms";
-    return "Sixteenth Notes";
+function getPatternName(deviationCount: number): string {
+    if (deviationCount === 0) return "Basic 16ths";
+    if (deviationCount === 1) return "One Skip";
+    if (deviationCount === 2) return "Two Skips";
+    if (deviationCount <= 4) return `${deviationCount} Skips`;
+    return "Advanced Pattern";
 }
 
-function getRhythmLevelDescription(level: number): string {
-    if (level === 1) return "Play one note that lasts the entire measure";
-    if (level === 2) return "Play two notes, each lasting half a measure";
-    if (level <= 4) return "Play on each beat (1 2 3 4)";
-    if (level <= 6) return "Play on beats and off-beats (1 + 2 + 3 + 4 +)";
-    if (level <= 8) return "Mix of quarter notes, eighth notes, and triplets";
-    return "Fast sixteenth note patterns with rests";
+function getPatternDescription(pattern: StumPattern[], deviationCount: number): string {
+    if (deviationCount === 0) {
+        return "Play all 16th notes with alternate picking";
+    }
+
+    const skips = pattern
+        .filter(s => !s.strum)
+        .map(s => `${s.beat}${s.subdivision}`)
+        .join(", ");
+
+    return `Skip: ${skips}`;
 }
 
 /**
- * Convert rhythm pattern to visual notation string
- * Uses Unicode musical symbols
+ * Convert pattern to strumming notation
+ * ↓ = down strum, ↑ = up strum, · = skip/rest
  */
-export function rhythmToNotation(pattern: RhythmPattern): string {
-    const symbols: string[] = [];
+export function patternToNotation(pattern: RhythmPattern): string {
+    const beats: string[] = [];
 
-    for (const note of pattern.notes) {
-        if (note.isRest) {
-            if (note.duration >= 16) symbols.push("𝄻"); // Whole rest
-            else if (note.duration >= 8) symbols.push("𝄼"); // Half rest
-            else if (note.duration >= 4) symbols.push("𝄽"); // Quarter rest
-            else if (note.duration >= 2) symbols.push("𝄾"); // Eighth rest
-            else symbols.push("𝄿"); // Sixteenth rest
-        } else {
-            if (note.duration >= 16) symbols.push("𝅝"); // Whole note
-            else if (note.duration >= 8) symbols.push("𝅗𝅥"); // Half note
-            else if (note.duration >= 4) symbols.push("♩"); // Quarter note
-            else if (note.duration >= 2) symbols.push("♪"); // Eighth note
-            else symbols.push("♬"); // Sixteenth note
-        }
+    for (let beat = 1; beat <= 4; beat++) {
+        const beatPatterns = pattern.pattern
+            .filter(s => s.beat === beat)
+            .map(s => {
+                if (!s.strum) return "·";
+                return s.direction === "down" ? "↓" : "↑";
+            });
+
+        beats.push(beatPatterns.join(" "));
     }
 
-    return symbols.join(" ");
+    return beats.join("  |  ");
+}
+
+/**
+ * Get subdivision labels for display
+ */
+export function getSubdivisionLabels(): string {
+    const beats: string[] = [];
+
+    for (let beat = 1; beat <= 4; beat++) {
+        beats.push(`${beat} y & a`);
+    }
+
+    return beats.join("    ");
 }

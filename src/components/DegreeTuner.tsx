@@ -7,18 +7,20 @@ interface DegreeTunerProps {
     currentChord: ChordInfo;
     detectedNote: string | null;
     confidence?: number;
+    keyRoot: string; // Add keyRoot prop
 }
 
 export function DegreeTuner({
     currentChord,
     detectedNote,
     confidence = 0,
+    keyRoot,
 }: DegreeTunerProps) {
-    // Calculate scale degree from detected note relative to current chord root
+    // Calculate scale degree from detected note relative to KEY root (not chord root)
     const scaleDegree = useMemo(() => {
         if (!detectedNote) return null;
-        return calculateDegreeFromRoot(detectedNote, currentChord.rootNote);
-    }, [detectedNote, currentChord.rootNote]);
+        return calculateDegreeFromRoot(detectedNote, keyRoot);
+    }, [detectedNote, keyRoot]);
 
     // Get color for the degree
     const degreeColor = scaleDegree
@@ -99,7 +101,7 @@ export function DegreeTuner({
             {/* Legend */}
             <div className="mt-8 pt-4 border-t border-border">
                 <p className="text-xs text-muted-foreground text-center">
-                    Shows the scale degree of your note relative to the current chord's root
+                    Shows the scale degree of your note in the key
                 </p>
             </div>
         </div>

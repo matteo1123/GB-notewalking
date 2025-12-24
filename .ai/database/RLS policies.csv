@@ -1,0 +1,20 @@
+schemaname,tablename,policyname,permissive,roles,cmd,qual,with_check
+public,legacy_exercises,Owners can delete own exercises,PERMISSIVE,{public},DELETE,(auth.uid() = created_by),null
+public,legacy_exercises,Owners can insert exercises,PERMISSIVE,{public},INSERT,null,(auth.uid() = created_by)
+public,legacy_exercises,Owners can read own exercises,PERMISSIVE,{public},SELECT,(auth.uid() = created_by),null
+public,legacy_exercises,Owners can update own exercises,PERMISSIVE,{public},UPDATE,(auth.uid() = created_by),null
+public,legacy_exercises,Public can read public exercises,PERMISSIVE,{public},SELECT,(is_public = true),null
+public,lesson_exercises,Users can insert their own lesson exercises.,PERMISSIVE,{public},INSERT,null,"(( SELECT auth.uid() AS uid) = ( SELECT lessons.created_by
+   FROM lessons
+  WHERE (lessons.id = lesson_exercises.lesson_id)))"
+public,lesson_exercises,Users can view their own lesson exercises.,PERMISSIVE,{public},SELECT,"(( SELECT auth.uid() AS uid) = ( SELECT lessons.created_by
+   FROM lessons
+  WHERE (lessons.id = lesson_exercises.lesson_id)))",null
+public,lessons,Users can insert their own lessons.,PERMISSIVE,{public},INSERT,null,(( SELECT auth.uid() AS uid) = created_by)
+public,lessons,Users can view their own lessons.,PERMISSIVE,{public},SELECT,(( SELECT auth.uid() AS uid) = created_by),null
+public,practice_log,Users can insert their own practice logs.,PERMISSIVE,{public},INSERT,null,(( SELECT auth.uid() AS uid) = user_id)
+public,practice_log,Users can view their own practice logs.,PERMISSIVE,{public},SELECT,(( SELECT auth.uid() AS uid) = user_id),null
+public,profiles,Public profiles are viewable by everyone.,PERMISSIVE,{public},SELECT,true,null
+public,profiles,Users can insert their own profile.,PERMISSIVE,{public},INSERT,null,(( SELECT auth.uid() AS uid) = id)
+public,profiles,Users can update their own profile.,PERMISSIVE,{public},UPDATE,(( SELECT auth.uid() AS uid) = id),null
+public,user_roles,Allow auth admin to read user roles,PERMISSIVE,{supabase_auth_admin},SELECT,true,null

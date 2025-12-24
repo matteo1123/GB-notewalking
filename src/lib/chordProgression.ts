@@ -146,9 +146,9 @@ export function calculateDegreeFromRoot(
 
 /**
  * Get the chord tones (scale degrees) for a given chord
- * Returns the scale degrees that make up the chord
+ * Returns the scale degrees that make up the chord, sorted from low to high
  * @param numeral - The chord numeral
- * @returns Array of scale degrees (e.g., [1, 3, 5, 7] for I, [4, 6, 1, 3] for IV)
+ * @returns Array of scale degrees sorted (e.g., [1, 3, 5, 7] for I, [1, 3, 4, 6] for IV)
  */
 export function getChordTones(numeral: ChordNumeral): number[] {
     const chordDegree = getChordDegree(numeral);
@@ -162,7 +162,8 @@ export function getChordTones(numeral: ChordNumeral): number[] {
         ((chordDegree + 5) % 7) + 1,         // 7th (skip two more)
     ];
 
-    return tones;
+    // Sort from low to high (1-7)
+    return tones.sort((a, b) => a - b);
 }
 
 /**

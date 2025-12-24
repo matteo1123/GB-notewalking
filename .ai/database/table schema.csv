@@ -1,0 +1,100 @@
+table_schema,table_name,column_name,data_type,is_nullable,column_default,character_maximum_length
+public,exercises,id,uuid,NO,gen_random_uuid(),null
+public,exercises,user_id,uuid,NO,null,null
+public,exercises,scale_id,uuid,NO,null,null
+public,exercises,sequence_id,uuid,NO,null,null
+public,exercises,name,text,YES,null,null
+public,exercises,bpm,integer,YES,120,null
+public,exercises,rhythm_value,numeric,YES,null,null
+public,exercises,created_at,timestamp with time zone,YES,now(),null
+public,exercises,updated_at,timestamp with time zone,YES,now(),null
+public,legacy_exercises,id,uuid,NO,'6525cf2d-4d2d-4c65-8a20-1456733933f4'::uuid,null
+public,legacy_exercises,created_by,uuid,NO,null,null
+public,legacy_exercises,name,text,NO,null,null
+public,legacy_exercises,description,text,YES,null,null
+public,legacy_exercises,type,USER-DEFINED,NO,null,null
+public,legacy_exercises,notes,jsonb,NO,null,null
+public,legacy_exercises,is_public,boolean,NO,true,null
+public,legacy_exercises,created_at,timestamp with time zone,NO,now(),null
+public,legacy_exercises,updated_at,timestamp with time zone,NO,now(),null
+public,legacy_exercises,notes_per_beat,smallint,YES,null,null
+public,legacy_exercises,Tonic,text,NO,'C'::text,null
+public,legacy_exercises,Tonality,text,NO,'Major'::text,null
+public,legacy_exercises,Position,smallint,YES,'1'::smallint,null
+public,legacy_exercises,Difficulty,smallint,YES,null,null
+public,legacy_exercises,Parent,uuid,YES,null,null
+public,lesson_exercises,id,bigint,NO,null,null
+public,lesson_exercises,lesson_id,uuid,NO,null,null
+public,lesson_exercises,scale_id,uuid,YES,null,null
+public,lesson_exercises,scale_shape_id,uuid,YES,null,null
+public,lesson_exercises,target_bpm,integer,YES,null,null
+public,lesson_exercises,order,integer,NO,null,null
+public,lesson_exercises,metronome_mode,text,YES,null,null
+public,lesson_exercises,starting_bpm,integer,YES,null,null
+public,lesson_exercises,increments,integer,YES,null,null
+public,lesson_exercises,measures_per_bpm,integer,YES,null,null
+public,lesson_exercises,display_view,text,YES,null,null
+public,lesson_exercises,target_type,text,YES,null,null
+public,lesson_exercises,time,integer,YES,null,null
+public,lesson_exercises,description,text,YES,null,null
+public,lesson_exercises,progressive_step_bpm,integer,YES,5,null
+public,lessons,id,uuid,NO,gen_random_uuid(),null
+public,lessons,name,text,NO,null,null
+public,lessons,created_by,uuid,YES,null,null
+public,lessons,created_at,timestamp with time zone,NO,now(),null
+public,practice_log,id,bigint,NO,null,null
+public,practice_log,user_id,uuid,NO,null,null
+public,practice_log,exercise_id,uuid,YES,null,null
+public,practice_log,duration,integer,NO,null,null
+public,practice_log,max_bpm,integer,YES,null,null
+public,practice_log,created_at,timestamp with time zone,NO,now(),null
+public,practice_log,scale_id,uuid,YES,null,null
+public,practice_log,scale_shape_id,uuid,YES,null,null
+public,practice_log,perfect_bpm,integer,YES,null,null
+public,practice_log,audio,text,YES,null,null
+public,practice_log,exercise_category,text,YES,null,null
+public,practice_log,name,text,YES,null,null
+public,profiles,id,uuid,NO,null,null
+public,profiles,website,text,YES,null,null
+public,profiles,youtube,text,YES,null,null
+public,profiles,band,text,YES,null,null
+public,profiles,settings,jsonb,YES,null,null
+public,scale_shapes,id,uuid,NO,gen_random_uuid(),null
+public,scale_shapes,name,text,NO,null,null
+public,scale_shapes,intervals,ARRAY,YES,null,null
+public,scale_shapes,shape_json,jsonb,NO,null,null
+public,scale_shapes,Position,smallint,YES,'1'::smallint,null
+public,scale_shapes,Type,text,YES,'3 note per string Scale'::text,null
+public,scale_shapes,Mode,text,YES,null,null
+public,scale_shapes,tonality,text,YES,null,null
+public,scale_shapes,root_fret,integer,YES,null,null
+public,scale_shapes,notes,ARRAY,YES,null,null
+public,scales,id,uuid,NO,gen_random_uuid(),null
+public,scales,name,text,NO,null,null
+public,scales,root_note,text,YES,null,null
+public,scales,tonality,text,YES,null,null
+public,scales,difficulty,integer,YES,null,null
+public,scales,notes_json,jsonb,NO,null,null
+public,scales,is_public,boolean,YES,true,null
+public,scales,created_by,uuid,YES,null,null
+public,scales,created_at,timestamp with time zone,YES,now(),null
+public,scales,updated_at,timestamp with time zone,YES,now(),null
+public,scales,mode,text,YES,null,null
+public,scales,major_key,text,YES,null,null
+public,scales,Position,integer,YES,null,null
+public,scales,Type,USER-DEFINED,YES,null,null
+public,scales,intervals,ARRAY,YES,null,null
+public,scales,scale_shape,uuid,YES,null,null
+public,scales,notes,ARRAY,YES,null,null
+public,sequences,id,uuid,NO,gen_random_uuid(),null
+public,sequences,name,text,NO,null,null
+public,sequences,pattern_string,text,NO,null,null
+public,sequences,repetition_style,text,NO,null,null
+public,sequences,Type,text,YES,null,null
+public,sequences,note_value,integer,YES,null,null
+public,sequences,is_triplet,boolean,YES,null,null
+public,sequences,bpm,integer,YES,null,null
+public,sequences,num_clicks,integer,YES,20,null
+public,user_roles,id,bigint,NO,null,null
+public,user_roles,user_id,uuid,NO,null,null
+public,user_roles,role,USER-DEFINED,NO,'user'::app_role,null

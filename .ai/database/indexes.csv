@@ -1,0 +1,17 @@
+schemaname,tablename,indexname,indexdef
+public,exercises,exercises_pkey1,CREATE UNIQUE INDEX exercises_pkey1 ON public.exercises USING btree (id)
+public,legacy_exercises,exercises_pkey,CREATE UNIQUE INDEX exercises_pkey ON public.legacy_exercises USING btree (id)
+public,legacy_exercises,idx_exercises_created_by,CREATE INDEX idx_exercises_created_by ON public.legacy_exercises USING btree (created_by)
+public,legacy_exercises,idx_exercises_is_public,CREATE INDEX idx_exercises_is_public ON public.legacy_exercises USING btree (is_public)
+public,legacy_exercises,idx_exercises_type,CREATE INDEX idx_exercises_type ON public.legacy_exercises USING btree (type)
+public,lesson_exercises,lesson_exercises_pkey,CREATE UNIQUE INDEX lesson_exercises_pkey ON public.lesson_exercises USING btree (id)
+public,lessons,lessons_pkey,CREATE UNIQUE INDEX lessons_pkey ON public.lessons USING btree (id)
+public,practice_log,practice_log_audio_key,CREATE UNIQUE INDEX practice_log_audio_key ON public.practice_log USING btree (audio)
+public,practice_log,practice_log_pkey,CREATE UNIQUE INDEX practice_log_pkey ON public.practice_log USING btree (id)
+public,profiles,profiles_pkey,CREATE UNIQUE INDEX profiles_pkey ON public.profiles USING btree (id)
+public,scale_shapes,scale_shapes_name_key,CREATE UNIQUE INDEX scale_shapes_name_key ON public.scale_shapes USING btree (name)
+public,scale_shapes,scale_shapes_pkey,CREATE UNIQUE INDEX scale_shapes_pkey ON public.scale_shapes USING btree (id)
+public,scales,scales_pkey,CREATE UNIQUE INDEX scales_pkey ON public.scales USING btree (id)
+public,sequences,sequences_pkey,CREATE UNIQUE INDEX sequences_pkey ON public.sequences USING btree (id)
+public,user_roles,user_roles_pkey,CREATE UNIQUE INDEX user_roles_pkey ON public.user_roles USING btree (id)
+public,user_roles,user_roles_user_id_role_key,"CREATE UNIQUE INDEX user_roles_user_id_role_key ON public.user_roles USING btree (user_id, role)"

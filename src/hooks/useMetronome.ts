@@ -17,6 +17,7 @@ export interface MetronomeSettings {
   progressiveStepBpm?: number;
   onTick?: (state: MetronomeState) => void;
   loop?: boolean;
+  muted?: boolean;
 }
 
 export const DEFAULT_PROGRESSIVE_STEP_BPM = 5;
@@ -72,6 +73,9 @@ export function useMetronome(settings: MetronomeSettings) {
 
   const playClick = useCallback(
     (isDownbeat = false) => {
+      // Don't play click if muted
+      if (settingsRef.current.muted) return;
+
       const audioContext = initAudioContext();
       if (!audioContext) return;
 

@@ -1,0 +1,3 @@
+id,name,public,file_size_limit,allowed_mime_types
+Piano,Piano,true,null,null
+practice,practice,false,null,null

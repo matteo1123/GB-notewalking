@@ -24,6 +24,7 @@ export function ChordProgressionExercise() {
     const [bpm, setBpm] = useState(80);
     const [mode, setMode] = useState<MetronomeMode>("regular");
     const [loop, setLoop] = useState(true);
+    const [metronomeMuted, setMetronomeMuted] = useState(false);
     const [detectedNote, setDetectedNote] = useState<string | null>(null);
     const [pitchConfidence, setPitchConfidence] = useState(0);
     const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
@@ -43,6 +44,7 @@ export function ChordProgressionExercise() {
         startBpm: bpm,
         endBpm: bpm,
         measures: 999,
+        muted: metronomeMuted,
         onTick: (state) => {
             chordProgression.handleMetronomeTick(state);
 
@@ -158,6 +160,7 @@ export function ChordProgressionExercise() {
                                     currentChord={chordProgression.currentChord}
                                     detectedNote={detectedNote}
                                     confidence={pitchConfidence}
+                                    keyRoot={settings.key}
                                 />
                             </div>
 
@@ -170,6 +173,21 @@ export function ChordProgressionExercise() {
                                         isPlaying={metronome.state.isPlaying}
                                         currentBpm={metronome.state.isPlaying ? metronome.state.currentBpm : bpm}
                                     />
+                                </div>
+
+                                {/* Mute Toggle */}
+                                <div className="flex items-center justify-between bg-muted/30 rounded p-2">
+                                    <span className="text-xs font-medium">Mute Clicks</span>
+                                    <button
+                                        onClick={() => setMetronomeMuted(!metronomeMuted)}
+                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${metronomeMuted ? 'bg-primary' : 'bg-muted'
+                                            }`}
+                                    >
+                                        <span
+                                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${metronomeMuted ? 'translate-x-5' : 'translate-x-0.5'
+                                                }`}
+                                        />
+                                    </button>
                                 </div>
 
                                 {/* Metronome Controls */}

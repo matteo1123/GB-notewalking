@@ -1,0 +1,10 @@
+from_table,from_column,to_table,to_column,constraint_name
+exercises,scale_id,scales,id,exercises_scale_id_fkey
+exercises,sequence_id,sequences,id,exercises_sequence_id_fkey
+lesson_exercises,scale_shape_id,scale_shapes,id,lesson_exercises_scale_shape_id_fkey
+lesson_exercises,lesson_id,lessons,id,lesson_exercises_lesson_id_fkey
+lesson_exercises,scale_id,scales,id,lesson_exercises_scale_id_fkey
+practice_log,scale_shape_id,scale_shapes,id,practice_log_scale_shape_id_fkey
+practice_log,exercise_id,exercises,id,practice_log_exercise_id_fkey
+practice_log,scale_id,scales,id,practice_log_scale_id_fkey
+scales,scale_shape,scale_shapes,id,scales_scale_shape_fkey

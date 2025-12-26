@@ -296,6 +296,7 @@ export const usePitchDetection = ({
   return {
     isListening,
     currentNote,
+    audioStream: streamRef.current, // Expose stream for auto-recording
     startListening,
     stopListening,
   };

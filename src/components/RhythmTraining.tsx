@@ -1,12 +1,15 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { generateRhythmPattern, patternToNotation, getSubdivisionLabels, type RhythmPattern } from "@/lib/rhythmGenerator";
 import { useMetronome, MetronomeSettings } from "@/hooks/useMetronome";
+import { useAutoRecording } from "@/hooks/useAutoRecording";
+import { supabase } from "@/integrations/supabase/client";
 import { MetronomeControls, MetronomeMode } from "./MetronomeControls";
 import { BeatVisualizer } from "./BeatVisualizer";
 import { Button } from "./ui/button";
 import { Slider } from "./ui/slider";
 import { Label } from "./ui/label";
-import { SkipForward, ChevronLeft, ChevronRight } from "lucide-react";
+import { Switch } from "./ui/switch";
+import { SkipForward, ChevronLeft, ChevronRight, Check } from "lucide-react";
 
 export function RhythmTraining() {
     const [level, setLevel] = useState(0);
@@ -15,6 +18,38 @@ export function RhythmTraining() {
     const [bpm, setBpm] = useState(60); // Start slower for rhythm practice
     const [mode, setMode] = useState<MetronomeMode>("regular");
     const [loop, setLoop] = useState(true);
+    const [autoRecordEnabled, setAutoRecordEnabled] = useState(false);
+    const [tickCount, setTickCount] = useState(0);
+
+    // Load auto-record setting from profile
+    useEffect(() => {
+        const loadSettings = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('settings')
+                .eq('id', user.id)
+                .single();
+
+            if (profile?.settings) {
+                const settings = profile.settings as { autoRecord?: boolean };
+                setAutoRecordEnabled(settings.autoRecord || false);
+            }
+        };
+        loadSettings();
+    }, []);
+
+    // Auto-recording
+    const recording = useAutoRecording({
+        enabled: autoRecordEnabled && isPlaying,
+        moduleType: 'rhythm',
+        moduleConfig: {
+            rhythm_level: level,
+            duration_minutes: 5,
+        },
+    });
 
     // Metronome setup
     const metronomeSettings: MetronomeSettings = {
@@ -23,7 +58,8 @@ export function RhythmTraining() {
         endBpm: bpm,
         measures: 999,
         onTick: (state) => {
-            // TODO: Add click on rhythm pattern beats
+            setTickCount(prev => prev + 1);
+            recording.handleTick(state.currentBeat + (state.currentMeasure - 1) * 4);
         },
     };
 
@@ -43,8 +79,10 @@ export function RhythmTraining() {
         } else {
             metronome.start();
             setIsPlaying(true);
+            setTickCount(0);
+            recording.reset();
         }
-    }, [isPlaying, metronome]);
+    }, [isPlaying, metronome, recording]);
 
     const handleRestart = useCallback(() => {
         metronome.stop();
@@ -90,6 +128,25 @@ export function RhythmTraining() {
                         currentBpm={metronome.state.isPlaying ? metronome.state.currentBpm : bpm}
                     />
                 </div>
+
+                {/* Recording Countdown */}
+                {recording.countdown && (
+                    <div className="flex-shrink-0 mb-2 bg-yellow-500/20 border border-yellow-500/50 rounded-lg p-2 flex items-center justify-center">
+                        <span className="text-sm font-semibold text-yellow-700 dark:text-yellow-400 animate-pulse">
+                            Recording in {recording.countdown} clicks...
+                        </span>
+                    </div>
+                )}
+
+                {/* Recording Indicator */}
+                {recording.isRecording && (
+                    <div className="flex-shrink-0 mb-2 bg-red-500/20 border border-red-500/50 rounded-lg p-2 flex items-center justify-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
+                        <span className="text-sm font-semibold text-red-700 dark:text-red-400">
+                            RECORDING
+                        </span>
+                    </div>
+                )}
 
                 {/* Pattern Display - takes remaining space */}
                 <div className="flex-1 bg-card border border-border rounded-lg p-6 mb-3 flex flex-col items-center justify-center min-h-0 overflow-auto">
@@ -168,6 +225,21 @@ export function RhythmTraining() {
                             <p className="text-xs text-muted-foreground mt-2">
                                 {level === 0 ? "Start here: all 16 strums" : `${pattern.deviationCount} skip${pattern.deviationCount > 1 ? 's' : ''} to master`}
                             </p>
+                        </div>
+
+                        {/* Auto-Record Toggle */}
+                        <div className="flex items-center justify-between bg-muted/30 rounded-lg p-3">
+                            <div className="flex items-center gap-2">
+                                <Label htmlFor="auto-record-rhythm">Auto-Record</Label>
+                                {recording.hasRecorded && (
+                                    <Check className="w-4 h-4 text-green-500" />
+                                )}
+                            </div>
+                            <Switch
+                                id="auto-record-rhythm"
+                                checked={autoRecordEnabled}
+                                onCheckedChange={setAutoRecordEnabled}
+                            />
                         </div>
 
                         <Button

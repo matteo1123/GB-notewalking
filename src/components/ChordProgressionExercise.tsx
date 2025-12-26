@@ -4,11 +4,16 @@ import { useMetronome, MetronomeSettings } from "@/hooks/useMetronome";
 import { useChordProgression } from "@/hooks/useChordProgression";
 import { useNotePlayer } from "@/hooks/useNotePlayer";
 import { usePitchDetection } from "@/hooks/usePitchDetection";
+import { useAutoRecording } from "@/hooks/useAutoRecording";
+import { supabase } from "@/integrations/supabase/client";
 import { MetronomeControls, MetronomeMode } from "./MetronomeControls";
 import { BeatVisualizer } from "./BeatVisualizer";
 import { ChordProgressionControls } from "./ChordProgressionControls";
 import { IntervalMatrix } from "./IntervalMatrix";
 import { DegreeTuner } from "./DegreeTuner";
+import { Switch } from "./ui/switch";
+import { Label } from "./ui/label";
+import { Check } from "lucide-react";
 
 const DEFAULT_SETTINGS: ChordProgressionSettings = {
     key: "C",
@@ -28,6 +33,28 @@ export function ChordProgressionExercise() {
     const [detectedNote, setDetectedNote] = useState<string | null>(null);
     const [pitchConfidence, setPitchConfidence] = useState(0);
     const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
+    const [autoRecordEnabled, setAutoRecordEnabled] = useState(false);
+    const [tickCount, setTickCount] = useState(0);
+
+    // Load auto-record setting from profile
+    useEffect(() => {
+        const loadSettings = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('settings')
+                .eq('id', user.id)
+                .single();
+
+            if (profile?.settings) {
+                const settings = profile.settings as { autoRecord?: boolean };
+                setAutoRecordEnabled(settings.autoRecord || false);
+            }
+        };
+        loadSettings();
+    }, []);
 
     // Initialize AudioContext on mount
     useEffect(() => {
@@ -46,7 +73,9 @@ export function ChordProgressionExercise() {
         measures: 999,
         muted: metronomeMuted,
         onTick: (state) => {
+            setTickCount(prev => prev + 1);
             chordProgression.handleMetronomeTick(state);
+            recording.handleTick(tickCount);
 
             // Play drone on beat 1 of each measure
             if (settings.droneEnabled && state.currentBeat === 1) {
@@ -81,10 +110,22 @@ export function ChordProgressionExercise() {
         []
     );
 
-    usePitchDetection({
+    const pitchDetection = usePitchDetection({
         isEnabled: isPlaying,
         onNoteDetected: handlePitchDetected,
         sensitivity: 0.7,
+    });
+
+    // Auto-recording with mic cloning
+    const recording = useAutoRecording({
+        enabled: autoRecordEnabled && isPlaying,
+        moduleType: 'notewalking',
+        moduleConfig: {
+            key: settings.key,
+            chords: settings.selectedChords,
+            measures_per_chord: settings.measuresPerChord,
+        },
+        existingMicStream: pitchDetection.audioStream || undefined,
     });
 
     // Handle settings changes
@@ -103,8 +144,10 @@ export function ChordProgressionExercise() {
         } else {
             metronome.start();
             setIsPlaying(true);
+            setTickCount(0);
+            recording.reset();
         }
-    }, [isPlaying, metronome]);
+    }, [isPlaying, metronome, recording]);
 
     const handleRestart = useCallback(() => {
         metronome.stop();
@@ -125,6 +168,25 @@ export function ChordProgressionExercise() {
                 <div className="flex-shrink-0">
                     <h1 className="text-xl font-bold">Notewalking</h1>
                 </div>
+
+                {/* Recording Countdown */}
+                {recording.countdown && (
+                    <div className="flex-shrink-0 mx-2 bg-yellow-500/20 border border-yellow-500/50 rounded-lg p-2 flex items-center justify-center">
+                        <span className="text-sm font-semibold text-yellow-700 dark:text-yellow-400 animate-pulse">
+                            Recording in {recording.countdown} clicks...
+                        </span>
+                    </div>
+                )}
+
+                {/* Recording Indicator */}
+                {recording.isRecording && (
+                    <div className="flex-shrink-0 mx-2 bg-red-500/20 border border-red-500/50 rounded-lg p-2 flex items-center justify-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
+                        <span className="text-sm font-semibold text-red-700 dark:text-red-400">
+                            RECORDING
+                        </span>
+                    </div>
+                )}
 
                 {/* Main Content */}
                 <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-2 min-h-0">
@@ -188,6 +250,22 @@ export function ChordProgressionExercise() {
                                                 }`}
                                         />
                                     </button>
+                                </div>
+
+                                {/* Auto-Record Toggle */}
+                                <div className="flex items-center justify-between bg-muted/30 rounded p-2">
+                                    <div className="flex items-center gap-1">
+                                        <Label htmlFor="auto-record-notewalking" className="text-xs font-medium cursor-pointer">Auto-Record</Label>
+                                        {recording.hasRecorded && (
+                                            <Check className="w-3 h-3 text-green-500" />
+                                        )}
+                                    </div>
+                                    <Switch
+                                        id="auto-record-notewalking"
+                                        checked={autoRecordEnabled}
+                                        onCheckedChange={setAutoRecordEnabled}
+                                        className="scale-75"
+                                    />
                                 </div>
 
                                 {/* Metronome Controls */}

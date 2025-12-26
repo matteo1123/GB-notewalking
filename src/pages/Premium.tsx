@@ -11,6 +11,7 @@ import { Tables } from "@/integrations/supabase/types";
 import Paywall from "@/components/Premium/Paywall";
 import { ChordProgressionExercise } from "@/components/ChordProgressionExercise";
 import { RhythmTraining } from "@/components/RhythmTraining";
+import { ModuleLibrary } from "@/components/ModuleLibrary";
 
 const Premium = () => {
   const { user } = useAuth();
@@ -182,13 +183,18 @@ const Premium = () => {
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden p-4">
         {/* Content */}
         <Tabs defaultValue="sessions" className="flex-1 flex flex-col min-h-0 overflow-hidden">
-          <TabsList className="grid w-full grid-cols-5 flex-shrink-0 mb-4">
+          <TabsList className="grid w-full grid-cols-6 flex-shrink-0 mb-4">
+            <TabsTrigger value="modules">🎯 Modules</TabsTrigger>
             <TabsTrigger value="sessions">Lessons</TabsTrigger>
             <TabsTrigger value="rhythms">Rhythms</TabsTrigger>
             <TabsTrigger value="scales">Scales</TabsTrigger>
             <TabsTrigger value="arpeggios">Arpeggios</TabsTrigger>
             <TabsTrigger value="ear-training">Notewalking</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="modules" className="flex-1 min-h-0 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col">
+            <ModuleLibrary />
+          </TabsContent>
 
           <TabsContent value="rhythms" className="flex-1 min-h-0 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col">
             <RhythmTraining />

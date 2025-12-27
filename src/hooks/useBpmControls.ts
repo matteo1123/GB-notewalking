@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 interface UseBpmControlsProps {
   currentBpm: number;
@@ -15,16 +15,35 @@ export function useBpmControls({
   minBpm = 40,
   maxBpm = 300,
 }: UseBpmControlsProps) {
-  const changeBpm = (delta: number) => {
-    const newBpm = Math.max(
-      minBpm,
-      Math.min(maxBpm, Math.round(currentBpm + delta))
-    );
-    onBpmChange(newBpm);
-  };
+  // Use refs to avoid effect re-runs when BPM changes
+  const currentBpmRef = useRef(currentBpm);
+  const onBpmChangeRef = useRef(onBpmChange);
+  const minBpmRef = useRef(minBpm);
+  const maxBpmRef = useRef(maxBpm);
+
+  // Keep refs in sync
+  useEffect(() => {
+    currentBpmRef.current = currentBpm;
+    onBpmChangeRef.current = onBpmChange;
+    minBpmRef.current = minBpm;
+    maxBpmRef.current = maxBpm;
+  }, [currentBpm, onBpmChange, minBpm, maxBpm]);
 
   useEffect(() => {
     if (!isEnabled) return;
+
+    const changeBpm = (delta: number) => {
+      const newBpm = Math.max(
+        minBpmRef.current,
+        Math.min(maxBpmRef.current, Math.round(currentBpmRef.current + delta))
+      );
+      onBpmChangeRef.current(newBpm);
+    };
+
+    const setBpmAbsolute = (bpm: number) => {
+      const newBpm = Math.max(minBpmRef.current, Math.min(maxBpmRef.current, Math.round(bpm)));
+      onBpmChangeRef.current(newBpm);
+    };
 
     const handleKeyDown = (e: KeyboardEvent) => {
       // Only respond if no input elements are focused
@@ -32,8 +51,8 @@ export function useBpmControls({
       if (
         activeElement &&
         (activeElement.tagName === "INPUT" ||
-         activeElement.tagName === "TEXTAREA" ||
-         (activeElement as HTMLElement).isContentEditable)
+          activeElement.tagName === "TEXTAREA" ||
+          (activeElement as HTMLElement).isContentEditable)
       )
         return;
 
@@ -50,7 +69,7 @@ export function useBpmControls({
     };
 
     const handleWheel = (e: WheelEvent) => {
-      // Check if we're in a bpm-control-area or if it's a general page area
+      // Check if we're in a bpm-control-area
       const target = e.target as HTMLElement;
       const isInControlArea = target.closest(".bpm-control-area");
       if (!isInControlArea) return;
@@ -60,8 +79,8 @@ export function useBpmControls({
       if (
         activeElement &&
         (activeElement.tagName === "INPUT" ||
-         activeElement.tagName === "TEXTAREA" ||
-         (activeElement as HTMLElement).isContentEditable)
+          activeElement.tagName === "TEXTAREA" ||
+          (activeElement as HTMLElement).isContentEditable)
       ) return;
 
       e.preventDefault();
@@ -70,12 +89,13 @@ export function useBpmControls({
       changeBpm(delta);
     };
 
-    // Mouse/Desktop controls
+    // Mouse/Desktop and Touch/Mobile controls
+    // Use relative positioning: track start Y and start BPM
     let isDragging = false;
-    let lastMouseY = 0;
+    let startY = 0;
+    let startBpm = 0;
 
-    const handleMouseDown = (e: MouseEvent) => {
-      // Check if we're in a bpm-control-area and not clicking on interactive elements
+    const handleDragStart = (e: MouseEvent | TouchEvent) => {
       const target = e.target as HTMLElement;
       const isInControlArea = target.closest(".bpm-control-area");
       const isInteractive =
@@ -91,95 +111,83 @@ export function useBpmControls({
       if (!isInControlArea || isInteractive) return;
 
       isDragging = true;
-      lastMouseY = e.clientY;
+
+      // Get Y position from either mouse or touch event
+      if (e instanceof MouseEvent) {
+        startY = e.clientY;
+      } else {
+        startY = e.touches[0].clientY;
+      }
+
+      startBpm = currentBpmRef.current;
       document.body.style.cursor = "ns-resize";
       e.preventDefault();
     };
 
-    const handleMouseMove = (e: MouseEvent) => {
+    const handleDragMove = (e: MouseEvent | TouchEvent) => {
       if (!isDragging) return;
       e.preventDefault();
-      const deltaY = lastMouseY - e.clientY;
-      lastMouseY = e.clientY;
 
-      // Increase sensitivity and keep continuous while dragging
-      if (Math.abs(deltaY) >= 1) {
-        const bpmChange = deltaY * 0.75; // ~1.33 px per BPM
-        changeBpm(bpmChange);
+      // Get current Y position from either mouse or touch event
+      let currentY: number;
+      if (e instanceof MouseEvent) {
+        currentY = e.clientY;
+      } else {
+        currentY = e.touches[0].clientY;
       }
+
+      // Calculate delta from START position (not last position)
+      const deltaY = startY - currentY;
+
+      // Scale: ~1/4 screen height (~200-250px on most devices) = 5 BPM
+      // So full screen (~800-1000px) would be ~20 BPM
+      // This gives us: deltaY * (5 / 250) = deltaY * 0.02
+      const pixelsPerBpm = 50; // 50 pixels = 1 BPM, so 250px = 5 BPM
+      const bpmChange = deltaY / pixelsPerBpm;
+
+      // Set BPM relative to starting BPM
+      setBpmAbsolute(startBpm + bpmChange);
     };
 
-    const handleMouseUp = () => {
+    const handleDragEnd = () => {
       isDragging = false;
       document.body.style.cursor = "";
-    };
-
-    // Touch/Mobile controls
-    let isTouching = false;
-    let lastTouchY = 0;
-
-    const handleTouchStart = (e: TouchEvent) => {
-      const target = e.target as HTMLElement;
-      const isInControlArea = target.closest(".bpm-control-area");
-      const isInteractive =
-        target.tagName === "BUTTON" ||
-        target.tagName === "INPUT" ||
-        target.tagName === "SELECT" ||
-        target.tagName === "TEXTAREA" ||
-        target.closest("button") ||
-        target.closest("input") ||
-        target.closest("select") ||
-        target.closest("textarea");
-
-      if (!isInControlArea || isInteractive) return;
-
-      isTouching = true;
-      lastTouchY = e.touches[0].clientY;
-      e.preventDefault();
-    };
-
-    const handleTouchMove = (e: TouchEvent) => {
-      if (!isTouching) return;
-      e.preventDefault();
-      const currentTouchY = e.touches[0].clientY;
-      const deltaY = lastTouchY - currentTouchY;
-      lastTouchY = currentTouchY;
-
-      // Make swipe much more sensitive: ~0.1 px per BPM -> full-height swipe ~10+ BPM
-      if (Math.abs(deltaY) >= 1) {
-        const bpmChange = deltaY * 2.0;
-        changeBpm(bpmChange);
-      }
-    };
-
-    const handleTouchEnd = () => {
-      isTouching = false;
     };
 
     // Add all event listeners
     document.addEventListener("keydown", handleKeyDown);
     document.addEventListener("wheel", handleWheel, { passive: false });
-    document.addEventListener("mousedown", handleMouseDown);
-    document.addEventListener("mousemove", handleMouseMove);
-    document.addEventListener("mouseup", handleMouseUp);
-    document.addEventListener("touchstart", handleTouchStart, {
+    document.addEventListener("mousedown", handleDragStart);
+    document.addEventListener("mousemove", handleDragMove);
+    document.addEventListener("mouseup", handleDragEnd);
+    document.addEventListener("touchstart", handleDragStart as EventListener, {
       passive: false,
     });
-    document.addEventListener("touchmove", handleTouchMove, { passive: false });
-    document.addEventListener("touchend", handleTouchEnd);
+    document.addEventListener("touchmove", handleDragMove as EventListener, {
+      passive: false
+    });
+    document.addEventListener("touchend", handleDragEnd);
 
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
       document.removeEventListener("wheel", handleWheel);
-      document.removeEventListener("mousedown", handleMouseDown);
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
-      document.removeEventListener("touchstart", handleTouchStart);
-      document.removeEventListener("touchmove", handleTouchMove);
-      document.removeEventListener("touchend", handleTouchEnd);
+      document.removeEventListener("mousedown", handleDragStart);
+      document.removeEventListener("mousemove", handleDragMove);
+      document.removeEventListener("mouseup", handleDragEnd);
+      document.removeEventListener("touchstart", handleDragStart as EventListener);
+      document.removeEventListener("touchmove", handleDragMove as EventListener);
+      document.removeEventListener("touchend", handleDragEnd);
       document.body.style.cursor = "";
     };
-  }, [currentBpm, isEnabled, minBpm, maxBpm]);
+  }, [isEnabled]); // Only re-run when isEnabled changes
 
-  return { changeBpm };
+  return {
+    changeBpm: (delta: number) => {
+      const newBpm = Math.max(
+        minBpm,
+        Math.min(maxBpm, Math.round(currentBpm + delta))
+      );
+      onBpmChange(newBpm);
+    }
+  };
 }

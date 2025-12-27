@@ -303,7 +303,7 @@ export function ChordProgressionExercise() {
                                         initialState={{
                                             mode,
                                             startBpm: bpm,
-                                            endBpm: bpm,
+                                            endBpm: bpm + 40, // Proper default for speed trainer/progressive modes
                                             increments: 8,
                                             measuresPerIncrement: 4,
                                             loop,

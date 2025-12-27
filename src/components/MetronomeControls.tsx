@@ -42,6 +42,10 @@ export function MetronomeControls({
   onRestart,
   onStateChange,
 }: MetronomeControlsProps) {
+  // Provide sensible defaults
+  const defaultStartBpm = initialState.startBpm ?? 80;
+  const defaultEndBpm = initialState.endBpm ?? (initialState.mode !== "regular" ? defaultStartBpm + 40 : defaultStartBpm);
+
   const [
     {
       mode,
@@ -54,14 +58,13 @@ export function MetronomeControls({
     },
     setState,
   ] = useState<MetronomeSettings>({
-    mode: "regular",
-    startBpm: 80,
-    endBpm: 120,
-    increments: 8,
-    measuresPerIncrement: 4,
-    progressiveStepBpm: 5,
-    loop: false,
-    ...initialState,
+    mode: initialState.mode ?? "regular",
+    startBpm: defaultStartBpm,
+    endBpm: defaultEndBpm,
+    increments: initialState.increments ?? 8,
+    measuresPerIncrement: initialState.measuresPerIncrement ?? 4,
+    progressiveStepBpm: initialState.progressiveStepBpm ?? 5,
+    loop: initialState.loop ?? false,
   });
 
   const syncingFromPropsRef = useRef(false);
@@ -72,7 +75,24 @@ export function MetronomeControls({
   const progressiveStepRef = useRef<HTMLInputElement>(null);
 
   const updateState = (newState: Partial<MetronomeSettings>) => {
-    setState((prevState) => ({ ...prevState, ...newState }));
+    setState((prevState) => {
+      const updated = { ...prevState, ...newState };
+
+      // Auto-adjust endBpm when switching from regular mode
+      if (newState.mode && newState.mode !== "regular" && prevState.mode === "regular") {
+        // If switching to speed trainer or progressive, ensure endBpm is higher than startBpm
+        if (updated.endBpm <= updated.startBpm) {
+          updated.endBpm = updated.startBpm + 40;
+        }
+      }
+
+      // If switching to regular mode, sync endBpm with startBpm
+      if (newState.mode === "regular") {
+        updated.endBpm = updated.startBpm;
+      }
+
+      return updated;
+    });
   };
 
   useEffect(() => {
@@ -197,19 +217,14 @@ export function MetronomeControls({
   });
 
   return (
-    <div
-      className={cn(
-        "space-y-2 text-xs",
-        compact ? "flex items-center gap-2" : ""
-      )}
-    >
+    <div className={cn("space-y-2", compact ? "w-full" : "")}>
       {/* Mode Selection and Play/Stop */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5 flex-wrap">
         <Select
           value={mode}
           onValueChange={(value) => updateState({ mode: value as MetronomeMode })}
         >
-          <SelectTrigger className="h-8">
+          <SelectTrigger className={cn("h-8 text-xs", compact ? "w-28" : "w-full")}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -222,7 +237,7 @@ export function MetronomeControls({
           variant={isPlaying ? "secondary" : "default"}
           onClick={onPlayPause}
           size="sm"
-          className="h-8"
+          className="h-8 px-2"
         >
           {isPlaying ? (
             <Pause className="h-4 w-4" />
@@ -234,7 +249,7 @@ export function MetronomeControls({
           variant="outline"
           onClick={onRestart}
           size="sm"
-          className="h-8"
+          className="h-8 px-2"
           title="Restart"
         >
           <Repeat className="h-4 w-4" />
@@ -243,7 +258,7 @@ export function MetronomeControls({
           variant={loop ? "secondary" : "outline"}
           onClick={() => updateState({ loop: !loop })}
           size="sm"
-          className="h-8"
+          className="h-8 px-2"
           title="Loop"
         >
           <RotateCcw className="h-4 w-4" />
@@ -251,9 +266,12 @@ export function MetronomeControls({
       </div>
 
       {mode !== "regular" && (
-        <div className="grid grid-cols-2 gap-2 text-xs">
-          <div className="space-y-1">
-            <Label>End BPM</Label>
+        <div className={cn(
+          "grid gap-1.5 text-xs",
+          compact ? "grid-cols-4 items-end" : "grid-cols-2 gap-2"
+        )}>
+          <div className="space-y-0.5">
+            <Label className="text-[10px]">End BPM</Label>
             <Input
               ref={endBpmRef}
               type="number"
@@ -261,11 +279,11 @@ export function MetronomeControls({
               onChange={(e) => updateState({ endBpm: Number(e.target.value) })}
               min={40}
               max={300}
-              className="h-8 text-center"
+              className="h-7 text-center text-xs px-1"
             />
           </div>
-          <div className="space-y-1">
-            <Label># Increments</Label>
+          <div className="space-y-0.5">
+            <Label className="text-[10px]"># Increments</Label>
             <Input
               ref={incrementsRef}
               type="number"
@@ -275,11 +293,11 @@ export function MetronomeControls({
               }
               min={2}
               max={100}
-              className="h-8 text-center"
+              className="h-7 text-center text-xs px-1"
             />
           </div>
-          <div className="space-y-1">
-            <Label>Measures/Inc</Label>
+          <div className="space-y-0.5">
+            <Label className="text-[10px]">Measures/Inc</Label>
             <Input
               ref={measuresPerBpmRef}
               type="number"
@@ -291,12 +309,12 @@ export function MetronomeControls({
               }
               min={1}
               max={20}
-              className="h-8 text-center"
+              className="h-7 text-center text-xs px-1"
             />
           </div>
           {mode === "progressive" && (
-            <div className="space-y-1">
-              <Label>Step BPM</Label>
+            <div className="space-y-0.5">
+              <Label className="text-[10px]">Step BPM</Label>
               <Input
                 ref={progressiveStepRef}
                 type="number"
@@ -308,7 +326,7 @@ export function MetronomeControls({
                 }
                 min={1}
                 max={30}
-                className="h-8 text-center"
+                className="h-7 text-center text-xs px-1"
               />
             </div>
           )}

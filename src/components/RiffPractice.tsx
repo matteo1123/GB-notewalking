@@ -652,7 +652,7 @@ const RiffPractice = ({
                   initialState={{
                     mode,
                     startBpm: metronomeBpm,
-                    endBpm: lessonExercise?.target_bpm || metronomeBpm,
+                    endBpm: lessonExercise?.target_bpm || (metronomeBpm + 40),
                     increments: lessonExercise?.increments || 8,
                     measuresPerIncrement: lessonExercise?.measures_per_bpm || 4,
                     loop,

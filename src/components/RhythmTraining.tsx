@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { generateRhythmPattern, patternToNotation, getSubdivisionLabels, type RhythmPattern } from "@/lib/rhythmGenerator";
 import { useMetronome, MetronomeSettings } from "@/hooks/useMetronome";
+import { useBpmControls } from "@/hooks/useBpmControls";
 import { useAutoRecording } from "@/hooks/useAutoRecording";
 import { supabase } from "@/integrations/supabase/client";
 import { MetronomeControls, MetronomeMode } from "./MetronomeControls";
@@ -65,6 +66,26 @@ export function RhythmTraining() {
 
     const metronome = useMetronome(metronomeSettings);
 
+    // BPM change handler for scroll/touch/drag controls
+    const handleBpmChange = useCallback(
+        (newBpm: number) => {
+            const wasPlaying = metronome.state.isPlaying;
+            setBpm(newBpm);
+            if (wasPlaying) {
+                metronome.stop();
+                setTimeout(() => metronome.start(), 100);
+            }
+        },
+        [metronome]
+    );
+
+    // Global BPM adjustment controls (scroll, touch, drag, keyboard)
+    useBpmControls({
+        currentBpm: bpm,
+        onBpmChange: handleBpmChange,
+        isEnabled: true,
+    });
+
     // Generate new pattern for current level
     const generateNewPattern = useCallback(() => {
         const newPattern = generateRhythmPattern(level);
@@ -112,7 +133,7 @@ export function RhythmTraining() {
     }, [level, handleLevelChange]);
 
     return (
-        <div className="flex flex-col h-full">
+        <div className="flex flex-col h-full bpm-control-area">
             <div className="flex-1 flex flex-col p-3 min-h-0 overflow-hidden">
                 {/* Header */}
                 <div className="flex-shrink-0 flex justify-between items-center mb-3">

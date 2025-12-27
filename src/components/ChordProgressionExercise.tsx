@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { ChordProgressionSettings } from "@/types/chords";
 import { useMetronome, MetronomeSettings } from "@/hooks/useMetronome";
+import { useBpmControls } from "@/hooks/useBpmControls";
 import { useChordProgression } from "@/hooks/useChordProgression";
 import { useNotePlayer } from "@/hooks/useNotePlayer";
 import { usePitchDetection } from "@/hooks/usePitchDetection";
@@ -89,6 +90,26 @@ export function ChordProgressionExercise() {
     const metronome = useMetronome(metronomeSettings);
     const { playNote } = useNotePlayer(audioContext);
 
+    // BPM change handler for scroll/touch/drag controls
+    const handleBpmChange = useCallback(
+        (newBpm: number) => {
+            const wasPlaying = metronome.state.isPlaying;
+            setBpm(newBpm);
+            if (wasPlaying) {
+                metronome.stop();
+                setTimeout(() => metronome.start(), 100);
+            }
+        },
+        [metronome]
+    );
+
+    // Global BPM adjustment controls (scroll, touch, drag, keyboard)
+    useBpmControls({
+        currentBpm: bpm,
+        onBpmChange: handleBpmChange,
+        isEnabled: true,
+    });
+
     // Chord progression logic
     const chordProgression = useChordProgression({
         settings,
@@ -162,7 +183,7 @@ export function ChordProgressionExercise() {
     }, []);
 
     return (
-        <div className="flex flex-col h-full">
+        <div className="flex flex-col h-full bpm-control-area">
             <div className="flex-1 flex flex-col p-2 min-h-0 overflow-hidden gap-2">
                 {/* Header - just title */}
                 <div className="flex-shrink-0">
@@ -191,8 +212,8 @@ export function ChordProgressionExercise() {
                 {/* Main Content */}
                 <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-2 min-h-0">
                     {/* Left Column: Controls only */}
-                    <div className="flex flex-col min-h-0">
-                        <div className="flex-1 overflow-y-auto min-h-0">
+                    <div className="flex flex-col min-h-0 overflow-hidden">
+                        <div className="flex-1 overflow-hidden min-h-0">
                             <ChordProgressionControls
                                 settings={settings}
                                 onSettingsChange={handleSettingsChange}

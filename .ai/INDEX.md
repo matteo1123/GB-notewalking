@@ -21,6 +21,29 @@
 
 **READ THIS FIRST** for complete understanding of TempoTrekker.
 
+### [TECHNICAL_ARCHITECTURE.md](./TECHNICAL_ARCHITECTURE.md) ⭐ **NEW**
+**The technical bible** - Deep dive into how the system actually works
+- Core concepts (Triadic Exercise Model)
+- Exercise generation engine
+- Data model & table relationships
+- Module system architecture
+- Progressive practice algorithm
+- Type compatibility matrix
+- Critical implementation notes
+
+**READ THIS BEFORE MAKING CHANGES** to understand the generative system.
+
+### [EXERCISE_ENGINE.md](./EXERCISE_ENGINE.md) ⭐ **NEW**
+**The rendering pipeline** - How exercises are generated in real-time
+- Scale shapes, sequences, and keys
+- Step-by-step rendering process
+- Type system deep dive
+- Performance tracking
+- Edge cases & gotchas
+- UI integration examples
+
+**READ THIS** to understand scale + sequence + key = exercise.
+
 ### [README.md](../README.md)
 Quick start guide, tech stack, current status, and how to contribute
 

@@ -199,7 +199,7 @@ const Profile = () => {
                       <TableCell>{new Date(log.created_at).toLocaleDateString()}</TableCell>
                       <TableCell>
                         {log.audio && (
-                          <audio controls src={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/practice/${log.audio}`} />
+                          <audio controls src={log.audio} />
                         )}
                       </TableCell>
                     </TableRow>

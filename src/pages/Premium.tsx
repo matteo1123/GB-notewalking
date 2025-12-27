@@ -12,6 +12,9 @@ import Paywall from "@/components/Premium/Paywall";
 import { ChordProgressionExercise } from "@/components/ChordProgressionExercise";
 import { RhythmTraining } from "@/components/RhythmTraining";
 import { ModuleLibrary } from "@/components/ModuleLibrary";
+import { PriorityManager } from "@/components/PriorityManager";
+import { PressStart } from "@/components/PressStart";
+import { ProgressDashboard } from "@/components/ProgressDashboard";
 
 const Premium = () => {
   const { user } = useAuth();
@@ -180,44 +183,55 @@ const Premium = () => {
 
   return (
     <div className="fixed inset-0 flex flex-col bg-background overflow-hidden">
+      {/* Fixed Header with Back Button */}
+      <div className="flex-shrink-0 border-b bg-card px-4 py-2 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => window.location.href = '/'}
+            className="gap-2"
+          >
+            ← Back
+          </Button>
+          <h2 className="font-semibold">TempoTrekker</h2>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => window.location.href = '/profile'}
+          >
+            Profile
+          </Button>
+        </div>
+      </div>
+
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden p-4">
         {/* Content */}
-        <Tabs defaultValue="sessions" className="flex-1 flex flex-col min-h-0 overflow-hidden">
-          <TabsList className="grid w-full grid-cols-6 flex-shrink-0 mb-4">
+        <Tabs defaultValue="start" className="flex-1 flex flex-col min-h-0 overflow-hidden">
+          <TabsList className="grid w-full grid-cols-5 flex-shrink-0 mb-4">
+            <TabsTrigger value="start">🚀 Start</TabsTrigger>
+            <TabsTrigger value="priorities">⚙️ Priorities</TabsTrigger>
+            <TabsTrigger value="progress">📊 Progress</TabsTrigger>
             <TabsTrigger value="modules">🎯 Modules</TabsTrigger>
-            <TabsTrigger value="sessions">Lessons</TabsTrigger>
-            <TabsTrigger value="rhythms">Rhythms</TabsTrigger>
-            <TabsTrigger value="scales">Scales</TabsTrigger>
-            <TabsTrigger value="arpeggios">Arpeggios</TabsTrigger>
-            <TabsTrigger value="ear-training">Notewalking</TabsTrigger>
+            <TabsTrigger value="sessions">📚 Lessons</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="start" className="flex-1 min-h-0 overflow-y-auto data-[state=active]:block p-6">
+            <PressStart />
+          </TabsContent>
+
+          <TabsContent value="priorities" className="flex-1 min-h-0 overflow-y-auto data-[state=active]:block p-6">
+            <PriorityManager />
+          </TabsContent>
+
+          <TabsContent value="progress" className="flex-1 min-h-0 overflow-y-auto data-[state=active]:block p-6">
+            <ProgressDashboard />
+          </TabsContent>
 
           <TabsContent value="modules" className="flex-1 min-h-0 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col">
             <ModuleLibrary />
-          </TabsContent>
-
-          <TabsContent value="rhythms" className="flex-1 min-h-0 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col">
-            <RhythmTraining />
-          </TabsContent>
-
-          <TabsContent value="scales" className="flex-1 min-h-0 overflow-y-auto data-[state=active]:block">
-            <ExerciseList
-              items={exercises.filter((e) => e.category === "scale")}
-              defaultSort={{ key: "position", dir: "asc" }}
-              onSelect={handleExerciseSelect}
-            />
-          </TabsContent>
-
-          <TabsContent value="arpeggios" className="flex-1 min-h-0 overflow-y-auto data-[state=active]:block">
-            <ExerciseList
-              items={exercises.filter((e) => e.category === "arpeggio")}
-              defaultSort={{ key: "difficulty", dir: "asc" }}
-              onSelect={handleExerciseSelect}
-            />
-          </TabsContent>
-
-          <TabsContent value="ear-training" className="flex-1 min-h-0 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col">
-            <ChordProgressionExercise />
           </TabsContent>
 
           <TabsContent value="sessions" className="flex-1 min-h-0 overflow-y-auto data-[state=active]:block">

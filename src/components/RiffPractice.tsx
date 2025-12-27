@@ -501,7 +501,7 @@ const RiffPractice = ({
 
   return (
     <>
-      <div className="flex flex-col h-screen bg-background text-foreground overflow-hidden">
+      <div className="flex flex-col h-screen bg-background text-foreground overflow-hidden bpm-control-area">
         <div className="flex-shrink-0 bg-card border-b border-border p-4">
           <div className="flex justify-between items-start">
             {/* Left side: Exercise Info and Controls */}

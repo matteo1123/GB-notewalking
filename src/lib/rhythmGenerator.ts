@@ -46,10 +46,10 @@ function generateBasicPattern(): StumPattern[] {
 
 /**
  * Generate a rhythm pattern based on level
+ * Level = number of skips (deviations from all notes played)
  * Level 0: No skips (all 16 strums)
- * Level 1-16: One skip at different positions
- * Level 17-32: Two skips at different positions
- * etc.
+ * Level 1: 1 random skip
+ * Level N: N random skips (max 15, leaving at least 1 note)
  */
 export function generateRhythmPattern(level: number): RhythmPattern {
     const basicPattern = generateBasicPattern();
@@ -57,7 +57,7 @@ export function generateRhythmPattern(level: number): RhythmPattern {
     // Level 0 = no deviations
     if (level === 0) {
         return {
-            id: `rhythm-l0-${Date.now()}`,
+            id: `rhythm-l0-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
             level: 0,
             name: "Basic 16ths",
             description: "All strums: 1 y and a, 2 y and a, 3 y and a, 4 y and a",
@@ -66,25 +66,19 @@ export function generateRhythmPattern(level: number): RhythmPattern {
         };
     }
 
-    // Calculate number of skips based on level
-    const deviationCount = Math.floor((level - 1) / 16) + 1;
+    // Level directly equals number of skips (capped at 15 to leave at least 1 note)
+    const deviationCount = Math.min(level, 15);
 
     // Clone the basic pattern
     const pattern = basicPattern.map(s => ({ ...s }));
 
-    // Determine which positions to skip
-    // Use a deterministic pattern based on level so the same level always gives the same pattern
-    const skipPositions: number[] = [];
-    let remaining = deviationCount;
-    let position = ((level - 1) % 16);
-
-    while (remaining > 0 && skipPositions.length < 16) {
-        if (!skipPositions.includes(position)) {
-            skipPositions.push(position);
-            remaining--;
-        }
-        position = (position + 7) % 16; // Jump by 7 to spread out skips
+    // Generate RANDOM skip positions using Fisher-Yates shuffle
+    const allPositions = Array.from({ length: 16 }, (_, i) => i);
+    for (let i = allPositions.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [allPositions[i], allPositions[j]] = [allPositions[j], allPositions[i]];
     }
+    const skipPositions = allPositions.slice(0, deviationCount);
 
     // Apply skips
     skipPositions.forEach(pos => {
@@ -92,7 +86,7 @@ export function generateRhythmPattern(level: number): RhythmPattern {
     });
 
     return {
-        id: `rhythm-l${level}-${Date.now()}`,
+        id: `rhythm-l${level}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         level,
         name: getPatternName(deviationCount),
         description: getPatternDescription(pattern, deviationCount),

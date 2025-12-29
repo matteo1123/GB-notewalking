@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { generateRhythmPattern, patternToNotation, getSubdivisionLabels, type RhythmPattern } from "@/lib/rhythmGenerator";
 import { useMetronome, MetronomeSettings } from "@/hooks/useMetronome";
 import { useBpmControls } from "@/hooks/useBpmControls";
@@ -10,7 +10,8 @@ import { Button } from "./ui/button";
 import { Slider } from "./ui/slider";
 import { Label } from "./ui/label";
 import { Switch } from "./ui/switch";
-import { SkipForward, ChevronLeft, ChevronRight, Check } from "lucide-react";
+import { SkipForward, ChevronLeft, ChevronRight, Check, Mic, Settings, ChevronUp } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui/collapsible";
 
 export function RhythmTraining() {
     const [level, setLevel] = useState(0);
@@ -21,6 +22,18 @@ export function RhythmTraining() {
     const [loop, setLoop] = useState(true);
     const [autoRecordEnabled, setAutoRecordEnabled] = useState(false);
     const [tickCount, setTickCount] = useState(0);
+
+    // Confirmation flow state
+    const [hasConfirmed, setHasConfirmed] = useState(false);
+
+    // Auto-switch settings
+    const [autoSwitch, setAutoSwitch] = useState(false);
+    const [switchMeasures, setSwitchMeasures] = useState(4);
+    const [measureCount, setMeasureCount] = useState(0);
+    const [settingsOpen, setSettingsOpen] = useState(false);
+
+    // Track beats for auto-switch (4 beats per measure)
+    const beatCountRef = useRef(0);
 
     // Load auto-record setting from profile
     useEffect(() => {
@@ -52,7 +65,7 @@ export function RhythmTraining() {
         },
     });
 
-    // Metronome setup
+    // Metronome setup with auto-switch logic
     const metronomeSettings: MetronomeSettings = {
         mode,
         startBpm: bpm,
@@ -61,6 +74,18 @@ export function RhythmTraining() {
         onTick: (state) => {
             setTickCount(prev => prev + 1);
             recording.handleTick(state.currentBeat + (state.currentMeasure - 1) * 4);
+
+            // Auto-switch logic: count beats (4 beats per measure)
+            if (autoSwitch && !hasConfirmed) {
+                beatCountRef.current += 1;
+                // Each measure = 4 beats, switch after switchMeasures * 4 beats
+                if (beatCountRef.current >= switchMeasures * 4) {
+                    beatCountRef.current = 0;
+                    setMeasureCount(prev => prev + 1);
+                    // Generate new pattern at same level
+                    setPattern(generateRhythmPattern(level));
+                }
+            }
         },
     };
 
@@ -90,6 +115,8 @@ export function RhythmTraining() {
     const generateNewPattern = useCallback(() => {
         const newPattern = generateRhythmPattern(level);
         setPattern(newPattern);
+        setHasConfirmed(false);
+        beatCountRef.current = 0;
     }, [level]);
 
     // Handle play/pause
@@ -119,7 +146,28 @@ export function RhythmTraining() {
     const handleLevelChange = useCallback((newLevel: number) => {
         setLevel(newLevel);
         setPattern(generateRhythmPattern(newLevel));
+        setHasConfirmed(false);
+        beatCountRef.current = 0;
     }, []);
+
+    // Handle user confirmation - they played it correctly
+    const handleConfirm = useCallback(() => {
+        setHasConfirmed(true);
+    }, []);
+
+    // Handle "Next Rhythm" - move to harder level
+    const handleNextRhythm = useCallback(() => {
+        const newLevel = Math.min(level + 1, 15); // Cap at 15
+        setLevel(newLevel);
+        setPattern(generateRhythmPattern(newLevel));
+        setHasConfirmed(false);
+        beatCountRef.current = 0;
+    }, [level]);
+
+    // Handle recording via the existing auto-recording hook
+    const handleRecord = useCallback(() => {
+        recording.startManualRecording();
+    }, [recording]);
 
     // Navigate levels
     const handlePreviousLevel = useCallback(() => {
@@ -208,7 +256,7 @@ export function RhythmTraining() {
 
                 {/* Controls - fixed height at bottom */}
                 <div className="flex-shrink-0 grid grid-cols-1 lg:grid-cols-2 gap-3">
-                    {/* Left: Level Control */}
+                    {/* Left: Level Control & Confirmation Flow */}
                     <div className="bg-card border border-border rounded-lg p-4 space-y-4">
                         {/* Level slider with prev/next buttons */}
                         <div>
@@ -228,7 +276,7 @@ export function RhythmTraining() {
                                 </Button>
                                 <Slider
                                     min={0}
-                                    max={50}
+                                    max={15}
                                     step={1}
                                     value={[level]}
                                     onValueChange={([value]) => handleLevelChange(value)}
@@ -238,6 +286,7 @@ export function RhythmTraining() {
                                     variant="outline"
                                     size="icon"
                                     onClick={handleNextLevel}
+                                    disabled={level >= 15}
                                     className="h-8 w-8"
                                 >
                                     <ChevronRight className="h-4 w-4" />
@@ -248,29 +297,113 @@ export function RhythmTraining() {
                             </p>
                         </div>
 
-                        {/* Auto-Record Toggle */}
-                        <div className="flex items-center justify-between bg-muted/30 rounded-lg p-3">
-                            <div className="flex items-center gap-2">
-                                <Label htmlFor="auto-record-rhythm">Auto-Record</Label>
-                                {recording.hasRecorded && (
-                                    <Check className="w-4 h-4 text-green-500" />
-                                )}
+                        {/* Confirmation Flow */}
+                        {!hasConfirmed ? (
+                            <div className="space-y-2">
+                                <Button
+                                    onClick={handleConfirm}
+                                    className="w-full bg-green-600 hover:bg-green-700"
+                                >
+                                    <Check className="w-4 h-4 mr-2" />
+                                    I played it correctly!
+                                </Button>
+                                <Button
+                                    onClick={handleNext}
+                                    variant="outline"
+                                    className="w-full"
+                                >
+                                    <SkipForward className="w-4 h-4 mr-2" />
+                                    Generate New Pattern
+                                </Button>
                             </div>
-                            <Switch
-                                id="auto-record-rhythm"
-                                checked={autoRecordEnabled}
-                                onCheckedChange={setAutoRecordEnabled}
-                            />
-                        </div>
+                        ) : (
+                            <div className="space-y-2">
+                                <div className="bg-green-500/20 border border-green-500/50 rounded-lg p-2 text-center mb-2">
+                                    <span className="text-sm font-semibold text-green-700 dark:text-green-400">
+                                        ✓ Great job! What's next?
+                                    </span>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <Button
+                                        onClick={handleRecord}
+                                        variant="outline"
+                                        className="border-red-500/50 hover:bg-red-500/10"
+                                        disabled={recording.isRecording}
+                                    >
+                                        <Mic className="w-4 h-4 mr-2 text-red-500" />
+                                        Record
+                                    </Button>
+                                    <Button
+                                        onClick={handleNextRhythm}
+                                        className="bg-blue-600 hover:bg-blue-700"
+                                    >
+                                        <SkipForward className="w-4 h-4 mr-2" />
+                                        Next Rhythm
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
 
-                        <Button
-                            onClick={handleNext}
-                            variant="outline"
-                            className="w-full"
-                        >
-                            <SkipForward className="w-4 h-4 mr-2" />
-                            Generate New Pattern
-                        </Button>
+                        {/* Settings Collapsible */}
+                        <Collapsible open={settingsOpen} onOpenChange={setSettingsOpen}>
+                            <CollapsibleTrigger asChild>
+                                <Button variant="ghost" className="w-full flex items-center justify-between p-2 h-auto">
+                                    <div className="flex items-center gap-2">
+                                        <Settings className="w-4 h-4" />
+                                        <span className="text-sm">Settings</span>
+                                    </div>
+                                    <ChevronUp className={`w-4 h-4 transition-transform ${settingsOpen ? '' : 'rotate-180'}`} />
+                                </Button>
+                            </CollapsibleTrigger>
+                            <CollapsibleContent className="space-y-3 pt-2">
+                                {/* Auto-Switch Toggle */}
+                                <div className="flex items-center justify-between bg-muted/30 rounded-lg p-3">
+                                    <div>
+                                        <Label htmlFor="auto-switch">Auto-Switch</Label>
+                                        <p className="text-xs text-muted-foreground">
+                                            Auto-advance to new pattern
+                                        </p>
+                                    </div>
+                                    <Switch
+                                        id="auto-switch"
+                                        checked={autoSwitch}
+                                        onCheckedChange={setAutoSwitch}
+                                    />
+                                </div>
+
+                                {/* Measures between switches */}
+                                {autoSwitch && (
+                                    <div className="bg-muted/30 rounded-lg p-3">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <Label>Measures between switches</Label>
+                                            <span className="text-sm font-semibold">{switchMeasures}</span>
+                                        </div>
+                                        <Slider
+                                            min={1}
+                                            max={8}
+                                            step={1}
+                                            value={[switchMeasures]}
+                                            onValueChange={([value]) => setSwitchMeasures(value)}
+                                        />
+                                    </div>
+                                )}
+
+                                {/* Auto-Record Toggle */}
+                                <div className="flex items-center justify-between bg-muted/30 rounded-lg p-3">
+                                    <div className="flex items-center gap-2">
+                                        <Label htmlFor="auto-record-rhythm">Auto-Record</Label>
+                                        {recording.hasRecorded && (
+                                            <Check className="w-4 h-4 text-green-500" />
+                                        )}
+                                    </div>
+                                    <Switch
+                                        id="auto-record-rhythm"
+                                        checked={autoRecordEnabled}
+                                        onCheckedChange={setAutoRecordEnabled}
+                                    />
+                                </div>
+                            </CollapsibleContent>
+                        </Collapsible>
                     </div>
 
                     {/* Right: Metronome Controls */}

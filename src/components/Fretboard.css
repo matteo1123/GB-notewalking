@@ -9,6 +9,22 @@
   grid-template-columns: 50px;
   grid-template-rows: repeat(6, 30px);
   margin-right: 5px;
+  background-color: #1a1a1a;
+  border: 2px solid #666;
+  border-right: 4px solid #fff;
+  border-radius: 4px 0 0 4px;
+  position: relative;
+}
+
+.open-notes-container::before {
+  content: "0";
+  position: absolute;
+  top: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 12px;
+  font-weight: bold;
+  color: #888;
 }
 
 .fretboard-container {

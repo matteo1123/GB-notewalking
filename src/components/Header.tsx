@@ -45,11 +45,13 @@ const Header = () => {
                 Premium
               </Button>
             </Link>
-            <Link to="/profile">
-              <Button variant="outline" className="flex items-center gap-2">
-                Profile
-              </Button>
-            </Link>
+            {user && (
+              <Link to="/profile">
+                <Button variant="outline" className="flex items-center gap-2">
+                  Profile
+                </Button>
+              </Link>
+            )}
             {user ? (
               <Button
                 variant="outline"

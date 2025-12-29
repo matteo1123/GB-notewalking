@@ -7,8 +7,13 @@ const AdminIndex = () => {
       <h1 className="text-2xl font-bold mb-4">Admin Page</h1>
       <ul>
         <li>
-          <Link to="/admin/scale-shape-editor" className="text-blue-500 hover:underline">
-            Scale Shape Editor
+          <Link to="/admin/shape-library" className="text-blue-500 hover:underline">
+            Shape Library
+          </Link>
+        </li>
+        <li>
+          <Link to="/admin/progression-editor" className="text-blue-500 hover:underline">
+            Progression Editor
           </Link>
         </li>
         <li>
@@ -24,6 +29,11 @@ const AdminIndex = () => {
         <li>
           <Link to="/admin/lesson-builder" className="text-blue-500 hover:underline">
             Lesson Builder
+          </Link>
+        </li>
+        <li>
+          <Link to="/admin/chord-trainer" className="text-blue-500 hover:underline">
+            Chord Progression Trainer (New)
           </Link>
         </li>
       </ul>

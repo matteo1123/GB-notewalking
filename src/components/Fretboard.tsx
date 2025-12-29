@@ -76,6 +76,8 @@ const Fretboard: React.FC<FretboardProps> = ({
           color = CHROMATIC_DEGREE_COLORS[chromaticDegree as keyof typeof CHROMATIC_DEGREE_COLORS] || '#fff';
         } else if (degree) {
           color = DEGREE_COLORS[degree as keyof typeof DEGREE_COLORS] || '#fff';
+        } else if (chromaticDegree) {
+          color = CHROMATIC_DEGREE_COLORS[chromaticDegree as keyof typeof CHROMATIC_DEGREE_COLORS] || '#fff';
         }
 
         notesToRender.push(
@@ -95,7 +97,7 @@ const Fretboard: React.FC<FretboardProps> = ({
             }}
           >
             {isSelected && (() => {
-              if (degree) {
+              if (degree || (chromaticDegree && rootNote)) {
                 // This is an in-scale note that is part of the exercise
                 const noteClasses = ['dot'];
                 if (isRoot) noteClasses.push('root');

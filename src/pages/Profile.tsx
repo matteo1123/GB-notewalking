@@ -15,6 +15,9 @@ import { Link } from 'react-router-dom';
 
 type PracticeLogWithExercise = Tables<'practice_log'> & {
   exercises: { name: string } | null;
+  module_type?: string | null;
+  module_config?: Record<string, any> | null;
+  exercise_category?: string | null;
 };
 
 interface ProfileSettings {
@@ -115,6 +118,14 @@ const Profile = () => {
         <TabsContent value="profile">
           <div className="space-y-4">
             <div>
+              <Label>Email</Label>
+              <Input
+                value={user?.email || ''}
+                disabled
+                className="bg-muted"
+              />
+            </div>
+            <div>
               <label htmlFor="website">Website</label>
               <Input
                 id="website"
@@ -187,23 +198,35 @@ const Profile = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {practiceLog.map((log) => (
-                    <TableRow key={log.id}>
-                      <TableCell>
-                        <Link to={`/premium?exerciseId=${log.scale_id}`} className="hover:underline">
-                          {log.exercise_category}
-                        </Link>
-                      </TableCell>
-                      <TableCell>{Math.round(log.duration / 60)}</TableCell>
-                      <TableCell>{log.max_bpm}</TableCell>
-                      <TableCell>{new Date(log.created_at).toLocaleDateString()}</TableCell>
-                      <TableCell>
-                        {log.audio && (
-                          <audio controls src={log.audio} />
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {practiceLog.map((log) => {
+                    // Handle polymorphic practice log - prefer module_type over legacy exercise_category
+                    const displayName = log.module_type
+                      ? `${log.module_type.charAt(0).toUpperCase() + log.module_type.slice(1)} Practice`
+                      : log.exercise_category || 'Unknown';
+
+                    // For module-based entries, show module config details
+                    const moduleDetails = log.module_config
+                      ? ` (${Object.entries(log.module_config).map(([k, v]) => `${k}: ${v}`).join(', ')})`
+                      : '';
+
+                    return (
+                      <TableRow key={log.id}>
+                        <TableCell>
+                          <Link to={`/premium?exerciseId=${log.scale_id}`} className="hover:underline">
+                            {displayName}{moduleDetails}
+                          </Link>
+                        </TableCell>
+                        <TableCell>{Math.round(log.duration / 60)}</TableCell>
+                        <TableCell>{log.max_bpm || '-'}</TableCell>
+                        <TableCell>{new Date(log.created_at).toLocaleDateString()}</TableCell>
+                        <TableCell>
+                          {log.audio && (
+                            <audio controls src={log.audio} />
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>

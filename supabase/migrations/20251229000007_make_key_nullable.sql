@@ -1,0 +1,1 @@
+ALTER TABLE chord_progressions ALTER COLUMN key DROP NOT NULL;

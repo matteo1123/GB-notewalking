@@ -29,9 +29,16 @@ interface ScaleShapeFormProps {
   setScaleType: (type: string) => void;
   SCALE_TYPES: string[];
   modeToMajorKeyInfo: { [key: string]: { degree: number; semitone_offset: number; } };
+  // Chord-specific props
+  isChordMode?: boolean;
+  chordQuality?: string;
+  setChordQuality?: (quality: string) => void;
+  CHORD_QUALITIES?: string[];
+  isMovable?: boolean;
+  setIsMovable?: (isMovable: boolean) => void;
 }
 
-const ScaleShapeForm: React.FC<ScaleShapeFormProps> = ({
+export const ScaleShapeForm: React.FC<ScaleShapeFormProps> = ({
   scaleName,
   setScaleName,
   intervals,
@@ -56,6 +63,12 @@ const ScaleShapeForm: React.FC<ScaleShapeFormProps> = ({
   setScaleType,
   SCALE_TYPES,
   modeToMajorKeyInfo,
+  isChordMode = false,
+  chordQuality = 'major',
+  setChordQuality,
+  CHORD_QUALITIES = [],
+  isMovable = false,
+  setIsMovable,
 }) => {
   return (
     <>
@@ -88,26 +101,58 @@ const ScaleShapeForm: React.FC<ScaleShapeFormProps> = ({
           <Label htmlFor="position">Position</Label>
           <Input id="position" type="number" value={position} onChange={(e) => setPosition(parseInt(e.target.value, 10) || 1)} className="bg-gray-800 text-white" />
         </div>
-        <div>
-          <Label htmlFor="mode">Mode</Label>
-          <select id="mode" value={mode} onChange={(e) => setMode(e.target.value)} className="w-full p-2 border rounded bg-gray-800 text-white">
-            {Object.keys(modeToMajorKeyInfo).map(modeName => (
-              <option key={modeName} value={modeName}>{modeName}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <Label htmlFor="tonality">Tonality</Label>
-          <select id="tonality" value={tonality} onChange={(e) => setTonality(e.target.value)} className="w-full p-2 border rounded bg-gray-800 text-white">
-            <option>Major</option>
-            <option>Minor</option>
-          </select>
-        </div>
+        {!isChordMode ? (
+          <>
+            <div>
+              <Label htmlFor="mode">Mode</Label>
+              <select id="mode" value={mode} onChange={(e) => setMode(e.target.value)} className="w-full p-2 border rounded bg-gray-800 text-white">
+                {Object.keys(modeToMajorKeyInfo).map(modeName => (
+                  <option key={modeName} value={modeName}>{modeName}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <Label htmlFor="tonality">Tonality</Label>
+              <select id="tonality" value={tonality} onChange={(e) => setTonality(e.target.value)} className="w-full p-2 border rounded bg-gray-800 text-white">
+                <option>Major</option>
+                <option>Minor</option>
+              </select>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="md:col-span-2">
+              <Label htmlFor="chordQuality">Chord Quality</Label>
+              <select
+                id="chordQuality"
+                value={chordQuality}
+                onChange={(e) => setChordQuality?.(e.target.value)}
+                className="w-full p-2 border rounded bg-gray-800 text-white"
+              >
+                {CHORD_QUALITIES?.map(quality => (
+                  <option key={quality} value={quality}>{quality}</option>
+                ))}
+              </select>
+            </div>
+            <div className="md:col-span-1 flex items-center mt-6">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="isMovable"
+                  checked={isMovable}
+                  onChange={(e) => setIsMovable?.(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                />
+                <Label htmlFor="isMovable">Movable Shape (Barre)</Label>
+              </div>
+            </div>
+          </>
+        )}
         <div className="md:col-span-3">
           <Button onClick={handleSave}>Save</Button>
           <Button onClick={handleSaveAs} className="ml-2">Save As</Button>
         </div>
-      </div>
+      </div >
 
       <div className="saved-shapes-container mt-8">
         <h2 className="text-xl font-bold mb-4">Load Saved Shape</h2>
@@ -133,4 +178,3 @@ const ScaleShapeForm: React.FC<ScaleShapeFormProps> = ({
   );
 };
 
-export default ScaleShapeForm;

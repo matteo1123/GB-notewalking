@@ -100,6 +100,9 @@ const Fretboard: React.FC<FretboardProps> = ({
               if (degree || (chromaticDegree && rootNote)) {
                 // This is an in-scale note that is part of the exercise
                 const noteClasses = ['dot'];
+                const isStructure = selectedNote && (selectedNote as any).isStructure;
+                const isActive = selectedNote && (selectedNote as any).isActive;
+
                 if (isRoot) noteClasses.push('root');
                 if (isHighlighted) noteClasses.push('highlighted');
                 if (isAnimated) noteClasses.push('animated');
@@ -107,14 +110,16 @@ const Fretboard: React.FC<FretboardProps> = ({
                 if (isPlaying) noteClasses.push('playing-note');
                 if (sungCorrect) noteClasses.push('sung-correct');
                 if (sungIncorrect) noteClasses.push('sung-incorrect');
+                if (isStructure) noteClasses.push('structure-note');
+                if (isActive) noteClasses.push('active-note');
 
                 return (
                   <div
                     className={noteClasses.join(' ')}
                     style={{ backgroundColor: color }}
                   >
-                    {showDegreeNumbers && chromaticDegree && (
-                      <span className="degree-number">{chromaticDegree}</span>
+                    {showDegreeNumbers && (degree || chromaticDegree) && (
+                      <span className="degree-number">{degree || chromaticDegree}</span>
                     )}
                   </div>
                 );

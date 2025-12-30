@@ -179,3 +179,16 @@
   background-color: #ef4444 !important;
   transform: translate(-50%, -50%) scale(1.2);
 }
+
+/* Notewalking Highlights */
+.dot.structure-note {
+  box-shadow: 0 0 0 2px #22c55e, 0 0 8px #22c55e;
+  z-index: 5;
+}
+
+.dot.active-note {
+  box-shadow: 0 0 0 3px #f97316, 0 0 12px #f97316;
+  z-index: 10;
+  transform: translate(-50%, -50%) scale(1.4) !important;
+  /* Ensure visibility over others */
+}

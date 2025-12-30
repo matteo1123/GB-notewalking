@@ -5,7 +5,7 @@ import RiffPractice from "@/components/RiffPractice";
 import ExerciseList from "@/components/ExerciseList";
 import { RepertoireItem } from "@/types/repertoire";
 import { useAuth } from "@/contexts/AuthContext";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Tables } from "@/integrations/supabase/types";
 import Paywall from "@/components/Premium/Paywall";
@@ -15,9 +15,15 @@ import { ModuleLibrary } from "@/components/ModuleLibrary";
 import { PriorityManager } from "@/components/PriorityManager";
 import { PressStart } from "@/components/PressStart";
 import { ProgressDashboard } from "@/components/ProgressDashboard";
+import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
+
+// Updated Stripe Price ID
+const STRIPE_PRICE_ID = "price_1SjudUEOnRZP4MxPsBbk5KIS";
 
 const Premium = () => {
   const { user } = useAuth();
+  const navigate = useNavigate(); // Hook
   const [selectedRiff, setSelectedRiff] = useState<RepertoireItem | null>(null);
   const [exercises, setExercises] = useState<RepertoireItem[]>([]);
   const [sequences, setSequences] = useState<Tables<"sequences">[]>([]);
@@ -29,6 +35,26 @@ const Premium = () => {
   const [error, setError] = useState<string | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const exerciseId = searchParams.get("exerciseId");
+  const [isPremium, setIsPremium] = useState(false);
+  const [isSubscribing, setIsSubscribing] = useState(false);
+  const [checkingPremium, setCheckingPremium] = useState(true); // New loading state for premium check specifically
+
+  useEffect(() => {
+    // Check for success/canceled params from Stripe
+    if (searchParams.get("success")) {
+      toast.success("Subscription successful! Welcome to Guitar Brain Premium.");
+      // optionally refresh profile here
+    }
+    if (searchParams.get("canceled")) {
+      toast.error("Subscription canceled.");
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    // If not logged in, Paywall component handles it (or we can redirect)
+    // User said: "send someone back to the homepage if they aren't premium and signed in"
+    // Paywall covers !user case generally, but let's see. logic below covers user && !premium.
+  }, []);
 
   useEffect(() => {
     if (exerciseId) {
@@ -51,6 +77,31 @@ const Premium = () => {
     let isMounted = true;
     async function loadData() {
       setLoading(true);
+      setCheckingPremium(true);
+
+      // Check premium status
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('premium_until') // Changed from is_premium
+          .eq('id', user.id)
+          .single();
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if ((profile as any)?.premium_until) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const expiryDate = new Date((profile as any).premium_until);
+          // Check if future
+          if (expiryDate > new Date()) {
+            setIsPremium(true);
+          }
+        }
+      }
+      setCheckingPremium(false); // Done checking
+
+      // Note: We might not want to fetch if not premium to save bandwidth? 
+      // User said they should be redirected.
+
       const { data: scalesData, error: scalesError } = await supabase
         .from("scales")
         .select("*");
@@ -113,6 +164,44 @@ const Premium = () => {
       isMounted = false;
     };
   }, [user?.id]);
+
+  // Redirect effect
+  useEffect(() => {
+    if (!checkingPremium && user && !isPremium) {
+      toast.error("Premium subscription expired or invalid.");
+      navigate("/");
+    }
+  }, [checkingPremium, user, isPremium, navigate]);
+
+  const handleSubscribe = async () => {
+    try {
+      setIsSubscribing(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error("Please log in to subscribe");
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke('create-checkout-session', {
+        body: {
+          priceId: STRIPE_PRICE_ID,
+        }
+      });
+
+      if (error) throw error;
+      if (data?.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error('No checkout URL returned');
+      }
+
+    } catch (err: any) {
+      console.error("Subscription error:", err);
+      toast.error("Failed to start subscription: " + err.message);
+    } finally {
+      setIsSubscribing(false);
+    }
+  }
 
   const handleExerciseSelect = async (item: RepertoireItem) => {
     if (!user) return;
@@ -195,8 +284,21 @@ const Premium = () => {
             ← Back
           </Button>
           <h2 className="font-semibold">Guitar Brain</h2>
+          {isPremium && <span className="text-xs bg-gradient-to-r from-yellow-400 to-orange-500 text-black font-bold px-2 py-0.5 rounded-full">PREMIUM</span>}
         </div>
         <div className="flex items-center gap-2">
+          {!isPremium && (
+            <Button
+              size="sm"
+              variant="default"
+              className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white border-0"
+              onClick={handleSubscribe}
+              disabled={isSubscribing}
+            >
+              {isSubscribing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Upgrade ($9.99/mo)
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="sm"

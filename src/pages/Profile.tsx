@@ -24,12 +24,20 @@ interface ProfileSettings {
   autoRecord?: boolean;
 }
 
+// Updated Stripe Price ID
+const STRIPE_PRICE_ID = "price_1SjudUEOnRZP4MxPsBbk5KIS";
+
 const Profile = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [profile, setProfile] = useState<Tables<'profiles'> | null>(null);
   const [practiceLog, setPracticeLog] = useState<PracticeLogWithExercise[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSubscribing, setIsSubscribing] = useState(false); // State for sub button
+
+  // Helper to check if premium based on date
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const isPremium = (profile as any)?.premium_until && new Date((profile as any).premium_until) > new Date();
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -103,6 +111,36 @@ const Profile = () => {
     }
   };
 
+  const handleSubscribe = async () => {
+    try {
+      setIsSubscribing(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast({ title: "Please log in to subscribe", variant: "destructive" });
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke('create-checkout-session', {
+        body: {
+          priceId: STRIPE_PRICE_ID,
+        }
+      });
+
+      if (error) throw error;
+      if (data?.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error('No checkout URL returned');
+      }
+
+    } catch (err: any) {
+      console.error("Subscription error:", err);
+      toast({ title: "Failed to start subscription: " + err.message, variant: "destructive" });
+    } finally {
+      setIsSubscribing(false);
+    }
+  }
+
   if (loading) {
     return <div>Loading...</div>;
   }
@@ -112,6 +150,7 @@ const Profile = () => {
       <Tabs defaultValue="profile">
         <TabsList>
           <TabsTrigger value="profile">Profile</TabsTrigger>
+          <TabsTrigger value="subscription">Subscription</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
           <TabsTrigger value="history">Practice History</TabsTrigger>
         </TabsList>
@@ -155,6 +194,57 @@ const Profile = () => {
             <Button onClick={handleUpdate}>Update Profile</Button>
           </div>
         </TabsContent>
+
+        <TabsContent value="subscription">
+          <Card>
+            <CardHeader>
+              <CardTitle>Subscription Status</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Label className="text-lg">Status:</Label>
+                <span className={`text-lg font-bold ${isPremium ? 'text-green-500' : 'text-gray-500'}`}>
+                  {isPremium ? 'Active Premium' : 'Free / Expired'}
+                </span>
+              </div>
+              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+              {(profile as any)?.premium_until && (
+                <div>
+                  <Label>Valid Until:</Label>
+                  <div className="text-muted-foreground">
+                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                    {new Date((profile as any).premium_until).toLocaleDateString()}
+                  </div>
+                </div>
+              )}
+
+              {!isPremium && (
+                <div className="pt-4">
+                  <p className="mb-4 text-muted-foreground">
+                    Upgrade to Guitar Brain Premium for $9.99/mo to unlock all features.
+                  </p>
+                  <Button
+                    onClick={handleSubscribe}
+                    disabled={isSubscribing}
+                    className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white"
+                  >
+                    {isSubscribing ? 'Processing...' : 'Upgrade Now ($9.99/mo)'}
+                  </Button>
+                </div>
+              )}
+
+              {isPremium && (
+                <div className="pt-4">
+                  <p className="text-muted-foreground">
+                    To manage or cancel your subscription, please use the Stripe Customer Portal (link coming soon, or contact support).
+                  </p>
+                  {/* Future: Add button to call create-portal-session */}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="settings">
           <Card>
             <CardHeader>

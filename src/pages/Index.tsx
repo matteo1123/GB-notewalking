@@ -31,6 +31,13 @@ const Index = () => {
             </p>
           </div>
         </div>
+        <div className="mt-8 text-xs text-muted-foreground max-w-2xl mx-auto">
+          <p>
+            Guitar Brain is the ultimate free online metronome and guitar practice platform.
+            Whether you want to learn guitar, master scales, or improve your timing,
+            our tools are designed to help you become a better musician.
+          </p>
+        </div>
       </footer>
     </div>
   );

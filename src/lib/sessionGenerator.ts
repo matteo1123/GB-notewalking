@@ -1,5 +1,5 @@
 /**
- * Session Generator - The Brain of TempoTrekker
+ * Session Generator - The Brain of Guitar Brain
  * 
  * Takes user priorities and available time, generates intelligent practice sessions
  * with proportional time allocation and warm-up periods.

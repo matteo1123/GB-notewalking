@@ -28,7 +28,7 @@ const Header = () => {
           <div className="flex items-center gap-3">
             <Music className="h-8 w-8 text-primary" />
             <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-              <Link to="/">Guitar Dojo</Link>
+              <Link to="/">Guitar Brain</Link>
             </h1>
           </div>
           <div className="flex-1 flex justify-end gap-2">

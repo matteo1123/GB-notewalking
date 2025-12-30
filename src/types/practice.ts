@@ -87,33 +87,39 @@ export type ModuleType =
 
 // Module Configurations
 export interface ScaleModuleConfig {
+  module_type: 'scale';
   scale_id: string;
   scale_shape_id?: string;
 }
 
 export interface RhythmModuleConfig {
+  module_type: 'rhythm';
   rhythm_level: number;
   duration_minutes?: number;
 }
 
 export interface NotewalkingModuleConfig {
+  module_type: 'notewalking';
   key: string;
   chords: string[];
   measures_per_chord: number;
 }
 
 export interface ChordProgressionsModuleConfig {
+  module_type: 'chord_progressions';
   progression_id: string;
   key: string;
   target_bpm?: number;
 }
 
 export interface ArpeggioModuleConfig {
+  module_type: 'arpeggio';
   arpeggio_id: string;
   pattern?: 'ascending' | 'descending' | 'alternating';
 }
 
 export interface RiffModuleConfig {
+  module_type: 'riff';
   repertoire_id: string;
   target_bpm: number;
 }

@@ -194,7 +194,7 @@ const Premium = () => {
           >
             ← Back
           </Button>
-          <h2 className="font-semibold">TempoTrekker</h2>
+          <h2 className="font-semibold">Guitar Brain</h2>
         </div>
         <div className="flex items-center gap-2">
           <Button

@@ -28,7 +28,7 @@ const Auth = () => {
     setLoading(true);
 
     const { error } = await signIn(email, password);
-    
+
     if (error) {
       toast({
         variant: "destructive",
@@ -42,7 +42,7 @@ const Auth = () => {
       });
       navigate('/');
     }
-    
+
     setLoading(false);
   };
 
@@ -51,7 +51,7 @@ const Auth = () => {
     setLoading(true);
 
     const { error } = await signUp(email, password);
-    
+
     if (error) {
       toast({
         variant: "destructive",
@@ -64,7 +64,7 @@ const Auth = () => {
         description: "Please check your email to confirm your account.",
       });
     }
-    
+
     setLoading(false);
   };
 
@@ -80,7 +80,7 @@ const Auth = () => {
           <div className="flex items-center justify-center gap-3">
             <Music className="h-8 w-8 text-primary" />
             <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-              Guitar Dojo
+              Guitar Brain
             </h1>
           </div>
           <p className="text-muted-foreground">

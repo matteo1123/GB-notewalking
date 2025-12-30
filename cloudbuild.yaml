@@ -1,0 +1,32 @@
+steps:
+  # Build the container image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: [
+      'build',
+      '-t', 'gcr.io/$PROJECT_ID/guitar-brain:$COMMIT_SHA',
+      '--build-arg', 'VITE_SUPABASE_URL=$_VITE_SUPABASE_URL',
+      '--build-arg', 'VITE_SUPABASE_ANON_KEY=$_VITE_SUPABASE_ANON_KEY',
+      '--build-arg', 'VITE_SUPABASE_PROJECT_ID=$_VITE_SUPABASE_PROJECT_ID',
+      '.'
+    ]
+  # Push the container image to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/guitar-brain:$COMMIT_SHA']
+  # Deploy container image to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'guitar-brain'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/guitar-brain:$COMMIT_SHA'
+      - '--region'
+      - 'us-central1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+images:
+  - 'gcr.io/$PROJECT_ID/guitar-brain:$COMMIT_SHA'
+options:
+  logging: CLOUD_LOGGING_ONLY

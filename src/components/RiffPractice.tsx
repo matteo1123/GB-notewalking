@@ -77,6 +77,7 @@ interface RiffPracticeProps {
   onComplete?: () => void;
   onExerciseSelect?: (exercise: RepertoireItem) => void;
   autoAdvance?: boolean;
+  autoStart?: boolean;
   timeLimit?: number; // Time in seconds
   isControlledSession?: boolean; // If true, parent controls the session
   lessonExercise?: Tables<"lesson_exercises"> | null; // For lesson-specific settings
@@ -88,6 +89,7 @@ const RiffPractice = ({
   onComplete,
   onExerciseSelect,
   autoAdvance = false,
+  autoStart = false,
   timeLimit,
   isControlledSession = false,
   lessonExercise,
@@ -95,7 +97,7 @@ const RiffPractice = ({
   const { user } = useAuth();
   const { toast } = useToast();
   const [noteIndex, setNoteIndex] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(autoStart);
   const [mode, setMode] = useState<MetronomeMode>(
     (lessonExercise?.metronome_mode as MetronomeMode) || "regular"
   );
@@ -129,6 +131,24 @@ const RiffPractice = ({
   useEffect(() => {
     setHarmonicContext(repertoireItem.major_key);
   }, [repertoireItem.major_key]);
+
+  // Handle auto-start
+  useEffect(() => {
+    if (autoStart) {
+      // Small delay to ensure audio context is ready/user interaction context is satisfied
+      // Note: Modern browsers block audio without user interaction.
+      // Since the user CLICKED "Start Practice Session" to get here,
+      // the audio context should be allowed to resume/start.
+      const timer = setTimeout(() => {
+        if (metronome.audioContext.state === 'suspended') {
+          metronome.audioContext.resume();
+        }
+        metronome.start();
+        setIsPlaying(true);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [autoStart]);
 
   const availableSequences = useMemo(() => {
     const itemType = repertoireItem.Type;

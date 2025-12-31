@@ -10,8 +10,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Play, Pause, Repeat, RotateCcw } from "lucide-react";
+import { Play, Pause, Repeat, RotateCcw, Mic } from "lucide-react";
 import { useNumberInputControls } from "@/hooks/useNumberInputControls";
+import { useAutoRecord } from "@/contexts/AutoRecordContext";
 
 export type MetronomeMode = "regular" | "speed-trainer" | "progressive";
 
@@ -42,6 +43,9 @@ export function MetronomeControls({
   onRestart,
   onStateChange,
 }: MetronomeControlsProps) {
+  // Auto-record context
+  const { autoRecordEnabled, setAutoRecordEnabled, isPremium } = useAutoRecord();
+
   // Provide sensible defaults
   const defaultStartBpm = initialState.startBpm ?? 80;
   const defaultEndBpm = initialState.endBpm ?? (initialState.mode !== "regular" ? defaultStartBpm + 40 : defaultStartBpm);
@@ -263,6 +267,18 @@ export function MetronomeControls({
         >
           <RotateCcw className="h-4 w-4" />
         </Button>
+        {/* Auto-Record Toggle - Premium Only */}
+        {isPremium && (
+          <Button
+            variant={autoRecordEnabled ? "default" : "outline"}
+            onClick={() => setAutoRecordEnabled(!autoRecordEnabled)}
+            size="sm"
+            className={cn("h-8 px-2", autoRecordEnabled && "bg-red-500 hover:bg-red-600")}
+            title={autoRecordEnabled ? "Auto-Record: ON (click to disable)" : "Auto-Record: OFF (click to enable)"}
+          >
+            <Mic className={cn("h-4 w-4", autoRecordEnabled && "text-white")} />
+          </Button>
+        )}
       </div>
 
       {mode !== "regular" && (

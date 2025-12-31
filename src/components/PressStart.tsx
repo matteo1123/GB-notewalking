@@ -4,17 +4,24 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
-import { Play, Clock, Target, Zap, History } from 'lucide-react';
+import { Input } from './ui/input';
+import { Play, Clock, Target, Zap, History, Pencil } from 'lucide-react';
 import { useToast } from './ui/use-toast';
 import { generatePracticeSession, formatSessionSummary, type SessionBlock } from '@/lib/sessionGenerator';
 import type { UserPriority } from '@/types/priorities';
 import { SessionExecutor, SessionComplete } from './SessionExecutor';
 
+// Session plan structure with optional name
+interface SessionPlanData {
+    name?: string;
+    blocks: SessionBlock[];
+}
+
 interface SavedSession {
     id: string;
     name: string;
     duration: number;
-    blocks: SessionBlock[];
+    planData: SessionPlanData; // Full plan data including name
     last_used: string;
 }
 
@@ -27,11 +34,13 @@ export function PressStart() {
     const { toast } = useToast();
     const [priorities, setPriorities] = useState<UserPriority[]>([]);
     const [selectedDuration, setSelectedDuration] = useState(30);
-    const [sessionPlan, setSessionPlan] = useState<SessionBlock[] | null>(null);
+    const [sessionPlan, setSessionPlan] = useState<SessionPlanData | null>(null);
+    const [sessionName, setSessionName] = useState('');
     const [recentSessions, setRecentSessions] = useState<SavedSession[]>([]);
     const [isExecuting, setIsExecuting] = useState(false);
     const [sessionComplete, setSessionComplete] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
 
     const durationOptions = [15, 20, 30, 45, 60];
 
@@ -76,13 +85,20 @@ export function PressStart() {
             .limit(3);
 
         if (!error && data) {
-            const sessions: SavedSession[] = data.map((s: any) => ({
-                id: s.id,
-                name: `${s.total_duration_seconds / 60} min practice`,
-                duration: s.total_duration_seconds / 60,
-                blocks: s.session_plan,
-                last_used: s.started_at
-            }));
+            const sessions: SavedSession[] = data.map((s: any) => {
+                // Handle both old format (array) and new format (object with name)
+                const planData: SessionPlanData = Array.isArray(s.session_plan)
+                    ? { blocks: s.session_plan }
+                    : s.session_plan;
+
+                return {
+                    id: s.id,
+                    name: planData.name || `${s.total_duration_seconds / 60} min practice`,
+                    duration: s.total_duration_seconds / 60,
+                    planData,
+                    last_used: s.started_at
+                };
+            });
             setRecentSessions(sessions);
         }
     };
@@ -104,7 +120,11 @@ export function PressStart() {
                 durationMinutes: selectedDuration,
             });
 
-            setSessionPlan(blocks);
+            // Create session plan with name
+            setSessionPlan({
+                name: sessionName.trim() || undefined,
+                blocks,
+            });
 
             toast({
                 title: 'Session generated!',
@@ -119,11 +139,11 @@ export function PressStart() {
         }
     };
 
-    const handleStartSession = async (blocks?: SessionBlock[]) => {
-        const planToUse = blocks || sessionPlan;
+    const handleStartSession = async (planData?: SessionPlanData) => {
+        const planToUse = planData || sessionPlan;
         if (!planToUse || !user) return;
 
-        // Save session to database
+        // Save session to database (store the full planData object including name)
         const { data, error } = await supabase
             .from('practice_sessions' as any)
             .insert([
@@ -144,8 +164,10 @@ export function PressStart() {
                 variant: 'destructive',
             });
         } else {
+            // Store the session ID for linking practice logs
+            setCurrentSessionId((data as any)?.id || null);
             setIsExecuting(true);
-            if (!blocks) {
+            if (!planData) {
                 // Reload recent sessions
                 loadRecentSessions();
             }
@@ -167,20 +189,63 @@ export function PressStart() {
 
     const handleRestart = () => {
         setSessionPlan(null);
+        setSessionName('');
         setIsExecuting(false);
         setSessionComplete(false);
+        setCurrentSessionId(null); // Clear session ID on restart
     };
 
     const handleUseRecentSession = (session: SavedSession) => {
-        setSessionPlan(session.blocks);
-        handleStartSession(session.blocks);
+        // Inherit the full plan data (including name) from the old session
+        setSessionPlan(session.planData);
+        setSessionName(session.planData.name || '');
+        handleStartSession(session.planData);
+    };
+
+    const handleRenameSession = async (sessionId: string, newName: string) => {
+        // Find the session in our local state
+        const session = recentSessions.find(s => s.id === sessionId);
+        if (!session) return;
+
+        // Update the session_plan JSON with the new name
+        const updatedPlanData: SessionPlanData = {
+            ...session.planData,
+            name: newName || undefined,
+        };
+
+        const { error } = await supabase
+            .from('practice_sessions' as any)
+            .update({ session_plan: updatedPlanData })
+            .eq('id', sessionId);
+
+        if (error) {
+            toast({
+                title: 'Error renaming session',
+                description: error.message,
+                variant: 'destructive',
+            });
+        } else {
+            // Update local state
+            setRecentSessions(prev =>
+                prev.map(s =>
+                    s.id === sessionId
+                        ? { ...s, name: newName || `${s.duration} min practice`, planData: updatedPlanData }
+                        : s
+                )
+            );
+            toast({
+                title: 'Session renamed',
+                description: `Session renamed to "${newName || 'Unnamed'}"`,
+            });
+        }
     };
 
     // Show session executor
     if (isExecuting && sessionPlan) {
         return (
             <SessionExecutor
-                sessionPlan={sessionPlan}
+                sessionPlan={sessionPlan.blocks}
+                sessionId={currentSessionId || undefined}
                 onComplete={handleSessionComplete}
                 onExit={() => setIsExecuting(false)}
             />
@@ -237,21 +302,42 @@ export function PressStart() {
                     </CardHeader>
                     <CardContent className="space-y-2">
                         {recentSessions.map((session) => (
-                            <Button
+                            <div
                                 key={session.id}
-                                variant="outline"
-                                className="w-full justify-between text-left h-auto py-3"
-                                onClick={() => handleUseRecentSession(session)}
+                                className="flex items-center gap-2 w-full border rounded-lg p-3 hover:bg-accent/50 transition-colors"
                             >
-                                <div>
-                                    <div className="font-semibold">{session.name}</div>
-                                    <div className="text-sm text-muted-foreground">
-                                        {session.blocks.length} exercises •{' '}
-                                        Last used {new Date(session.last_used).toLocaleDateString()}
+                                {/* Edit button */}
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="flex-shrink-0 h-8 w-8"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        const newName = prompt('Enter session name:', session.name);
+                                        if (newName !== null && newName.trim() !== session.name) {
+                                            handleRenameSession(session.id, newName.trim());
+                                        }
+                                    }}
+                                >
+                                    <Pencil className="w-4 h-4" />
+                                </Button>
+
+                                {/* Session info + play button */}
+                                <Button
+                                    variant="ghost"
+                                    className="flex-1 justify-between text-left h-auto py-1 px-2"
+                                    onClick={() => handleUseRecentSession(session)}
+                                >
+                                    <div>
+                                        <div className="font-semibold">{session.name}</div>
+                                        <div className="text-sm text-muted-foreground">
+                                            {session.planData.blocks.length} exercises •{' '}
+                                            Last used {new Date(session.last_used).toLocaleDateString()}
+                                        </div>
                                     </div>
-                                </div>
-                                <Play className="w-5 h-5" />
-                            </Button>
+                                    <Play className="w-5 h-5 flex-shrink-0" />
+                                </Button>
+                            </div>
                         ))}
                     </CardContent>
                 </Card>
@@ -315,6 +401,26 @@ export function PressStart() {
                             </div>
                         </div>
 
+                        {/* Session Name Input */}
+                        <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                                <Pencil className="w-4 h-4 text-muted-foreground" />
+                                <label htmlFor="session-name" className="text-sm font-medium">
+                                    Session Name (optional)
+                                </label>
+                            </div>
+                            <Input
+                                id="session-name"
+                                placeholder="e.g., Morning Singing Practice, Guitar Warmup..."
+                                value={sessionName}
+                                onChange={(e) => setSessionName(e.target.value)}
+                                className="w-full"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                                Give your session a name to easily find it later
+                            </p>
+                        </div>
+
                         {/* Generate Button */}
                         <Button
                             onClick={handleGenerateSession}
@@ -334,16 +440,18 @@ export function PressStart() {
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2 text-2xl">
                             <Target className="w-6 h-6" />
-                            Your {selectedDuration}-Minute Practice Plan
+                            {sessionPlan.name || `Your ${selectedDuration}-Minute Practice Plan`}
                         </CardTitle>
                         <CardDescription>
-                            Optimized for your priorities and goals
+                            {sessionPlan.name
+                                ? `${selectedDuration} minute session • Optimized for your priorities`
+                                : 'Optimized for your priorities and goals'}
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         {/* Session Blocks */}
                         <div className="space-y-3">
-                            {sessionPlan.map((block, index) => (
+                            {sessionPlan.blocks.map((block, index) => (
                                 <div
                                     key={block.id}
                                     className="flex items-center gap-4 p-4 border rounded-lg bg-card hover:bg-accent/50 transition-colors"

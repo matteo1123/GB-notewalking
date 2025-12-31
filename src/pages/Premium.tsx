@@ -38,6 +38,7 @@ const Premium = () => {
   const [isPremium, setIsPremium] = useState(false);
   const [isSubscribing, setIsSubscribing] = useState(false);
   const [checkingPremium, setCheckingPremium] = useState(true); // New loading state for premium check specifically
+  const [activeTab, setActiveTab] = useState("priorities");
 
   useEffect(() => {
     // Check for success/canceled params from Stripe
@@ -81,21 +82,29 @@ const Premium = () => {
 
       // Check premium status
       if (user) {
-        const { data: profile } = await supabase
+        console.log('[Premium] Checking premium for user:', user.id);
+        const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('premium_until') // Changed from is_premium
           .eq('id', user.id)
           .single();
 
+        console.log('[Premium] Profile query result:', { profile, error: profileError });
+
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         if ((profile as any)?.premium_until) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const expiryDate = new Date((profile as any).premium_until);
+          console.log('[Premium] Expiry date:', expiryDate, 'Now:', new Date(), 'Is future?', expiryDate > new Date());
           // Check if future
           if (expiryDate > new Date()) {
             setIsPremium(true);
           }
+        } else {
+          console.log('[Premium] No premium_until found or profile is null');
         }
+      } else {
+        console.log('[Premium] No user, skipping premium check');
       }
       setCheckingPremium(false); // Done checking
 
@@ -311,7 +320,7 @@ const Premium = () => {
 
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden p-4">
         {/* Content */}
-        <Tabs defaultValue="start" className="flex-1 flex flex-col min-h-0 overflow-hidden">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0 overflow-hidden">
           <TabsList className="grid w-full grid-cols-5 flex-shrink-0 mb-4">
             <TabsTrigger value="start">🚀 Start</TabsTrigger>
             <TabsTrigger value="priorities">⚙️ Priorities</TabsTrigger>
@@ -325,7 +334,7 @@ const Premium = () => {
           </TabsContent>
 
           <TabsContent value="priorities" className="flex-1 min-h-0 overflow-y-auto data-[state=active]:block p-6">
-            <PriorityManager />
+            <PriorityManager onStart={() => setActiveTab("start")} />
           </TabsContent>
 
           <TabsContent value="progress" className="flex-1 min-h-0 overflow-y-auto data-[state=active]:block p-6">

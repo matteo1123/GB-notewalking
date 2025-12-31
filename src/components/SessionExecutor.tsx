@@ -16,11 +16,12 @@ import { ChordProgressionExercise } from './ChordProgressionExercise';
 
 interface SessionExecutorProps {
     sessionPlan: SessionBlock[];
+    sessionId?: string; // Practice session ID for linking practice logs
     onComplete: () => void;
     onExit: () => void;
 }
 
-export function SessionExecutor({ sessionPlan, onComplete, onExit }: SessionExecutorProps) {
+export function SessionExecutor({ sessionPlan, sessionId, onComplete, onExit }: SessionExecutorProps) {
     const [currentBlockIndex, setCurrentBlockIndex] = useState(0);
     const [elapsedTime, setElapsedTime] = useState(0); // seconds
     const [isPaused, setIsPaused] = useState(false);
@@ -143,7 +144,7 @@ export function SessionExecutor({ sessionPlan, onComplete, onExit }: SessionExec
 
             {/* Module Content - Takes remaining space, no overflow */}
             <div className="flex-1 min-h-0 overflow-hidden">
-                {renderModuleContent(currentBlock)}
+                {renderModuleContent(currentBlock, sessionId)}
             </div>
         </div>
     );
@@ -153,19 +154,19 @@ export function SessionExecutor({ sessionPlan, onComplete, onExit }: SessionExec
  * Render the appropriate module based on block type
  * Pure flexbox layout - NO OVERFLOW EVER
  */
-function renderModuleContent(block: SessionBlock) {
+function renderModuleContent(block: SessionBlock, sessionId?: string) {
     switch (block.module_type) {
         case 'rhythm':
             return (
                 <div className="h-full flex flex-col overflow-hidden">
-                    <RhythmTraining />
+                    <RhythmTraining autoStart={true} sessionId={sessionId} />
                 </div>
             );
 
         case 'notewalking':
             return (
                 <div className="h-full flex flex-col overflow-hidden">
-                    <ChordProgressionExercise />
+                    <ChordProgressionExercise autoStart={true} sessionId={sessionId} />
                 </div>
             );
 

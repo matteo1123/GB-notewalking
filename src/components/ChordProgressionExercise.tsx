@@ -6,6 +6,7 @@ import { useChordProgression } from "@/hooks/useChordProgression";
 import { useNotePlayer } from "@/hooks/useNotePlayer";
 import { usePitchDetection } from "@/hooks/usePitchDetection";
 import { useAutoRecording } from "@/hooks/useAutoRecording";
+import { useAutoRecord } from "@/contexts/AutoRecordContext";
 import { supabase } from "@/integrations/supabase/client";
 import { MetronomeControls, MetronomeMode } from "./MetronomeControls";
 import { BeatVisualizer } from "./BeatVisualizer";
@@ -29,9 +30,14 @@ const DEFAULT_SETTINGS: ChordProgressionSettings = {
     droneVolume: 0.5,
 };
 
-export function ChordProgressionExercise() {
+interface ChordProgressionExerciseProps {
+    autoStart?: boolean;
+    sessionId?: string; // Practice session ID for linking logs
+}
+
+export function ChordProgressionExercise({ autoStart = false, sessionId }: ChordProgressionExerciseProps) {
     const [settings, setSettings] = useState<ChordProgressionSettings>(DEFAULT_SETTINGS);
-    const [isPlaying, setIsPlaying] = useState(false);
+    const [isPlaying, setIsPlaying] = useState(autoStart);
     const [bpm, setBpm] = useState(80);
     const [mode, setMode] = useState<MetronomeMode>("regular");
     const [loop, setLoop] = useState(true);
@@ -39,8 +45,10 @@ export function ChordProgressionExercise() {
     const [detectedNote, setDetectedNote] = useState<string | null>(null);
     const [pitchConfidence, setPitchConfidence] = useState(0);
     const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
-    const [autoRecordEnabled, setAutoRecordEnabled] = useState(false);
     const [tickCount, setTickCount] = useState(0);
+
+    // Global auto-record setting from context
+    const { autoRecordEnabled } = useAutoRecord();
 
     // Initialize AudioContext on mount
     useEffect(() => {
@@ -50,6 +58,8 @@ export function ChordProgressionExercise() {
             ctx.close();
         };
     }, []);
+
+
 
     const { playNote } = useNotePlayer(audioContext);
 
@@ -169,6 +179,24 @@ export function ChordProgressionExercise() {
 
     const metronome = useMetronome(metronomeSettings);
 
+    // Handle auto-start
+    useEffect(() => {
+        if (autoStart && metronome) {
+            const timer = setTimeout(() => {
+                if (metronome.audioContext.state === 'suspended') {
+                    metronome.audioContext.resume();
+                }
+                if (!metronome.state.isPlaying) {
+                    metronome.start();
+                    setIsPlaying(true);
+                    setTickCount(0);
+                    recording.reset();
+                }
+            }, 500);
+            return () => clearTimeout(timer);
+        }
+    }, [autoStart, metronome]);
+
     // BPM change handler for scroll/touch/drag controls
     const handleBpmChange = useCallback(
         (newBpm: number) => {
@@ -214,7 +242,9 @@ export function ChordProgressionExercise() {
     const recording = useAutoRecording({
         enabled: autoRecordEnabled && isPlaying,
         moduleType: 'notewalking',
+        sessionId,
         moduleConfig: {
+            module_type: 'notewalking',
             key: settings.key,
             chords: settings.selectedChords,
             measures_per_chord: settings.measuresPerChord,
@@ -455,22 +485,6 @@ export function ChordProgressionExercise() {
                                                 }`}
                                         />
                                     </button>
-                                </div>
-
-                                {/* Auto-Record Toggle */}
-                                <div className="flex items-center justify-between bg-muted/30 rounded p-2">
-                                    <div className="flex items-center gap-1">
-                                        <Label htmlFor="auto-record-notewalking" className="text-xs font-medium cursor-pointer">Auto-Record</Label>
-                                        {recording.hasRecorded && (
-                                            <Check className="w-3 h-3 text-green-500" />
-                                        )}
-                                    </div>
-                                    <Switch
-                                        id="auto-record-notewalking"
-                                        checked={autoRecordEnabled}
-                                        onCheckedChange={setAutoRecordEnabled}
-                                        className="scale-75"
-                                    />
                                 </div>
 
                                 {/* Metronome Controls */}

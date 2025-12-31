@@ -21,7 +21,7 @@ type PracticeLogWithExercise = Tables<'practice_log'> & {
 };
 
 interface ProfileSettings {
-  autoRecord?: boolean;
+  autoRecordEnabled?: boolean;
 }
 
 // Updated Stripe Price ID
@@ -250,27 +250,44 @@ const Profile = () => {
             <CardHeader>
               <CardTitle>Settings</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between">
-                <Label htmlFor="auto-record">Default to Auto Record</Label>
-                <Switch
-                  id="auto-record"
-                  checked={(profile?.settings as ProfileSettings)?.autoRecord || false}
-                  onCheckedChange={(value) =>
-                    setProfile((prev) => ({
-                      ...prev,
-                      id: user!.id,
-                      settings: {
-                        ...((prev?.settings as ProfileSettings) || {}),
-                        autoRecord: value,
-                      },
-                    }))
-                  }
-                />
+            <CardContent className="space-y-6">
+              {/* Auto-Record Setting */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label htmlFor="auto-record" className="text-base font-medium">Auto-Record Practice</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Automatically record snippets during your practice sessions
+                    </p>
+                  </div>
+                  <Switch
+                    id="auto-record"
+                    checked={(profile?.settings as ProfileSettings)?.autoRecordEnabled !== false}
+                    onCheckedChange={(value) =>
+                      setProfile((prev) => ({
+                        ...prev,
+                        id: user!.id,
+                        settings: {
+                          ...((prev?.settings as ProfileSettings) || {}),
+                          autoRecordEnabled: value,
+                        },
+                      }))
+                    }
+                  />
+                </div>
+
+                {/* Microphone Permission Note */}
+                <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                  <p className="text-sm text-blue-800 dark:text-blue-200">
+                    <span className="font-medium">🎤 Tip:</span> For auto-recording to work seamlessly,
+                    set your browser's microphone permission for this site to "Always Allow".
+                    This prevents the permission prompt from interrupting your practice.
+                  </p>
+                </div>
               </div>
             </CardContent>
           </Card>
-          <Button onClick={handleUpdate} className="mt-4">Update Settings</Button>
+          <Button onClick={handleUpdate} className="mt-4">Save Settings</Button>
         </TabsContent>
         <TabsContent value="history">
           <div className="space-y-8">

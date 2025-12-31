@@ -9,13 +9,17 @@ import { Plus, Trash2, Target } from 'lucide-react';
 import { useToast } from './ui/use-toast';
 import { MODULE_REGISTRY } from '@/types/modules';
 import type { UserPriority, CreatePriorityInput } from '@/types/priorities';
-import type { ModuleType } from '@/types/practice';
+import { ModuleType } from '@/types/practice';
+
+interface PriorityManagerProps {
+    onStart?: () => void;
+}
 
 /**
  * Priority Manager Component
  * Allows users to set and manage their practice priorities
  */
-export function PriorityManager() {
+export function PriorityManager({ onStart }: PriorityManagerProps) {
     const { user } = useAuth();
     const { toast } = useToast();
     const [priorities, setPriorities] = useState<UserPriority[]>([]);
@@ -30,7 +34,7 @@ export function PriorityManager() {
 
     const loadPriorities = async () => {
         if (!user) return;
-
+        // ... rest of loadPriorities
         setLoading(true);
         const { data, error } = await supabase
             .from('user_priorities')
@@ -51,6 +55,7 @@ export function PriorityManager() {
     };
 
     const handleUpdateWeight = async (priorityId: string, newWeight: number) => {
+        // ... rest of file ...
         const { error } = await supabase
             .from('user_priorities')
             .update({ weight: newWeight })
@@ -287,6 +292,21 @@ export function PriorityManager() {
                             </Button>
                         </CardContent>
                     </Card>
+                </div>
+            )}
+            {/* Start Button */}
+            {onStart && priorities.length > 0 && (
+                <div className="pt-4 border-t mt-8">
+                    <Button
+                        size="lg"
+                        className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-bold text-lg shadow-lg hover:shadow-xl transition-all"
+                        onClick={onStart}
+                    >
+                        Start Practice Session →
+                    </Button>
+                    <p className="text-center text-sm text-muted-foreground mt-2">
+                        Ready to go? Head to the start screen to begin.
+                    </p>
                 </div>
             )}
         </div>

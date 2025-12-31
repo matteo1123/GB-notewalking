@@ -3,6 +3,7 @@ import { generateRhythmPattern, patternToNotation, getSubdivisionLabels, type Rh
 import { useMetronome, MetronomeSettings } from "@/hooks/useMetronome";
 import { useBpmControls } from "@/hooks/useBpmControls";
 import { useAutoRecording } from "@/hooks/useAutoRecording";
+import { useAutoRecord } from "@/contexts/AutoRecordContext";
 import { supabase } from "@/integrations/supabase/client";
 import { MetronomeControls, MetronomeMode } from "./MetronomeControls";
 import { BeatVisualizer } from "./BeatVisualizer";
@@ -13,15 +14,22 @@ import { Switch } from "./ui/switch";
 import { SkipForward, ChevronLeft, ChevronRight, Check, Mic, Settings, ChevronUp } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui/collapsible";
 
-export function RhythmTraining() {
+interface RhythmTrainingProps {
+    autoStart?: boolean;
+    sessionId?: string; // Practice session ID for linking logs
+}
+
+export function RhythmTraining({ autoStart = false, sessionId }: RhythmTrainingProps) {
     const [level, setLevel] = useState(0);
     const [pattern, setPattern] = useState<RhythmPattern>(() => generateRhythmPattern(0));
     const [isPlaying, setIsPlaying] = useState(false);
     const [bpm, setBpm] = useState(60); // Start slower for rhythm practice
     const [mode, setMode] = useState<MetronomeMode>("regular");
     const [loop, setLoop] = useState(true);
-    const [autoRecordEnabled, setAutoRecordEnabled] = useState(false);
     const [tickCount, setTickCount] = useState(0);
+
+    // Global auto-record setting from context
+    const { autoRecordEnabled } = useAutoRecord();
 
     // Confirmation flow state
     const [hasConfirmed, setHasConfirmed] = useState(false);
@@ -35,35 +43,35 @@ export function RhythmTraining() {
     // Track beats for auto-switch (4 beats per measure)
     const beatCountRef = useRef(0);
 
-    // Load auto-record setting from profile
-    useEffect(() => {
-        const loadSettings = async () => {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
-
-            const { data: profile } = await supabase
-                .from('profiles')
-                .select('settings')
-                .eq('id', user.id)
-                .single();
-
-            if (profile?.settings) {
-                const settings = profile.settings as { autoRecord?: boolean };
-                setAutoRecordEnabled(settings.autoRecord || false);
-            }
-        };
-        loadSettings();
-    }, []);
-
-    // Auto-recording
+    // Auto-recording (uses global context setting)
     const recording = useAutoRecording({
         enabled: autoRecordEnabled && isPlaying,
         moduleType: 'rhythm',
+        sessionId,
         moduleConfig: {
+            module_type: 'rhythm',
             rhythm_level: level,
             duration_minutes: 5,
         },
     });
+
+    // Handle auto-start
+    useEffect(() => {
+        if (autoStart) {
+            const timer = setTimeout(() => {
+                if (metronome.audioContext.state === 'suspended') {
+                    metronome.audioContext.resume();
+                }
+                if (!metronome.state.isPlaying) {
+                    metronome.start();
+                    setIsPlaying(true);
+                    setTickCount(0);
+                    recording.reset();
+                }
+            }, 500);
+            return () => clearTimeout(timer);
+        }
+    }, [autoStart]);
 
     // Metronome setup with auto-switch logic
     const metronomeSettings: MetronomeSettings = {
@@ -387,21 +395,6 @@ export function RhythmTraining() {
                                         />
                                     </div>
                                 )}
-
-                                {/* Auto-Record Toggle */}
-                                <div className="flex items-center justify-between bg-muted/30 rounded-lg p-3">
-                                    <div className="flex items-center gap-2">
-                                        <Label htmlFor="auto-record-rhythm">Auto-Record</Label>
-                                        {recording.hasRecorded && (
-                                            <Check className="w-4 h-4 text-green-500" />
-                                        )}
-                                    </div>
-                                    <Switch
-                                        id="auto-record-rhythm"
-                                        checked={autoRecordEnabled}
-                                        onCheckedChange={setAutoRecordEnabled}
-                                    />
-                                </div>
                             </CollapsibleContent>
                         </Collapsible>
                     </div>

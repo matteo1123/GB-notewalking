@@ -7,6 +7,7 @@ export interface AutoRecordingOptions {
     enabled: boolean;
     moduleType: ModuleType;
     moduleConfig?: ModuleConfig;
+    sessionId?: string; // Practice session ID to link recordings
     minClicksBeforeRecord?: number; // Min clicks before scheduling (default: 30)
     maxClicksBeforeRecord?: number; // Max clicks before scheduling (default: 90)
     recordingDurationSeconds?: number; // How long to record (default: 30)
@@ -47,6 +48,7 @@ export function useAutoRecording(options: AutoRecordingOptions) {
         enabled,
         moduleType,
         moduleConfig,
+        sessionId,
         minClicksBeforeRecord = 30,
         maxClicksBeforeRecord = 90,
         recordingDurationSeconds = 30,
@@ -180,6 +182,7 @@ export function useAutoRecording(options: AutoRecordingOptions) {
                     audio: publicUrl,
                     module_type: moduleType,
                     module_config: moduleConfig,
+                    session_id: sessionId || null,
                     created_at: new Date().toISOString(),
                 });
 

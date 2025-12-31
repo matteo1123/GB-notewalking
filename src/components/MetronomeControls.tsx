@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Play, Pause, Repeat, RotateCcw, Mic } from "lucide-react";
+import { Play, Pause, Repeat, RotateCcw, Mic, Drum } from "lucide-react";
 import { useNumberInputControls } from "@/hooks/useNumberInputControls";
 import { useAutoRecord } from "@/contexts/AutoRecordContext";
 
@@ -24,6 +24,7 @@ export interface MetronomeSettings {
   measuresPerIncrement: number;
   progressiveStepBpm: number;
   loop: boolean;
+  drumBeat?: boolean; // Play kick on 1, snare on 3
 }
 
 interface MetronomeControlsProps {
@@ -59,6 +60,7 @@ export function MetronomeControls({
       measuresPerIncrement,
       progressiveStepBpm,
       loop,
+      drumBeat,
     },
     setState,
   ] = useState<MetronomeSettings>({
@@ -69,6 +71,7 @@ export function MetronomeControls({
     measuresPerIncrement: initialState.measuresPerIncrement ?? 4,
     progressiveStepBpm: initialState.progressiveStepBpm ?? 5,
     loop: initialState.loop ?? false,
+    drumBeat: initialState.drumBeat ?? false,
   });
 
   const syncingFromPropsRef = useRef(false);
@@ -176,6 +179,7 @@ export function MetronomeControls({
       measuresPerIncrement,
       progressiveStepBpm,
       loop,
+      drumBeat,
     });
   }, [
     mode,
@@ -185,6 +189,7 @@ export function MetronomeControls({
     measuresPerIncrement,
     progressiveStepBpm,
     loop,
+    drumBeat,
     onStateChange,
   ]);
 
@@ -266,6 +271,16 @@ export function MetronomeControls({
           title="Loop"
         >
           <RotateCcw className="h-4 w-4" />
+        </Button>
+        {/* Drum Beat Toggle */}
+        <Button
+          variant={drumBeat ? "default" : "outline"}
+          onClick={() => updateState({ drumBeat: !drumBeat })}
+          size="sm"
+          className={cn("h-8 px-2", drumBeat && "bg-orange-500 hover:bg-orange-600")}
+          title={drumBeat ? "Drum Beat: ON (Kick on 1, Snare on 3)" : "Drum Beat: OFF (click to enable)"}
+        >
+          <Drum className={cn("h-4 w-4", drumBeat && "text-white")} />
         </Button>
         {/* Auto-Record Toggle - Premium Only */}
         {isPremium && (

@@ -61,6 +61,7 @@ export function MetronomeScreen({
       measuresPerIncrement,
       progressiveStepBpm: currentProgressiveStepBpm,
       loop,
+      drumBeat,
     },
     setSettings,
   ] = useState({
@@ -71,6 +72,7 @@ export function MetronomeScreen({
     measuresPerIncrement: initialMeasuresPerIncrement,
     progressiveStepBpm: progressiveStepBpm,
     loop: false,
+    drumBeat: false,
   });
 
   const metronome = useMetronome({
@@ -80,6 +82,7 @@ export function MetronomeScreen({
     measures: increments,
     measuresPerBpmChange: measuresPerIncrement,
     progressiveStepBpm: currentProgressiveStepBpm,
+    drumBeat,
     onTick,
   });
 
@@ -151,11 +154,11 @@ export function MetronomeScreen({
     mode === "regular"
       ? startBpm
       : startBpm +
-        (metronome.state.progressiveRound - 1) * currentProgressiveStepBpm;
+      (metronome.state.progressiveRound - 1) * currentProgressiveStepBpm;
   const effectiveTargetBpm =
     mode === "progressive"
       ? endBpm +
-        (metronome.state.progressiveRound - 1) * currentProgressiveStepBpm
+      (metronome.state.progressiveRound - 1) * currentProgressiveStepBpm
       : endBpm;
 
   return (
@@ -187,6 +190,7 @@ export function MetronomeScreen({
               measuresPerIncrement,
               progressiveStepBpm: currentProgressiveStepBpm,
               loop,
+              drumBeat,
             }}
             onPlayPause={metronome.togglePlayPause}
             onRestart={metronome.restart}

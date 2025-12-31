@@ -1,5 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
+// Supabase storage URLs for drum samples
+const SUPABASE_STORAGE_URL = "https://idsufbsfywgmcrhldqxq.supabase.co/storage/v1/object/public/drums";
+const DRUM_SAMPLES = {
+  ride: `${SUPABASE_STORAGE_URL}/Ride.wav`,
+  kick: `${SUPABASE_STORAGE_URL}/Kick.wav`,
+  snare: `${SUPABASE_STORAGE_URL}/Snare.wav`,
+};
+
 export interface MetronomeState {
   isPlaying: boolean;
   currentBpm: number;
@@ -18,9 +26,11 @@ export interface MetronomeSettings {
   onTick?: (state: MetronomeState) => void;
   loop?: boolean;
   muted?: boolean;
+  drumBeat?: boolean; // When true, plays kick on 1, snare on 3
 }
 
 export const DEFAULT_PROGRESSIVE_STEP_BPM = 5;
+
 
 function clamp(value: number, min: number, max: number) {
   if (value < min) return min;
@@ -44,6 +54,12 @@ export function useMetronome(settings: MetronomeSettings) {
   const measureCountRef = useRef<number>(1);
   const progressiveRoundRef = useRef<number>(1);
   const settingsRef = useRef(settings);
+
+  // Drum sample audio buffers
+  const rideBufferRef = useRef<AudioBuffer | null>(null);
+  const kickBufferRef = useRef<AudioBuffer | null>(null);
+  const snareBufferRef = useRef<AudioBuffer | null>(null);
+  const samplesLoadedRef = useRef(false);
 
   useEffect(() => {
     settingsRef.current = settings;
@@ -71,14 +87,102 @@ export function useMetronome(settings: MetronomeSettings) {
     return audioContextRef.current;
   }, []);
 
+  // Load drum samples
+  const loadDrumSamples = useCallback(async () => {
+    if (samplesLoadedRef.current) return;
+
+    const audioContext = initAudioContext();
+    if (!audioContext) return;
+
+    try {
+      const responses = await Promise.all([
+        fetch(DRUM_SAMPLES.ride),
+        fetch(DRUM_SAMPLES.kick),
+        fetch(DRUM_SAMPLES.snare),
+      ]);
+
+      // Check if any fetch failed
+      for (const response of responses) {
+        if (!response.ok) {
+          console.error(`Failed to fetch drum sample: ${response.url} (${response.status} ${response.statusText})`);
+          throw new Error(`Failed to fetch ${response.url}`);
+        }
+      }
+
+      const [rideBuffer, kickBuffer, snareBuffer] = await Promise.all(
+        responses.map(async (res) => audioContext.decodeAudioData(await res.arrayBuffer()))
+      );
+
+      rideBufferRef.current = rideBuffer;
+      kickBufferRef.current = kickBuffer;
+      snareBufferRef.current = snareBuffer;
+      samplesLoadedRef.current = true;
+      console.log("Drum samples loaded successfully");
+    } catch (error) {
+      console.error("Failed to load drum samples:", error);
+    }
+  }, [initAudioContext]);
+
+  // Load samples on mount
+  useEffect(() => {
+    loadDrumSamples();
+  }, [loadDrumSamples]);
+
+  // Play a sample buffer with optional fade-out
+  const playSample = useCallback((buffer: AudioBuffer | null, volume: number = 0.5, fadeOutMs: number = 0) => {
+    if (!buffer) return;
+
+    const audioContext = initAudioContext();
+    if (!audioContext) return;
+
+    try {
+      const source = audioContext.createBufferSource();
+      const gainNode = audioContext.createGain();
+
+      source.buffer = buffer;
+      source.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      gainNode.gain.setValueAtTime(volume, audioContext.currentTime);
+
+      // Apply fade-out if specified
+      if (fadeOutMs > 0) {
+        const fadeOutTime = fadeOutMs / 1000;
+        gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + fadeOutTime);
+        source.start(0);
+        source.stop(audioContext.currentTime + fadeOutTime);
+      } else {
+        source.start(0);
+      }
+    } catch (error) {
+      console.error("Failed to play sample:", error);
+    }
+  }, [initAudioContext]);
+
   const playClick = useCallback(
-    (isDownbeat = false) => {
+    (beat: number = 1) => {
       // Don't play click if muted
       if (settingsRef.current.muted) return;
 
       const audioContext = initAudioContext();
       if (!audioContext) return;
 
+      // If samples are loaded, use drum sounds
+      if (samplesLoadedRef.current) {
+        // Always play ride for the click (with 150ms fade-out for smoother ending)
+        playSample(rideBufferRef.current, 0.4, 150);
+
+        // If drum beat is enabled, add kick on 1 and snare on 3
+        if (settingsRef.current.drumBeat) {
+          if (beat === 1) {
+            playSample(kickBufferRef.current, 0.7);
+          } else if (beat === 3) {
+            playSample(snareBufferRef.current, 0.6);
+          }
+        }
+        return;
+      }
+
+      // Fallback to oscillator if samples not loaded
       try {
         const oscillator = audioContext.createOscillator();
         const gainNode = audioContext.createGain();
@@ -87,7 +191,7 @@ export function useMetronome(settings: MetronomeSettings) {
         gainNode.connect(audioContext.destination);
 
         oscillator.frequency.setValueAtTime(
-          isDownbeat ? 1000 : 800,
+          beat === 1 ? 1000 : 800,
           audioContext.currentTime
         );
         oscillator.type = "square";
@@ -104,7 +208,7 @@ export function useMetronome(settings: MetronomeSettings) {
         console.error("Metronome click failed", error);
       }
     },
-    [initAudioContext]
+    [initAudioContext, playSample]
   );
 
   const calculateCurrentBpm = useCallback(
@@ -173,7 +277,7 @@ export function useMetronome(settings: MetronomeSettings) {
       progressiveRoundRef.current
     );
 
-    playClick(beat === 1);
+    playClick(beat);
 
     const nextState: MetronomeState = {
       isPlaying: true,

@@ -26,6 +26,7 @@ export function RhythmTraining({ autoStart = false, sessionId }: RhythmTrainingP
     const [bpm, setBpm] = useState(60); // Start slower for rhythm practice
     const [mode, setMode] = useState<MetronomeMode>("regular");
     const [loop, setLoop] = useState(true);
+    const [drumBeat, setDrumBeat] = useState(false);
     const [tickCount, setTickCount] = useState(0);
 
     // Global auto-record setting from context
@@ -79,6 +80,7 @@ export function RhythmTraining({ autoStart = false, sessionId }: RhythmTrainingP
         startBpm: bpm,
         endBpm: bpm,
         measures: 999,
+        drumBeat,
         onTick: (state) => {
             setTickCount(prev => prev + 1);
             recording.handleTick(state.currentBeat + (state.currentMeasure - 1) * 4);

@@ -10,6 +10,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { MODULE_REGISTRY } from '@/types/modules';
 import type { ModuleType } from '@/types/practice';
 import type { RepertoireItem } from '@/types/repertoire';
+import { PieceList } from './piece-mastery/PieceList';
+import { PieceMastery } from './piece-mastery/PieceMastery';
+import { Piece } from './piece-mastery/types';
 
 /**
  * Module Library - Storefront view for all practice modules
@@ -18,6 +21,7 @@ export function ModuleLibrary() {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedSkill, setSelectedSkill] = useState<string | null>(null);
     const [activeModule, setActiveModule] = useState<ModuleType | null>(null);
+    const [selectedPiece, setSelectedPiece] = useState<Piece | null>(null);
     const [exercises, setExercises] = useState<RepertoireItem[]>([]);
 
     // Load exercises for scales and arpeggios
@@ -72,8 +76,8 @@ export function ModuleLibrary() {
                 type: 'arpeggio',
             },
             {
-                type: 'riff',
-                progress: { current_level: 2, mastery_percentage: 15, time_practiced_minutes: 30 },
+                type: 'piece_mastery',
+                progress: { current_level: 1, mastery_percentage: 0, time_practiced_minutes: 0 },
             },
         ];
 
@@ -92,6 +96,7 @@ export function ModuleLibrary() {
     };
 
     const handleCloseModule = () => {
+        setSelectedPiece(null);
         setActiveModule(null);
     };
 
@@ -145,14 +150,16 @@ export function ModuleLibrary() {
                             </div>
                         </div>
                     )}
-                    {activeModule === 'riff' && (
-                        <div className="flex items-center justify-center h-full">
-                            <div className="text-center p-8">
-                                <span className="text-6xl mb-4 block">🎸</span>
-                                <h3 className="text-2xl font-bold mb-2">Riff Practice</h3>
-                                <p className="text-muted-foreground">Coming soon!</p>
+                    {activeModule === 'piece_mastery' && (
+                        selectedPiece ? (
+                            <div className="h-full bg-background">
+                                <PieceMastery piece={selectedPiece} onBack={() => setSelectedPiece(null)} />
                             </div>
-                        </div>
+                        ) : (
+                            <div className="h-full overflow-y-auto">
+                                <PieceList onSelectPiece={setSelectedPiece} />
+                            </div>
+                        )
                     )}
                 </div>
             </div>

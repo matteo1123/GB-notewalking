@@ -211,21 +211,21 @@ export const MODULE_REGISTRY: Record<ModuleType, Omit<ModuleMetadata, 'progress'
         },
     },
 
-    riff: {
-        id: 'riff',
-        name: 'Riff Practice',
-        shortDescription: 'Learn songs and build repertoire',
-        fullDescription: 'Practice specific riffs and songs. Build your repertoire and apply techniques in musical context.',
+    piece_mastery: {
+        id: 'piece_mastery',
+        name: 'Piece Mastery',
+        shortDescription: 'Master songs with looped practice',
+        fullDescription: 'Practice pieces section by section with MP3 playback. Automatic loop expansion builds muscle memory progressively.',
         icon: '🎸',
         emoji: '🎸',
         difficulty: { min: 1, max: 10 },
         estimatedTime: { min: 10, max: 60, recommended: 20 },
-        skills: ['repertoire', 'technique', 'musicality'],
+        skills: ['repertoire', 'technique', 'musicality', 'ear-training'],
         capabilities: {
             supportsFreeplay: true,
             supportsGoals: true,
             supportsRoutines: true,
-            requiresAudio: false,
+            requiresAudio: true,
             hasAutoRecord: true,
             hasLevels: false,
         },

@@ -82,7 +82,7 @@ export type ModuleType =
   | 'rhythm'
   | 'notewalking'
   | 'arpeggio'
-  | 'riff'
+  | 'piece_mastery'
   | 'chord_progressions';
 
 // Module Configurations
@@ -118,10 +118,10 @@ export interface ArpeggioModuleConfig {
   pattern?: 'ascending' | 'descending' | 'alternating';
 }
 
-export interface RiffModuleConfig {
-  module_type: 'riff';
-  repertoire_id: string;
-  target_bpm: number;
+export interface PieceMasteryModuleConfig {
+  module_type: 'piece_mastery';
+  piece_id: string;
+  segment_seconds: number;
 }
 
 export type ModuleConfig =
@@ -130,7 +130,7 @@ export type ModuleConfig =
   | NotewalkingModuleConfig
   | ChordProgressionsModuleConfig
   | ArpeggioModuleConfig
-  | RiffModuleConfig;
+  | PieceMasteryModuleConfig;
 
 // Practice Sessions
 export interface SessionBlock {

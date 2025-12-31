@@ -103,6 +103,21 @@ const Premium = () => {
         } else {
           console.log('[Premium] No premium_until found or profile is null');
         }
+
+        // Check for recent sessions to determine initial tab
+        const { data: sessionsData } = await supabase
+          .from('practice_sessions' as any)
+          .select('id')
+          .eq('user_id', user.id)
+          .not('started_at', 'is', null)
+          .limit(1);
+
+        // If user has sessions, show Start tab; otherwise show Priorities
+        if (sessionsData && sessionsData.length > 0) {
+          setActiveTab("start");
+        } else {
+          setActiveTab("priorities");
+        }
       } else {
         console.log('[Premium] No user, skipping premium check');
       }

@@ -44,11 +44,11 @@ const ProgressGraphs = () => {
 
   return (
     <div>
-      <h2 className="text-xl font-bold mb-4">Progress</h2>
-      {Object.entries(exercises).map(([exerciseName, data]) => (
+      {/* Only show first 2 graphs as a preview */}
+      {Object.entries(exercises).slice(0, 2).map(([exerciseName, data]) => (
         <div key={exerciseName} className="mb-8">
           <h3 className="text-lg font-bold mb-2">{exerciseName}</h3>
-          <ResponsiveContainer width="100%" height={300}>
+          <ResponsiveContainer width="100%" height={250}>
             <LineChart data={data}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="created_at" tickFormatter={(date) => new Date(date).toLocaleDateString()} />
@@ -61,6 +61,11 @@ const ProgressGraphs = () => {
           </ResponsiveContainer>
         </div>
       ))}
+      {Object.keys(exercises).length === 0 && (
+        <div className="text-center text-muted-foreground py-8">
+          <p>No exercise data yet. Start practicing to see your progress!</p>
+        </div>
+      )}
     </div>
   );
 };

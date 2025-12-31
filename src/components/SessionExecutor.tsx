@@ -8,6 +8,7 @@ import type { SessionBlock } from '@/lib/sessionGenerator';
 // Import module components
 import { RhythmTraining } from './RhythmTraining';
 import { ChordProgressionExercise } from './ChordProgressionExercise';
+import { ScalePracticeSession } from './ScalePracticeSession';
 
 /**
  * Session Executor - Takes user through a practice session
@@ -173,21 +174,13 @@ function renderModuleContent(block: SessionBlock, sessionId?: string) {
         case 'scale':
         case 'arpeggio':
             return (
-                <div className="h-full flex items-center justify-center overflow-hidden">
-                    <div className="text-center space-y-4 p-6">
-                        <div className="text-6xl">🎸</div>
-                        <h3 className="text-2xl font-bold">
-                            {block.module_type === 'scale' ? 'Scale Practice' : 'Arpeggio Practice'}
-                        </h3>
-                        <p className="text-muted-foreground">
-                            Module integration coming soon!
-                        </p>
-                        <div className="p-4 bg-muted rounded-lg text-left max-w-md">
-                            <p className="text-sm font-mono">
-                                Config: {JSON.stringify(block.config, null, 2)}
-                            </p>
-                        </div>
-                    </div>
+                <div className="h-full flex flex-col overflow-hidden">
+                    <ScalePracticeSession
+                        autoStart={true}
+                        sessionId={sessionId}
+                        moduleType={block.module_type as 'scale' | 'arpeggio'}
+                        specificExerciseId={(block.config as any)?.exercise_id}
+                    />
                 </div>
             );
 

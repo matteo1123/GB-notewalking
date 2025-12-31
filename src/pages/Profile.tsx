@@ -291,15 +291,45 @@ const Profile = () => {
         </TabsContent>
         <TabsContent value="history">
           <div className="space-y-8">
-            <ProgressGraphs />
+            {/* Practice Log Section - First */}
             <div>
-              <h2 className="text-2xl font-bold mb-4">Practice Log</h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-2xl font-bold">Practice Log</h2>
+                {/* Module Filter Dropdown */}
+                <div className="flex items-center gap-2">
+                  <label htmlFor="module-filter" className="text-sm text-muted-foreground">
+                    Filter by:
+                  </label>
+                  <select
+                    id="module-filter"
+                    className="px-3 py-2 border rounded-md bg-background text-sm"
+                    onChange={(e) => {
+                      const filter = e.target.value;
+                      const rows = document.querySelectorAll('[data-module-type]');
+                      rows.forEach((row) => {
+                        const el = row as HTMLElement;
+                        if (filter === 'all' || el.dataset.moduleType === filter) {
+                          el.style.display = '';
+                        } else {
+                          el.style.display = 'none';
+                        }
+                      });
+                    }}
+                  >
+                    <option value="all">All Modules</option>
+                    {/* Get unique module types from practiceLog */}
+                    {[...new Set(practiceLog.map(log => log.module_type).filter(Boolean))].map(type => (
+                      <option key={type} value={type || ''}>
+                        {type ? type.charAt(0).toUpperCase() + type.slice(1) : 'Unknown'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Exercise</TableHead>
-                    <TableHead>Duration (minutes)</TableHead>
-                    <TableHead>Max BPM</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead>Recording</TableHead>
                   </TableRow>
@@ -311,24 +341,17 @@ const Profile = () => {
                       ? `${log.module_type.charAt(0).toUpperCase() + log.module_type.slice(1)} Practice`
                       : log.exercise_category || 'Unknown';
 
-                    // For module-based entries, show module config details
-                    const moduleDetails = log.module_config
-                      ? ` (${Object.entries(log.module_config).map(([k, v]) => `${k}: ${v}`).join(', ')})`
-                      : '';
-
                     return (
-                      <TableRow key={log.id}>
+                      <TableRow key={log.id} data-module-type={log.module_type || ''}>
                         <TableCell>
-                          <Link to={`/premium?exerciseId=${log.scale_id}`} className="hover:underline">
-                            {displayName}{moduleDetails}
-                          </Link>
+                          <span className="font-medium">{displayName}</span>
                         </TableCell>
-                        <TableCell>{Math.round(log.duration / 60)}</TableCell>
-                        <TableCell>{log.max_bpm || '-'}</TableCell>
                         <TableCell>{new Date(log.created_at).toLocaleDateString()}</TableCell>
                         <TableCell>
-                          {log.audio && (
-                            <audio controls src={log.audio} />
+                          {log.audio ? (
+                            <audio controls src={log.audio} className="h-8" />
+                          ) : (
+                            <span className="text-muted-foreground text-sm">No recording</span>
                           )}
                         </TableCell>
                       </TableRow>
@@ -336,6 +359,15 @@ const Profile = () => {
                   })}
                 </TableBody>
               </Table>
+            </div>
+
+            {/* Progress Graphs Section - Second (simplified) */}
+            <div>
+              <h2 className="text-2xl font-bold mb-4">Progress Over Time</h2>
+              <p className="text-sm text-muted-foreground mb-4">
+                More detailed progress analytics coming soon!
+              </p>
+              <ProgressGraphs />
             </div>
           </div>
         </TabsContent>

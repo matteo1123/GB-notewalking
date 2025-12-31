@@ -9,7 +9,17 @@ import { Play, Clock, Target, Zap, History, Pencil } from 'lucide-react';
 import { useToast } from './ui/use-toast';
 import { generatePracticeSession, formatSessionSummary, type SessionBlock } from '@/lib/sessionGenerator';
 import type { UserPriority } from '@/types/priorities';
-import { SessionExecutor, SessionComplete } from './SessionExecutor';
+import { SessionExecutor } from './SessionExecutor';
+import { SessionWrapUp } from './SessionWrapUp';
+
+// Interface for recordings fetched after session
+interface SessionRecording {
+    id: number;
+    audio: string;
+    module_type: string;
+    duration: number;
+    created_at: string;
+}
 
 // Session plan structure with optional name
 interface SessionPlanData {
@@ -41,6 +51,8 @@ export function PressStart() {
     const [sessionComplete, setSessionComplete] = useState(false);
     const [loading, setLoading] = useState(true);
     const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+    const [sessionRecordings, setSessionRecordings] = useState<SessionRecording[]>([]);
+    const [completedBlocks, setCompletedBlocks] = useState<SessionBlock[]>([]);
 
     const durationOptions = [15, 20, 30, 45, 60];
 
@@ -176,12 +188,27 @@ export function PressStart() {
 
     const handleSessionComplete = async () => {
         setIsExecuting(false);
-        setSessionComplete(true);
 
-        toast({
-            title: 'Session complete!',
-            description: 'Great work! Your progress has been saved.',
-        });
+        // Save the completed blocks for the wrap-up screen
+        if (sessionPlan) {
+            setCompletedBlocks(sessionPlan.blocks);
+        }
+
+        // Fetch recordings for this session
+        if (currentSessionId) {
+            const { data: recordings } = await supabase
+                .from('practice_log' as any)
+                .select('id, audio, module_type, duration, created_at')
+                .eq('session_id', currentSessionId)
+                .not('audio', 'is', null)
+                .order('created_at', { ascending: true });
+
+            if (recordings && Array.isArray(recordings)) {
+                setSessionRecordings(recordings as unknown as SessionRecording[]);
+            }
+        }
+
+        setSessionComplete(true);
 
         // Reload recent sessions
         await loadRecentSessions();
@@ -192,7 +219,9 @@ export function PressStart() {
         setSessionName('');
         setIsExecuting(false);
         setSessionComplete(false);
-        setCurrentSessionId(null); // Clear session ID on restart
+        setCurrentSessionId(null);
+        setSessionRecordings([]);
+        setCompletedBlocks([]);
     };
 
     const handleUseRecentSession = (session: SavedSession) => {
@@ -252,9 +281,16 @@ export function PressStart() {
         );
     }
 
-    // Show completion screen
+    // Show completion screen with wrap-up
     if (sessionComplete) {
-        return <SessionComplete onRestart={handleRestart} />;
+        return (
+            <SessionWrapUp
+                sessionBlocks={completedBlocks}
+                recordings={sessionRecordings}
+                totalDurationMinutes={selectedDuration}
+                onRestart={handleRestart}
+            />
+        );
     }
 
     if (loading) {

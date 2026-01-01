@@ -19,7 +19,7 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
 // Updated Stripe Price ID
-const STRIPE_PRICE_ID = "price_1SjudUEOnRZP4MxPsBbk5KIS";
+const STRIPE_PRICE_ID = "price_1SknWkEOnRZP4MxPtX889sCh";
 
 const Premium = () => {
   const { user } = useAuth();

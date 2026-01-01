@@ -189,13 +189,13 @@ const Premium = () => {
     };
   }, [user?.id]);
 
-  // Redirect effect
-  useEffect(() => {
-    if (!checkingPremium && user && !isPremium) {
-      toast.error("Premium subscription expired or invalid.");
-      navigate("/");
-    }
-  }, [checkingPremium, user, isPremium, navigate]);
+  // Redirect effect - REMOVED so users can see the Paywall/Upgrade button
+  // useEffect(() => {
+  //   if (!checkingPremium && user && !isPremium) {
+  //     toast.error("Premium subscription expired or invalid.");
+  //     navigate("/");
+  //   }
+  // }, [checkingPremium, user, isPremium, navigate]);
 
   const handleSubscribe = async () => {
     try {
@@ -266,8 +266,19 @@ const Premium = () => {
     setSelectedLessonExercise(null);
   };
 
-  if (!user) {
-    return <Paywall />;
+  // Determine what to render based on premium status
+  if (loading || checkingPremium) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="w-8 h-8 animate-spin" />
+      </div>
+    );
+  }
+
+  // If not logged in, OR (logged in but Not Premium), show paywall
+  // We pass handleSubscribe ONLY if user is logged in
+  if (!user || (!isPremium && user)) {
+    return <Paywall onSubscribe={user ? handleSubscribe : undefined} isLoading={isSubscribing} />;
   }
 
   if (selectedRiff) {

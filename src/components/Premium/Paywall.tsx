@@ -2,12 +2,17 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Music, Star, Zap, LogIn } from 'lucide-react';
+import { Music, Star, Zap, LogIn, CreditCard, Loader2 } from 'lucide-react';
 
-const Paywall = () => {
+interface PaywallProps {
+  onSubscribe?: () => void;
+  isLoading?: boolean;
+}
+
+const Paywall = ({ onSubscribe, isLoading }: PaywallProps) => {
   return (
-    <div className="min-h-screen bg-background p-4">
-      <div className="max-w-4xl mx-auto space-y-8">
+    <div className="min-h-screen bg-background p-4 flex flex-col items-center justify-center">
+      <div className="max-w-4xl mx-auto space-y-8 w-full">
         <div className="text-center space-y-6">
           <div className="space-y-4">
             <h2 className="text-4xl font-bold text-foreground">
@@ -22,7 +27,7 @@ const Paywall = () => {
 
           {/* Features */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 my-12">
-            <Card className="text-center">
+            <Card className="text-center h-full hover:shadow-lg transition-shadow">
               <CardHeader>
                 <Music className="h-12 w-12 text-primary mx-auto mb-4" />
                 <CardTitle>Repertoire Library</CardTitle>
@@ -35,7 +40,7 @@ const Paywall = () => {
               </CardContent>
             </Card>
 
-            <Card className="text-center">
+            <Card className="text-center h-full hover:shadow-lg transition-shadow">
               <CardHeader>
                 <Zap className="h-12 w-12 text-primary mx-auto mb-4" />
                 <CardTitle>Smart Practice Sessions</CardTitle>
@@ -48,7 +53,7 @@ const Paywall = () => {
               </CardContent>
             </Card>
 
-            <Card className="text-center">
+            <Card className="text-center h-full hover:shadow-lg transition-shadow">
               <CardHeader>
                 <Star className="h-12 w-12 text-primary mx-auto mb-4" />
                 <CardTitle>Progress Tracking</CardTitle>
@@ -63,18 +68,31 @@ const Paywall = () => {
           </div>
 
           {/* CTA */}
-          <div className="space-y-4">
-            <Link to="/auth">
+          <div className="space-y-4 pt-4">
+            {onSubscribe ? (
               <Button
                 size="lg"
-                className="text-lg px-8 py-6 flex items-center gap-2"
+                className="text-lg px-8 py-6 w-full md:w-auto min-w-[300px] bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-xl hover:scale-105 transition-transform"
+                onClick={onSubscribe}
+                disabled={isLoading}
               >
-                <LogIn className="h-5 w-5" />
-                Sign In to Access Premium Features
+                {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <CreditCard className="mr-2 h-5 w-5" />}
+                Upgrade to Premium ($9.99/mo)
               </Button>
-            </Link>
-            <p className="text-sm text-muted-foreground">
-              Create an account to access premium guitar training tools
+            ) : (
+              <Link to="/auth">
+                <Button
+                  size="lg"
+                  className="text-lg px-8 py-6 w-full md:w-auto min-w-[300px] flex items-center justify-center gap-2"
+                >
+                  <LogIn className="h-5 w-5" />
+                  Sign In to Access Premium Features
+                </Button>
+              </Link>
+            )}
+
+            <p className="text-sm text-muted-foreground mt-4">
+              {onSubscribe ? "Secure checkout powered by Stripe. Cancel anytime." : "Create an account to access premium guitar training tools"}
             </p>
           </div>
         </div>

@@ -13,6 +13,8 @@ serve(async (req) => {
     }
 
     try {
+        console.log("Function called. Method:", req.method);
+
         // 1. Authenticate user
         const authHeader = req.headers.get("Authorization");
         if (!authHeader) {
@@ -33,10 +35,37 @@ serve(async (req) => {
             throw new Error("User not authenticated");
         }
 
+        console.log("User authenticated:", user.id);
+
         // 2. Get Request Body (Price ID)
-        const { priceId } = await req.json();
+        let priceId;
+        try {
+            const body = await req.json();
+            console.log("Request body received:", body);
+            priceId = body.priceId;
+        } catch (e) {
+            console.error("Failed to parse request body:", e);
+            throw new Error("Invalid JSON body");
+        }
+
         if (!priceId) {
+            console.error("Missing Price ID in body");
             throw new Error("Missing Price ID");
+        }
+
+        console.log("Price ID:", priceId);
+
+        // Check Stripe Key
+        const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
+        if (!stripeKey) {
+            console.error("STRIPE_SECRET_KEY is missing in environment variables");
+            throw new Error("Server misconfiguration: Stripe key missing");
+        }
+
+        console.log("Using Frontend URL:", frontendUrl);
+        if (!frontendUrl || !frontendUrl.startsWith("http")) {
+            console.error("FRONTEND_URL is invalid or missing:", frontendUrl);
+            throw new Error("Server misconfiguration: Invalid FRONTEND_URL");
         }
 
         // 3. Get or Create Stripe Customer
@@ -48,8 +77,10 @@ serve(async (req) => {
             .single();
 
         let customerId = profile?.stripe_customer_id;
+        console.log("Existing Customer ID:", customerId);
 
         if (!customerId) {
+            console.log("Creating new Stripe customer...");
             const customer = await stripe.customers.create({
                 email: user.email,
                 metadata: {
@@ -57,6 +88,7 @@ serve(async (req) => {
                 },
             });
             customerId = customer.id;
+            console.log("Created Customer ID:", customerId);
 
             // Save customer ID to profile
             await supabase
@@ -66,6 +98,7 @@ serve(async (req) => {
         }
 
         // 4. Create Checkout Session
+        console.log("Creating Checkout Session...");
         const session = await stripe.checkout.sessions.create({
             customer: customerId,
             line_items: [
@@ -79,6 +112,8 @@ serve(async (req) => {
             cancel_url: `${frontendUrl}/premium?canceled=true`,
         });
 
+        console.log("Session created:", session.id);
+
         return new Response(
             JSON.stringify({ url: session.url }),
             {
@@ -87,6 +122,7 @@ serve(async (req) => {
             }
         );
     } catch (error) {
+        console.error("Error in prepare-checkout-session:", error);
         return new Response(JSON.stringify({ error: error.message }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
             status: 400,

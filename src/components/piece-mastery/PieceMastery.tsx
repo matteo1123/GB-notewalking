@@ -3,10 +3,12 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { Play, Pause, ChevronLeft, ChevronRight, RotateCcw, ArrowLeft, Mic, Volume2, Music } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Play, Pause, ChevronLeft, ChevronRight, RotateCcw, ArrowLeft, Mic, Volume2, Music, Settings2, PlusCircle, Save } from "lucide-react";
 import { usePieceMastery, PracticePhase } from "@/hooks/usePieceMastery";
 import { Piece } from "./types";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 
 interface PieceMasteryProps {
     piece: Piece;
@@ -15,17 +17,19 @@ interface PieceMasteryProps {
 
 export function PieceMastery({ piece, onBack }: PieceMasteryProps) {
     const [autoAdvance, setAutoAdvance] = useState(false);
+    const [notes, setNotes] = useState(piece.notes || "");
+    const { toast } = useToast();
 
     const { state, controls } = usePieceMastery({
         audioUrl: piece.audio_url,
         segmentSeconds: piece.segment_seconds || 5,
         onLoopComplete: (blockIndex, loopCount) => {
             // Optional: Auto-advance logic
-            // e.g., if (autoAdvance && loopCount >= 3) controls.nextBlock();
+            if (autoAdvance && loopCount >= 3) controls.nextBlock();
         }
     });
 
-    const { phase, isPlaying, currentBlockIndex, loopRange, currentTime, duration, loopCount } = state;
+    const { phase, isPlaying, currentBlockIndex, loopRange, currentTime, duration, loopCount, offset, segmentSeconds } = state;
 
     // Calculate progress percentages for visualization
     const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
@@ -59,6 +63,29 @@ export function PieceMastery({ piece, onBack }: PieceMasteryProps) {
         }
     };
 
+    // Handle Note Appending
+    const handleAddTimestampedNote = () => {
+        const timestamp = formatTime(currentTime);
+        const blockLabel = `Block ${currentBlockIndex + 1}`;
+        const newNoteLine = `\n[${blockLabel} - ${timestamp}] `;
+        setNotes(prev => prev + newNoteLine);
+        toast({ title: "Timestamp added to notes" });
+    };
+
+    // Handle Range Slider Change
+    // value[0] = offset (start)
+    // value[1] = offset + segmentSeconds (end)
+    const handleRangeChange = (values: number[]) => {
+        if (values.length === 2) {
+            const [newStart, newEnd] = values;
+            controls.setOffset(newStart);
+
+            // Ensure minimum duration prevents 0-length loops
+            const newDuration = Math.max(1, newEnd - newStart);
+            controls.setSegmentSeconds(newDuration);
+        }
+    };
+
     return (
         <div className="flex flex-col h-full max-h-screen">
             {/* Header */}
@@ -74,7 +101,10 @@ export function PieceMastery({ piece, onBack }: PieceMasteryProps) {
                     </p>
                 </div>
                 <div className="ml-auto flex items-center gap-2">
-                    {/* Settings or Auto-advance toggle could go here */}
+                    <Button variant={autoAdvance ? "secondary" : "ghost"} size="sm" onClick={() => setAutoAdvance(!autoAdvance)} className="gap-2">
+                        <RotateCcw className="w-4 h-4" />
+                        Auto-Advance: {autoAdvance ? 'ON' : 'OFF'}
+                    </Button>
                 </div>
             </div>
 
@@ -100,17 +130,27 @@ export function PieceMastery({ piece, onBack }: PieceMasteryProps) {
                     </div>
 
                     {/* Timeline Bar */}
-                    <div className="w-full max-w-2xl space-y-2">
-                        <div className="flex justify-between text-xs text-muted-foreground px-1">
-                            <span>{formatTimeMinutes(loopRange.start)}</span>
-                            <span>{formatTimeMinutes(loopRange.end)}</span>
+                    <div className="w-full max-w-2xl space-y-6">
+                        {/* Combined Offset & Size Slider */}
+                        <div className="space-y-2">
+                            <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                                <span className="flex items-center gap-1"><Settings2 className="w-3 h-3" /> Loop Region</span>
+                                <span>Start: {formatTime(offset)} • Size: {segmentSeconds}s</span>
+                            </div>
+                            <Slider
+                                value={[offset, offset + segmentSeconds]}
+                                min={0}
+                                max={duration || 100} // Fallback if duration 0
+                                step={1}
+                                minStepsBetweenThumbs={1}
+                                onValueChange={handleRangeChange}
+                                className="py-2"
+                            />
                         </div>
 
-                        {/* Progress Container */}
-                        <div className="relative h-12 bg-secondary rounded-lg overflow-hidden border cursor-pointer group">
-                            {/* Full Track context bar (thin line) */}
-
-                            {/* Loop Range Highlight (background of active area) */}
+                        {/* Progress Container (Static Visualization) */}
+                        <div className="relative h-12 bg-secondary rounded-lg overflow-hidden border">
+                            {/* Loop Range Highlight */}
                             <div
                                 className="absolute h-full bg-primary/10 border-x-2 border-primary/30"
                                 style={{ left: `${loopStartPercent}%`, width: `${loopWidthPercent}%` }}
@@ -122,15 +162,9 @@ export function PieceMastery({ piece, onBack }: PieceMasteryProps) {
                                 style={{ left: `${progressPercent}%` }}
                             />
 
-                            {/* Block Markers Visual (conceptual) */}
-                            <div className="absolute bottom-0 w-full h-1 flex opacity-20">
-                                {/* Could render tick marks */}
-                            </div>
-                        </div>
-
-                        <div className="flex justify-between text-xs text-muted-foreground">
-                            <span>0:00</span>
-                            <span>{formatTimeMinutes(duration)}</span>
+                            {/* Time Labels */}
+                            <span className="absolute bottom-1 left-2 text-[10px] text-muted-foreground">0:00</span>
+                            <span className="absolute bottom-1 right-2 text-[10px] text-muted-foreground">{formatTime(duration)}</span>
                         </div>
                     </div>
 
@@ -161,15 +195,27 @@ export function PieceMastery({ piece, onBack }: PieceMasteryProps) {
                 </div>
 
                 {/* Right: Notes Panel */}
-                <div className="md:w-96 border-l bg-card p-6 overflow-y-auto">
-                    <h3 className="font-semibold mb-4 flex items-center gap-2">
-                        <Music className="w-4 h-4" /> Notes & Chords
-                    </h3>
-                    <Card className="p-4 bg-muted/30 min-h-[50%] whitespace-pre-wrap font-mono text-sm leading-relaxed">
-                        {piece.notes || "No notes added for this piece."}
-                    </Card>
+                <div className="md:w-96 border-l bg-card flex flex-col h-full">
+                    <div className="p-4 border-b bg-muted/20 flex justify-between items-center">
+                        <h3 className="font-semibold flex items-center gap-2">
+                            <Music className="w-4 h-4" /> Notes & Chords
+                        </h3>
+                        <Button size="sm" variant="outline" onClick={handleAddTimestampedNote} title="Add timestamped note">
+                            <PlusCircle className="w-4 h-4 mr-2" /> Add Note
+                        </Button>
+                    </div>
 
-                    {/* Future: Add specific chord diagrams here based on parsed notes */}
+                    <div className="flex-1 p-4 overflow-hidden flex flex-col gap-2">
+                        <Textarea
+                            value={notes}
+                            onChange={(e) => setNotes(e.target.value)}
+                            className="flex-1 font-mono text-sm leading-relaxed resize-none bg-background/50"
+                            placeholder="Add your tabs, chords, or notes here..."
+                        />
+                        <Button className="w-full" disabled={notes === piece.notes}>
+                            <Save className="w-4 h-4 mr-2" /> Save Notes
+                        </Button>
+                    </div>
                 </div>
 
             </div>
@@ -182,4 +228,10 @@ function formatTimeMinutes(seconds: number) {
     const s = Math.floor(seconds % 60);
     const ms = Math.floor((seconds % 1) * 10);
     return `${m}:${s.toString().padStart(2, '0')}.${ms}`;
+}
+
+function formatTime(seconds: number) {
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m}:${s.toString().padStart(2, '0')}`;
 }

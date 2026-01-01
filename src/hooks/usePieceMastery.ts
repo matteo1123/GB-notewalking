@@ -20,8 +20,8 @@ interface LoopRange {
 
 // Binary-tree block expansion algorithm
 // Pattern: A, B, AB, C, D, CD, ABCD...
-export function getBlockRange(index: number, segmentSeconds: number): LoopRange {
-    const width = segmentSeconds;
+export function getBlockRange(index: number, segmentSeconds: number, offset: number = 0): LoopRange {
+    const width = Number(segmentSeconds); // Ensure number
     let currentIndex = 0;
 
     // Recursive search for the Nth node in post-order traversal
@@ -62,7 +62,8 @@ export function getBlockRange(index: number, segmentSeconds: number): LoopRange 
     }
 
     // Start heavily enough to cover realistic usage (h=10 ~ 1.4 hours)
-    return findRangeAt(10, 0) || { start: 0, end: segmentSeconds, label: "Start" };
+    // Apply offset to the root start time
+    return findRangeAt(10, offset) || { start: offset, end: offset + width, label: "Start" };
 }
 
 function formatTime(seconds: number) {
@@ -73,7 +74,7 @@ function formatTime(seconds: number) {
 
 export function usePieceMastery({
     audioUrl,
-    segmentSeconds = 5,
+    segmentSeconds: initialSegmentSeconds = 5,
     initialBlockIndex = 0,
     onProgress,
     onLoopComplete
@@ -85,19 +86,28 @@ export function usePieceMastery({
     const playbackRef = useRef<HTMLAudioElement | null>(null);
     const loopTimeoutRef = useRef<number | null>(null);
     const phaseStartTimeRef = useRef<number>(0);
+    const phaseRef = useRef<PracticePhase>('idle'); // Tracking ref for closure safety
 
     // State
-    const [phase, setPhase] = useState<PracticePhase>('idle');
+    const [phase, setPhaseState] = useState<PracticePhase>('idle');
     const [currentBlockIndex, setCurrentBlockIndex] = useState(initialBlockIndex);
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
     const [playbackUrl, setPlaybackUrl] = useState<string | null>(null);
     const [loopCount, setLoopCount] = useState(0);
+    const [offset, setOffset] = useState(0);
+    const [segmentSeconds, setSegmentSeconds] = useState(Number(initialSegmentSeconds));
+
+    // Sync state to ref
+    const setPhase = (p: PracticePhase) => {
+        phaseRef.current = p;
+        setPhaseState(p);
+    }
 
     // Derived
     const loopRange = useMemo(() =>
-        getBlockRange(currentBlockIndex, segmentSeconds),
-        [currentBlockIndex, segmentSeconds]
+        getBlockRange(currentBlockIndex, segmentSeconds, offset),
+        [currentBlockIndex, segmentSeconds, offset]
     );
 
     // Hooks
@@ -125,6 +135,10 @@ export function usePieceMastery({
 
     // Phase Transition Logic
     const transitionPhase = useCallback(async () => {
+        // Use REF to get current phase to avoid stale closure issues in setTimeout
+        const currentPhase = phaseRef.current;
+
+        // Map flow
         const nextPhaseMap: Record<PracticePhase, PracticePhase> = {
             'idle': 'piece',
             'piece': 'user',
@@ -132,25 +146,23 @@ export function usePieceMastery({
             'playback': 'piece'
         };
 
-        const nextPhase = nextPhaseMap[phase];
+        const nextPhase = nextPhaseMap[currentPhase];
         const duration = loopRange.end - loopRange.start;
 
         // Cleanup previous phase
-        if (phase === 'piece') {
+        if (currentPhase === 'piece') {
             audioRef.current?.pause();
-        } else if (phase === 'user') {
+        } else if (currentPhase === 'user') {
             stopRecording();
-            // recorderState.audioBlob update is handled by effect below
-        } else if (phase === 'playback') {
+        } else if (currentPhase === 'playback') {
             playbackRef.current?.pause();
-            // Cycle complete, increment loop count
             setLoopCount(c => c + 1);
         }
 
         setPhase(nextPhase);
         phaseStartTimeRef.current = Date.now();
 
-        // Start next phase
+        // Start next phase Actions
         if (nextPhase === 'piece') {
             if (audioRef.current) {
                 audioRef.current.currentTime = loopRange.start;
@@ -168,13 +180,14 @@ export function usePieceMastery({
                 scheduleTransition(duration * 1000);
             } catch (e) {
                 console.error("Recording failed", e);
-                toast({ title: "Recording failed", variant: "destructive" });
+                // Toast removed to avoid annoyance if mic is just blocked
+                // toast({ title: "Recording failed", variant: "destructive" });
                 setIsPlaying(false);
             }
         }
-        // 'playback' phase is started by the effect watching `recorderState.audioBlob`
+        // 'playback' phase is handled by effect
 
-    }, [phase, loopRange, startRecording, stopRecording, toast]);
+    }, [loopRange, startRecording, stopRecording, toast]);
 
     const scheduleTransition = (ms: number) => {
         if (loopTimeoutRef.current) clearTimeout(loopTimeoutRef.current);
@@ -218,7 +231,7 @@ export function usePieceMastery({
 
     const startPractice = () => {
         setIsPlaying(true);
-        setPhase('piece'); // Always start with piece
+        setPhase('piece');
         if (audioRef.current) {
             audioRef.current.currentTime = loopRange.start;
             const duration = loopRange.end - loopRange.start;
@@ -256,12 +269,14 @@ export function usePieceMastery({
     useEffect(() => {
         let raf: number;
         const updateTime = () => {
-            if (phase === 'piece' && audioRef.current) {
+            const currentPhase = phaseRef.current;
+
+            if (currentPhase === 'piece' && audioRef.current) {
                 setCurrentTime(audioRef.current.currentTime);
-            } else if (phase === 'user') {
+            } else if (currentPhase === 'user') {
                 const elapsed = (Date.now() - phaseStartTimeRef.current) / 1000;
                 setCurrentTime(loopRange.start + elapsed);
-            } else if (phase === 'playback' && playbackRef.current) {
+            } else if (currentPhase === 'playback' && playbackRef.current) {
                 setCurrentTime(loopRange.start + playbackRef.current.currentTime);
             }
             raf = requestAnimationFrame(updateTime);
@@ -282,13 +297,17 @@ export function usePieceMastery({
             currentTime,
             duration: audioRef.current?.duration || 0,
             loopCount,
-            audioRef
+            audioRef,
+            offset,
+            segmentSeconds
         },
         controls: {
             togglePlay,
             nextBlock,
             prevBlock,
-            setBlock
+            setBlock,
+            setOffset,
+            setSegmentSeconds
         }
     };
 }

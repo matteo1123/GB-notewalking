@@ -54,14 +54,87 @@ export function PressStart() {
     const [sessionRecordings, setSessionRecordings] = useState<SessionRecording[]>([]);
     const [completedBlocks, setCompletedBlocks] = useState<SessionBlock[]>([]);
 
+    const [warmupCandidates, setWarmupCandidates] = useState<{ id: string; name: string; type: 'scale' | 'arpeggio' }[]>([]);
+
     const durationOptions = [15, 20, 30, 45, 60];
 
     useEffect(() => {
         if (user) {
             loadPriorities();
             loadRecentSessions();
+            loadWarmupSuggestions();
         }
     }, [user]);
+
+    const loadWarmupSuggestions = async () => {
+        if (!user) return;
+
+        // Strategy 1: Last 2 practiced scales
+        const { data: recentLogs } = await supabase
+            .from('practice_log' as any)
+            .select(`
+                scale_id,
+                created_at,
+                scales!inner (
+                    id,
+                    name,
+                    Type
+                )
+            `)
+            .eq('user_id', user.id)
+            .not('scale_id', 'is', null)
+            .order('created_at', { ascending: false })
+            .limit(20); // Fetch more to deduplicate
+
+        const uniqueScales = new Map();
+        if (recentLogs) {
+            recentLogs.forEach((log: any) => {
+                const scale = log.scales;
+                if (scale && !uniqueScales.has(scale.id)) {
+                    uniqueScales.set(scale.id, {
+                        id: scale.id,
+                        name: scale.name,
+                        type: scale.Type === 'arpeggio' ? 'arpeggio' : 'scale'
+                    });
+                }
+            });
+        }
+
+        let candidates = Array.from(uniqueScales.values()).slice(0, 2);
+
+        // Strategy 2: If < 2 found, get oldest by scale_shape
+        if (candidates.length < 2) {
+            const { data: oldestScales } = await supabase
+                .from('scales')
+                .select(`
+                    id,
+                    name,
+                    Type,
+                    scale_shapes!inner (
+                        created_at
+                    )
+                `)
+                .order('created_at', { foreignTable: 'scale_shapes', ascending: true })
+                .limit(20); // Fetch a batch to find ones we don't have
+
+            if (oldestScales) {
+                for (const scale of oldestScales) {
+                    if (candidates.length >= 2) break;
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    if (!candidates.find(c => c.id === scale.id)) {
+                        candidates.push({
+                            id: scale.id,
+                            name: scale.name,
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            type: (scale as any).Type === 'arpeggio' ? 'arpeggio' : 'scale'
+                        });
+                    }
+                }
+            }
+        }
+
+        setWarmupCandidates(candidates as any);
+    };
 
     const loadPriorities = async () => {
         if (!user) return;
@@ -130,6 +203,7 @@ export function PressStart() {
                 userId: user.id,
                 priorities,
                 durationMinutes: selectedDuration,
+                warmupExercises: warmupCandidates,
             });
 
             // Create session plan with name

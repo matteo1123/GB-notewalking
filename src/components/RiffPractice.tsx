@@ -7,6 +7,8 @@ import { useBpmControls } from "@/hooks/useBpmControls";
 import NoteDisplay from "./NoteDisplay";
 import { BeatVisualizer } from "./BeatVisualizer";
 import { MetronomeControls, MetronomeMode } from "./MetronomeControls";
+
+
 import ExerciseHierarchy from "./ExerciseHierarchy";
 import { Button } from "./ui/button";
 import { Progress } from "./ui/progress";
@@ -151,8 +153,8 @@ const RiffPractice = ({
   }, [autoStart]);
 
   const availableSequences = useMemo(() => {
-    const itemType = repertoireItem.Type;
-    return sequences.filter((s) => s.Type === itemType);
+    const itemType = repertoireItem.Type?.toLowerCase();
+    return sequences.filter((s) => s.Type?.toLowerCase() === itemType);
   }, [sequences, repertoireItem]);
 
   useEffect(() => {
@@ -260,12 +262,15 @@ const RiffPractice = ({
     setShowSaveDialog(false);
   };
 
+  const [drumBeat, setDrumBeat] = useState(false);
+
   const metronomeSettings: MetronomeSettings = {
     mode,
     startBpm: lessonExercise?.starting_bpm || metronomeBpm,
     endBpm: lessonExercise?.target_bpm || metronomeBpm,
     measures: lessonExercise ? (lessonExercise.increments || 1) * (lessonExercise.measures_per_bpm || 4) : 8,
     measuresPerBpmChange: lessonExercise?.measures_per_bpm || 4,
+    drumBeat,
   };
 
   const metronome = useMetronome({
@@ -305,9 +310,12 @@ const RiffPractice = ({
           }
         }
 
+
+
         if (playContextNote) {
           if (tickCountRef.current % 4 === 0) {
             const note = harmonicContext.replace("#", "s").replace("♭", "b");
+            // Determine octave for context drone - usually lower? Let's stick to 3
             playNote(`${note}3`);
           }
         }
@@ -421,43 +429,57 @@ const RiffPractice = ({
 
   const generateLearnSequence = useCallback(() => {
     const baseNotes = baseExerciseNotes;
+    const chunkSize = 3;
     const chunks = [];
-    for (let i = 0; i < baseNotes.length; i += 5) {
-      chunks.push(baseNotes.slice(i, i + 5));
+    for (let i = 0; i < baseNotes.length; i += chunkSize) {
+      chunks.push(baseNotes.slice(i, i + chunkSize));
     }
 
     const newNotes: Note[] = [];
     const timeline: { label: string | number, startIndex: number, endIndex: number }[] = [];
     let time = 0;
 
-    for (let i = 1; i < chunks.length; i++) {
-      // A: previous chunk
-      const prevChunkStartIndex = newNotes.length;
+    // Handle single chunk case
+    if (chunks.length === 1) {
+      const chunk = chunks[0];
+      const startIndex = newNotes.length;
       for (let r = 0; r < learnRepetitions; r++) {
-        chunks[i - 1].forEach(note => {
+        chunk.forEach(note => {
           newNotes.push({ ...note, time: time++, duration: 1 });
         });
       }
-      timeline.push({ label: "|", startIndex: prevChunkStartIndex, endIndex: newNotes.length - 1 });
+      timeline.push({ label: "1", startIndex, endIndex: newNotes.length - 1 });
+    } else {
+      // Standard linking behavior for multiple chunks
+      for (let i = 1; i < chunks.length; i++) {
+        // A: previous chunk
+        const prevChunkStartIndex = newNotes.length;
+        for (let r = 0; r < learnRepetitions; r++) {
+          chunks[i - 1].forEach(note => {
+            newNotes.push({ ...note, time: time++, duration: 1 });
+          });
+        }
+        timeline.push({ label: `${i}`, startIndex: prevChunkStartIndex, endIndex: newNotes.length - 1 });
 
-      // B: current chunk
-      const currentChunkStartIndex = newNotes.length;
-      for (let r = 0; r < learnRepetitions; r++) {
-        chunks[i].forEach(note => {
-          newNotes.push({ ...note, time: time++, duration: 1 });
-        });
-      }
-      timeline.push({ label: "", startIndex: currentChunkStartIndex, endIndex: newNotes.length - 1 });
+        // B: current chunk
+        const currentChunkStartIndex = newNotes.length;
+        for (let r = 0; r < learnRepetitions; r++) {
+          chunks[i].forEach(note => {
+            newNotes.push({ ...note, time: time++, duration: 1 });
+          });
+        }
+        timeline.push({ label: `${i + 1}`, startIndex: currentChunkStartIndex, endIndex: newNotes.length - 1 });
 
-      // C: combined
-      const combined = [...chunks[i - 1], ...chunks[i]];
-      const combinedStartIndex = newNotes.length;
-      for (let r = 0; r < learnRepetitions; r++) {
-        combined.forEach(note => {
-          newNotes.push({ ...note, time: time++, duration: 1 });
-        });
+        // C: combined
+        const combined = [...chunks[i - 1], ...chunks[i]];
+        const combinedStartIndex = newNotes.length;
+        for (let r = 0; r < learnRepetitions; r++) {
+          combined.forEach(note => {
+            newNotes.push({ ...note, time: time++, duration: 1 });
+          });
+        }
+        timeline.push({ label: `${i}-${i + 1}`, startIndex: combinedStartIndex, endIndex: newNotes.length - 1 });
       }
-      timeline.push({ label: "", startIndex: combinedStartIndex, endIndex: newNotes.length - 1 });
     }
 
     setLearnNotes(newNotes);
@@ -481,8 +503,15 @@ const RiffPractice = ({
   }, [isLearning, learnNotes, baseExerciseNotes]);
 
   useEffect(() => {
-    if (loop && noteIndex >= displayNotes.length - 1) {
-      setNoteIndex(0);
+    if (loop) {
+      if (isLearning) {
+        const currentSection = learnTimeline[currentLearnIndex];
+        if (currentSection && noteIndex >= currentSection.endIndex) {
+          setNoteIndex(currentSection.startIndex);
+        }
+      } else if (noteIndex >= displayNotes.length - 1) {
+        setNoteIndex(0);
+      }
     }
     if (isLearning) {
       const currentSection = learnTimeline.findIndex(
@@ -668,6 +697,7 @@ const RiffPractice = ({
                     setMode(newState.mode);
                     setMetronomeBpm(newState.startBpm);
                     setLoop(newState.loop);
+                    setDrumBeat(!!newState.drumBeat);
                   }}
                   initialState={{
                     mode,
@@ -676,6 +706,7 @@ const RiffPractice = ({
                     increments: lessonExercise?.increments || 8,
                     measuresPerIncrement: lessonExercise?.measures_per_bpm || 4,
                     loop,
+                    drumBeat,
                     progressiveStepBpm:
                       lessonExercise?.progressive_step_bpm || 5,
                   }}
@@ -697,11 +728,18 @@ const RiffPractice = ({
             setLearnRepetitions={setLearnRepetitions}
             setMetronomeBpm={setMetronomeBpm}
             handlePlay={handlePlay}
+            handleStart={() => {
+              if (!metronome.state.isPlaying) {
+                handlePlay();
+              }
+            }}
             learnTimeline={learnTimeline}
             currentLearnIndex={currentLearnIndex}
             setNoteIndex={setNoteIndex}
+            setNoteIndex={setNoteIndex}
             setCurrentLearnIndex={setCurrentLearnIndex}
             scaleShapeNotes={scaleShapeNotes}
+            tickCount={tickCountRef.current}
           />
         </main>
       </div>

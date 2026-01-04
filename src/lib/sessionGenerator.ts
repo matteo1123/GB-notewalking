@@ -35,6 +35,7 @@ export interface GenerateSessionOptions {
     durationMinutes: number;
     includeWarmup?: boolean; // Default true
     warmupPercentage?: number; // Default 10%
+    warmupExercises?: { id: string; name: string; type: 'scale' | 'arpeggio' }[]; // Specific exercises to use
 }
 
 /**
@@ -45,7 +46,7 @@ export function generatePracticeSession(options: GenerateSessionOptions): Sessio
         priorities,
         durationMinutes,
         includeWarmup = true,
-        warmupPercentage = 0.1
+        warmupExercises = []
     } = options;
 
     if (priorities.length === 0) {
@@ -54,32 +55,55 @@ export function generatePracticeSession(options: GenerateSessionOptions): Sessio
 
     const blocks: SessionBlock[] = [];
 
-    // Calculate time allocations
-    const warmupTime = includeWarmup
-        ? Math.max(2, Math.floor(durationMinutes * warmupPercentage))
-        : 0;
+    // 1. Add warm-up blocks
+    // User requested: "2 minutes of 2 exercises" = 4 minutes total if 2 exercises found
+    const warmupDurationPerExercise = 2;
+    let totalWarmupTime = 0;
 
-    const practiceTime = durationMinutes - warmupTime;
+    if (includeWarmup) {
+        if (warmupExercises.length > 0) {
+            // detailed specific warmup
+            warmupExercises.forEach((ex, i) => {
+                blocks.push({
+                    id: `warmup-${i}-${Date.now()}`,
+                    type: 'warmup',
+                    module_type: ex.type,
+                    config: {
+                        module_type: ex.type,
+                        exercise_id: ex.id
+                    },
+                    duration_minutes: warmupDurationPerExercise,
+                    title: `🔥 Warm-up: ${ex.name}`,
+                    description: `Review this ${ex.type} to get your fingers moving.`,
+                });
+                totalWarmupTime += warmupDurationPerExercise;
+            });
+        } else {
+            // Fallback generic warmup (legacy behavior)
+            const genericDuration = Math.max(2, Math.floor(durationMinutes * 0.1));
+            blocks.push(createGenericWarmupBlock(genericDuration, priorities));
+            totalWarmupTime += genericDuration;
+        }
+    }
+
+    // 2. Allocate remaining time to priorities
+    const practiceTime = Math.max(0, durationMinutes - totalWarmupTime);
 
     // Calculate total weight
     const totalWeight = priorities.reduce((sum, p) => sum + p.weight, 0);
 
-    // 1. Add warm-up block (if enabled)
-    if (includeWarmup && warmupTime > 0) {
-        blocks.push(createWarmupBlock(warmupTime, priorities));
-    }
-
-    // 2. Allocate time to each priority
     const priorityBlocks: SessionBlock[] = [];
 
-    for (const priority of priorities) {
-        // Calculate this priority's share of practice time
-        const timeShare = (priority.weight / totalWeight) * practiceTime;
-        const duration = Math.max(2, Math.floor(timeShare)); // Minimum 2 minutes
+    if (practiceTime > 0) {
+        for (const priority of priorities) {
+            // Calculate this priority's share of practice time
+            const timeShare = (priority.weight / totalWeight) * practiceTime;
+            const duration = Math.max(2, Math.floor(timeShare)); // Minimum 2 minutes
 
-        // Create block for this priority
-        const block = createPriorityBlock(priority, duration);
-        priorityBlocks.push(block);
+            // Create block for this priority
+            const block = createPriorityBlock(priority, duration);
+            priorityBlocks.push(block);
+        }
     }
 
     // 3. Shuffle priority blocks (ensures variety, avoids monotony)
@@ -92,10 +116,9 @@ export function generatePracticeSession(options: GenerateSessionOptions): Sessio
 }
 
 /**
- * Create a warm-up block
- * Reviews recently practiced items for muscle memory
+ * Create a generic warm-up block (fallback)
  */
-function createWarmupBlock(
+function createGenericWarmupBlock(
     duration: number,
     priorities: UserPriority[]
 ): SessionBlock {

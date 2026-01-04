@@ -14,6 +14,8 @@ import { PieceList } from './piece-mastery/PieceList';
 import { PieceMastery } from './piece-mastery/PieceMastery';
 import { Piece } from './piece-mastery/types';
 
+import RiffPractice from './RiffPractice';
+
 /**
  * Module Library - Storefront view for all practice modules
  */
@@ -21,12 +23,14 @@ export function ModuleLibrary() {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedSkill, setSelectedSkill] = useState<string | null>(null);
     const [activeModule, setActiveModule] = useState<ModuleType | null>(null);
+    const [selectedExercise, setSelectedExercise] = useState<RepertoireItem | null>(null);
     const [selectedPiece, setSelectedPiece] = useState<Piece | null>(null);
     const [exercises, setExercises] = useState<RepertoireItem[]>([]);
+    const [sequences, setSequences] = useState<any[]>([]);
 
     // Load exercises for scales and arpeggios
     useEffect(() => {
-        async function loadExercises() {
+        async function loadData() {
             const { data: scalesData } = await supabase
                 .from('scales')
                 .select('*')
@@ -45,10 +49,19 @@ export function ModuleLibrary() {
                     major_key: row.major_key,
                     Type: row.Type,
                 }));
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 setExercises(mapped as any);
             }
+
+            const { data: sequencesData } = await supabase
+                .from('sequences')
+                .select('*');
+
+            if (sequencesData) {
+                setSequences(sequencesData);
+            }
         }
-        loadExercises();
+        loadData();
     }, []);
 
     // Available modules with mock progress data
@@ -96,7 +109,14 @@ export function ModuleLibrary() {
     };
 
     const handleCloseModule = () => {
-        setSelectedPiece(null);
+        if (selectedPiece) {
+            setSelectedPiece(null);
+            return;
+        }
+        if (selectedExercise) {
+            setSelectedExercise(null);
+            return;
+        }
         setActiveModule(null);
     };
 
@@ -124,22 +144,42 @@ export function ModuleLibrary() {
                     {activeModule === 'rhythm' && <RhythmTraining />}
                     {activeModule === 'notewalking' && <ChordProgressionExercise />}
                     {activeModule === 'scale' && (
-                        <div className="h-full overflow-y-auto p-4">
-                            <ExerciseList
-                                items={exercises.filter((e) => e.category === "scale")}
-                                defaultSort={{ key: "position", dir: "asc" }}
-                                onSelect={(exercise) => console.log('Selected scale:', exercise)}
-                            />
-                        </div>
+                        selectedExercise ? (
+                            <div className="h-full bg-background">
+                                <RiffPractice
+                                    repertoireItem={selectedExercise}
+                                    sequences={sequences}
+                                    onExerciseSelect={() => { }}
+                                />
+                            </div>
+                        ) : (
+                            <div className="h-full overflow-y-auto p-4">
+                                <ExerciseList
+                                    items={exercises.filter((e) => e.category === "scale")}
+                                    defaultSort={{ key: "position", dir: "asc" }}
+                                    onSelect={setSelectedExercise}
+                                />
+                            </div>
+                        )
                     )}
                     {activeModule === 'arpeggio' && (
-                        <div className="h-full overflow-y-auto p-4">
-                            <ExerciseList
-                                items={exercises.filter((e) => e.category === "arpeggio")}
-                                defaultSort={{ key: "difficulty", dir: "asc" }}
-                                onSelect={(exercise) => console.log('Selected arpeggio:', exercise)}
-                            />
-                        </div>
+                        selectedExercise ? (
+                            <div className="h-full bg-background">
+                                <RiffPractice
+                                    repertoireItem={selectedExercise}
+                                    sequences={sequences}
+                                    onExerciseSelect={() => { }}
+                                />
+                            </div>
+                        ) : (
+                            <div className="h-full overflow-y-auto p-4">
+                                <ExerciseList
+                                    items={exercises.filter((e) => e.category === "arpeggio")}
+                                    defaultSort={{ key: "difficulty", dir: "asc" }}
+                                    onSelect={setSelectedExercise}
+                                />
+                            </div>
+                        )
                     )}
                     {activeModule === 'chord_progressions' && (
                         <div className="flex items-center justify-center h-full">

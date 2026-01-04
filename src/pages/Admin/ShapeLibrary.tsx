@@ -410,7 +410,7 @@ const ShapeLibrary = () => {
         }
 
         const newScale = {
-          name: `${enharmonicallyCorrectRoot} ${sourceShape.Mode}`,
+          name: `${enharmonicallyCorrectRoot} ${sourceShape.name}`,
           intervals: sourceShape.intervals,
           notes: enharmonicNotes,
           notes_json: filteredNotesJson,
@@ -421,7 +421,7 @@ const ShapeLibrary = () => {
           tonality: sourceShape.tonality,
           major_key: majorKey,
           created_by: user?.id,
-          scale_shape_id: sourceShape.id,
+          scale_shape: sourceShape.id,
         };
         newItems.push(newScale);
       }

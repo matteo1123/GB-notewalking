@@ -28,6 +28,7 @@ interface NoteDisplayProps {
   setLearnRepetitions?: (repetitions: number) => void;
   setMetronomeBpm?: (bpm: number) => void;
   handlePlay?: () => void;
+  handleStart?: () => void;
   learnTimeline?: { label: string | number, startIndex: number, endIndex: number }[];
   currentLearnIndex?: number;
   setNoteIndex?: (index: number) => void;
@@ -49,11 +50,13 @@ const NoteDisplay = ({
   setLearnRepetitions,
   setMetronomeBpm,
   handlePlay,
+  handleStart,
   learnTimeline,
   currentLearnIndex,
   setNoteIndex,
   setCurrentLearnIndex,
   scaleShapeNotes,
+  tickCount = 0,
 }: NoteDisplayProps) => {
   const strings = [1, 2, 3, 4, 5, 6]; // High E to Low E
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -336,13 +339,29 @@ const NoteDisplay = ({
                 </>
               )}
             </div>
-            {/* Ear Training always gets all notes, not affected by Single Note Mode or Help Me Learn */}
+            {/* Ear Training always gets all notes, not affected by Single Note Mode or Help Me Learn */
+              /* UPDATE: For Help Me Learn, we ONLY want to show the notes in the current section */
+            }
             <EarTrainingWrapper
-              notes={notes.map((n, idx) => ({ ...n, time: idx }))}
+              notes={
+                isLearning && learnTimeline && learnTimeline[currentLearnIndex]
+                  ? notes.slice(learnTimeline[currentLearnIndex].startIndex, learnTimeline[currentLearnIndex].endIndex + 1).map((n, i) => ({
+                    ...n,
+                    // Remap time so it flows visually if needed? 
+                    // actually Fretboard doesn't use 'time' for static display, 
+                    // but 'time' is used for identifying current note.
+                    // We should keep original note objects essentially, 
+                    // but slice the array so Fretboard only renders these dots.
+                  }))
+                  : notes.map((n, idx) => ({ ...n, time: idx }))
+              }
               major_key={major_key}
               tonalContext={tonalContext}
               displayMode="fretboard"
               scaleShapeNotes={scaleShapeNotes}
+              currentPosition={currentPosition}
+              tickCount={tickCount}
+              onEnsurePlaying={handleStart}
             />
           </>
         )}

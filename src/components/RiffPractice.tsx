@@ -736,7 +736,6 @@ const RiffPractice = ({
             learnTimeline={learnTimeline}
             currentLearnIndex={currentLearnIndex}
             setNoteIndex={setNoteIndex}
-            setNoteIndex={setNoteIndex}
             setCurrentLearnIndex={setCurrentLearnIndex}
             scaleShapeNotes={scaleShapeNotes}
             tickCount={tickCountRef.current}

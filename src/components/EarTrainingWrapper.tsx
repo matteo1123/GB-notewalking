@@ -303,7 +303,7 @@ export function EarTrainingWrapper({
                     <p className="text-center text-lg font-medium text-blue-600">
                         👆 Click the note you just heard on the fretboard!
                     </p>
-                    )}
+
                     {feedbackMessage && (
                         <p className={`text-center text-xl font-bold mt-2 ${feedbackMessage.includes("Correct") ? "text-green-600" : "text-amber-500"}`}>
                             {feedbackMessage}

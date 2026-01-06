@@ -60,30 +60,12 @@ export function EarTrainingWrapper({
             onEnsurePlaying();
         }
 
-        // Loop logic: Trigger playback on Beat 1 (every 4 ticks assuming 4/4)
-        if (earTrainingEnabled && earTrainingSettings.mode === 'identify') {
-            if (tickCount !== lastPlayedTickRef.current) {
-                lastPlayedTickRef.current = tickCount;
-
-                if (tickCount % 4 === 0) {
-                    // If currently asking a question (waiting for click), repeat the target note
-                    if (earTraining.waitingForClick && earTraining.currentPhrase) {
-                        const targetNote = earTraining.currentPhrase.notes[0];
-                        handlePlayNote(targetNote);
-                    } else if (!earTraining.waitingForClick && !earTraining.isPlaying) {
-                        // If not waiting and not playing, start new phrase
-                        earTraining.playCurrentPhrase();
-                    }
-                }
-            }
-        }
-
         return () => {
             if (audioContext) {
                 audioContext.close();
             }
         };
-    }, [earTrainingEnabled, tickCount, onEnsurePlaying, earTrainingSettings.mode, earTraining.isPlaying, earTraining.waitingForClick, earTraining.currentPhrase]);
+    }, [earTrainingEnabled, onEnsurePlaying]);
 
     const simpleNotes = useMemo(() => {
         return notes.map((n) => ({ string: n.string, fret: n.fret }));

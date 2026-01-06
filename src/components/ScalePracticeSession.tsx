@@ -1,128 +1,111 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import RiffPractice from './RiffPractice';
-import { RepertoireItem } from '@/types/repertoire';
 import { Tables } from '@/integrations/supabase/types';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useExerciseQueue, UseExerciseQueueOptions } from '@/hooks/useExerciseQueue';
+import { ScaleModuleConfig, ArpeggioModuleConfig } from '@/types/practice';
 
 interface ScalePracticeSessionProps {
     autoStart?: boolean;
     sessionId?: string;
     moduleType?: 'scale' | 'arpeggio';
-    specificExerciseId?: string; // If provided, use this specific exercise
+    specificExerciseId?: string; // If provided, use this specific exercise (overrides queue)
+    moduleConfig?: ScaleModuleConfig | ArpeggioModuleConfig; // Optional configuration for exercise ordering
+    onConfigChange?: (config: ScaleModuleConfig | ArpeggioModuleConfig) => void; // Callback when navigation changes
 }
 
 /**
- * ScalePracticeSession - Auto-selects and renders scale/arpeggio practice
+ * ScalePracticeSession - Renders scale/arpeggio practice with configurable exercise ordering
  * 
- * Uses a weekly rotation system to keep users focused on one position at a time.
- * Week X → Position (X % 5) + 1
+ * Now supports:
+ * - Priority exercise ordering (specific UUIDs first)
+ * - Type filtering (e.g., "3 Notes Per String")
+ * - Step-through navigation (Previous/Next)
+ * - Fallback ordering by scale_shapes.created_at
  */
 export function ScalePracticeSession({
     autoStart = true,
     sessionId,
     moduleType = 'scale',
-    specificExerciseId
+    specificExerciseId,
+    moduleConfig,
+    onConfigChange,
 }: ScalePracticeSessionProps) {
     const { user } = useAuth();
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [repertoireItem, setRepertoireItem] = useState<RepertoireItem | null>(null);
     const [sequences, setSequences] = useState<Tables<"sequences">[]>([]);
+    const [sequencesLoading, setSequencesLoading] = useState(true);
 
-    // Get current position based on week rotation (1-5)
-    const getCurrentPosition = () => {
-        const now = new Date();
-        const startOfYear = new Date(now.getFullYear(), 0, 1);
-        const weekNumber = Math.floor((now.getTime() - startOfYear.getTime()) / (7 * 24 * 60 * 60 * 1000));
-        return (weekNumber % 5) + 1;
+    // Derive queue options from moduleConfig
+    const queueOptions: UseExerciseQueueOptions = {
+        moduleType,
+        priorityIds: moduleConfig?.module_type === 'scale'
+            ? (moduleConfig as ScaleModuleConfig).priority_scale_ids
+            : moduleConfig?.module_type === 'arpeggio'
+                ? (moduleConfig as ArpeggioModuleConfig).priority_arpeggio_ids
+                : undefined,
+        typeFilter: moduleConfig?.type_filter,
+        orderBy: moduleConfig?.order_by || 'created_at',
+        initialIndex: moduleConfig?.current_index || 0,
     };
 
+    // Use the exercise queue hook
+    const {
+        currentExercise,
+        currentIndex,
+        totalCount,
+        next,
+        previous,
+        loading: queueLoading,
+        error: queueError,
+    } = useExerciseQueue(queueOptions);
+
+    // Load sequences for patterns (independent of queue)
     useEffect(() => {
-        async function loadExercise() {
-            if (!user) {
-                setError('Please log in to practice');
-                setLoading(false);
-                return;
+        async function loadSequences() {
+            const { data: seqData } = await supabase
+                .from('sequences')
+                .select('*');
+
+            if (seqData) {
+                setSequences(seqData);
             }
-
-            try {
-                setLoading(true);
-
-                // Fetch sequences for patterns
-                const { data: seqData } = await supabase
-                    .from('sequences')
-                    .select('*');
-
-                if (seqData) {
-                    setSequences(seqData);
-                }
-
-                let exerciseData: RepertoireItem | null = null;
-
-                // If specific exercise requested, fetch that
-                if (specificExerciseId) {
-                    const { data: scale } = await supabase
-                        .from('scales')
-                        .select('*')
-                        .eq('id', specificExerciseId)
-                        .single();
-
-                    if (scale) {
-                        exerciseData = transformToRepertoireItem(scale, moduleType);
-                    }
-                } else {
-                    // Weekly rotation: fetch a scale from current position
-                    const position = getCurrentPosition();
-
-                    // Fetch scales that match the current position (using position field or fallback)
-                    const { data: scales } = await supabase
-                        .from('scales')
-                        .select('*')
-                        .order('id', { ascending: true });
-
-                    if (scales && scales.length > 0) {
-                        // For now, cycle through scales based on position and day
-                        const dayOfYear = Math.floor(
-                            (new Date().getTime() - new Date(new Date().getFullYear(), 0, 0).getTime()) /
-                            (1000 * 60 * 60 * 24)
-                        );
-                        const scaleIndex = dayOfYear % scales.length;
-                        exerciseData = transformToRepertoireItem(scales[scaleIndex], moduleType);
-                    }
-                }
-
-                if (exerciseData) {
-                    setRepertoireItem(exerciseData);
-                } else {
-                    setError('No scales available. Please add some scales to practice.');
-                }
-            } catch (err) {
-                console.error('Error loading exercise:', err);
-                setError('Failed to load exercise');
-            } finally {
-                setLoading(false);
-            }
+            setSequencesLoading(false);
         }
+        loadSequences();
+    }, []);
 
-        loadExercise();
-    }, [user, specificExerciseId, moduleType]);
+    // Notify parent when navigation changes (to persist state)
+    const handleNext = useCallback(() => {
+        next();
+        if (onConfigChange && moduleConfig) {
+            onConfigChange({
+                ...moduleConfig,
+                current_index: currentIndex + 1,
+            } as ScaleModuleConfig | ArpeggioModuleConfig);
+        }
+    }, [next, onConfigChange, moduleConfig, currentIndex]);
 
-    // Transform database scale to RepertoireItem format
-    function transformToRepertoireItem(scale: any, category: string): RepertoireItem {
-        return {
-            id: scale.id,
-            name: scale.name || 'Unknown Scale',
-            category: category as 'scale' | 'arpeggio',
-            difficulty: scale.difficulty || 1,
-            notes: scale.notes || [],
-            tonic: scale.key || scale.tonic || 'C',
-            tonality: scale.mode || scale.tonality || 'Major',
-            position: scale.position,
-            description: scale.description,
-            created_at: scale.created_at,
-        };
+    const handlePrevious = useCallback(() => {
+        previous();
+        if (onConfigChange && moduleConfig) {
+            onConfigChange({
+                ...moduleConfig,
+                current_index: Math.max(0, currentIndex - 1),
+            } as ScaleModuleConfig | ArpeggioModuleConfig);
+        }
+    }, [previous, onConfigChange, moduleConfig, currentIndex]);
+
+    const loading = queueLoading || sequencesLoading;
+
+    if (!user) {
+        return (
+            <div className="h-full flex items-center justify-center">
+                <p className="text-muted-foreground">Please log in to practice</p>
+            </div>
+        );
     }
 
     if (loading) {
@@ -136,7 +119,7 @@ export function ScalePracticeSession({
         );
     }
 
-    if (error || !repertoireItem) {
+    if (queueError || !currentExercise) {
         return (
             <div className="h-full flex items-center justify-center">
                 <div className="text-center space-y-4 p-6">
@@ -145,10 +128,10 @@ export function ScalePracticeSession({
                         {moduleType === 'scale' ? 'Scale Practice' : 'Arpeggio Practice'}
                     </h3>
                     <p className="text-muted-foreground">
-                        {error || 'Unable to load exercise'}
+                        {queueError || 'No exercises available'}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                        Try adding some scales from the Modules tab first!
+                        Try adding some {moduleType}s from the Modules tab first!
                     </p>
                 </div>
             </div>
@@ -157,12 +140,49 @@ export function ScalePracticeSession({
 
     return (
         <div className="h-full flex flex-col overflow-hidden">
-            <RiffPractice
-                repertoireItem={repertoireItem}
-                sequences={sequences}
-                autoStart={autoStart}
-                isControlledSession={true}
-            />
+            {/* Navigation Header */}
+            <div className="flex items-center justify-between px-4 py-2 border-b bg-muted/30">
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handlePrevious}
+                    disabled={totalCount <= 1}
+                    className="flex items-center gap-1"
+                >
+                    <ChevronLeft className="w-4 h-4" />
+                    Previous
+                </Button>
+
+                <div className="text-center">
+                    <span className="text-sm font-medium">
+                        {currentExercise.name}
+                    </span>
+                    <span className="text-xs text-muted-foreground ml-2">
+                        ({currentIndex + 1} / {totalCount})
+                    </span>
+                </div>
+
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleNext}
+                    disabled={totalCount <= 1}
+                    className="flex items-center gap-1"
+                >
+                    Next
+                    <ChevronRight className="w-4 h-4" />
+                </Button>
+            </div>
+
+            {/* RiffPractice Component */}
+            <div className="flex-1 overflow-hidden">
+                <RiffPractice
+                    repertoireItem={currentExercise}
+                    sequences={sequences}
+                    autoStart={autoStart}
+                    isControlledSession={true}
+                />
+            </div>
         </div>
     );
 }

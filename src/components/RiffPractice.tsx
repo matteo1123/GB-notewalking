@@ -121,6 +121,7 @@ const RiffPractice = ({
   const [tonalContext, setTonalContext] = useState("major");
   const [playContextNote, setPlayContextNote] = useState(false);
   const tickCountRef = useRef(0);
+  const [tickCountState, setTickCountState] = useState(0); // For triggering re-renders in EarTraining
   const [isRecordingArmed, setIsRecordingArmed] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [autoRecord, setAutoRecord] = useState(false);
@@ -278,6 +279,7 @@ const RiffPractice = ({
     onTick: () => {
       if (isPlaying) {
         tickCountRef.current += 1;
+        setTickCountState(tickCountRef.current); // Trigger re-render for ear training
         setNoteIndex((prevIndex) => prevIndex + 1);
 
         if (isRecordingArmed) {
@@ -738,7 +740,7 @@ const RiffPractice = ({
             setNoteIndex={setNoteIndex}
             setCurrentLearnIndex={setCurrentLearnIndex}
             scaleShapeNotes={scaleShapeNotes}
-            tickCount={tickCountRef.current}
+            tickCount={tickCountState}
           />
         </main>
       </div>

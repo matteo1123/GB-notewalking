@@ -23,6 +23,8 @@ export interface RepertoireItem {
   major_key?: string;
   created_at?: string;
   updated_at?: string;
+  scale_shape?: string; // UUID reference to scale_shapes table
+  scale_shape_created_at?: string; // For queue ordering by scale_shape creation date
 }
 
 export interface PracticeSession {

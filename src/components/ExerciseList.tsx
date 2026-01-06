@@ -13,13 +13,11 @@ import {
 
 type SortKey =
   | "name"
-  | "difficulty"
+  | "Type"
   | "tonic"
   | "tonality"
-  | "position"
-  | "notes_per_beat"
-  | "created_at"
-  | "updated_at";
+  | "major_key"
+  | "position";
 type SortDir = "asc" | "desc";
 
 interface ExerciseListProps {
@@ -40,7 +38,7 @@ function compareValues(a: any, b: any) {
 
 export function ExerciseList({
   items,
-  defaultSort = { key: "difficulty", dir: "asc" },
+  defaultSort = { key: "position", dir: "asc" },
   onSelect,
 }: ExerciseListProps) {
   const [query, setQuery] = useState("");
@@ -55,7 +53,9 @@ export function ExerciseList({
         i.name.toLowerCase().includes(q) ||
         (i.description?.toLowerCase().includes(q) ?? false) ||
         (i.tonic?.toLowerCase().includes(q) ?? false) ||
-        (i.tonality?.toLowerCase().includes(q) ?? false)
+        (i.tonality?.toLowerCase().includes(q) ?? false) ||
+        (i.Type?.toLowerCase().includes(q) ?? false) ||
+        (i.major_key?.toLowerCase().includes(q) ?? false)
       );
     });
   }, [items, query]);
@@ -112,11 +112,11 @@ export function ExerciseList({
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="w-[40%]">
+            <TableHead className="w-[30%]">
               {headerButton("Name", "name")}
             </TableHead>
-            <TableHead className="w-[10%]">
-              {headerButton("Diff", "difficulty")}
+            <TableHead className="w-[20%]">
+              {headerButton("Type", "Type")}
             </TableHead>
             <TableHead className="w-[10%]">
               {headerButton("Tonic", "tonic")}
@@ -124,14 +124,11 @@ export function ExerciseList({
             <TableHead className="w-[15%]">
               {headerButton("Tonality", "tonality")}
             </TableHead>
+            <TableHead className="w-[15%]">
+              {headerButton("Major Key", "major_key")}
+            </TableHead>
             <TableHead className="w-[10%]">
               {headerButton("Pos", "position")}
-            </TableHead>
-            <TableHead className="w-[10%]">
-              {headerButton("Notes/Beat", "notes_per_beat")}
-            </TableHead>
-            <TableHead className="w-[5%]">
-              {headerButton("Updated", "updated_at")}
             </TableHead>
           </TableRow>
         </TableHeader>
@@ -139,20 +136,15 @@ export function ExerciseList({
           {sorted.map((item) => (
             <TableRow
               key={item.id}
-              className="cursor-pointer"
+              className="cursor-pointer hover:bg-muted/50"
               onClick={() => onSelect?.(item)}
             >
               <TableCell className="font-medium">{item.name}</TableCell>
-              <TableCell>{item.difficulty}</TableCell>
+              <TableCell className="text-sm">{item.Type ?? "-"}</TableCell>
               <TableCell className="font-mono">{item.tonic}</TableCell>
               <TableCell>{item.tonality}</TableCell>
+              <TableCell>{item.major_key ?? "-"}</TableCell>
               <TableCell>{item.position ?? "-"}</TableCell>
-              <TableCell>{item.notes_per_beat ?? "-"}</TableCell>
-              <TableCell className="text-xs text-muted-foreground">
-                {item.updated_at?.slice(0, 10) ??
-                  item.created_at?.slice(0, 10) ??
-                  ""}
-              </TableCell>
             </TableRow>
           ))}
         </TableBody>

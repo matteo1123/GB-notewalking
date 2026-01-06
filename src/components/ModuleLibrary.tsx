@@ -18,6 +18,11 @@ import RiffPractice from './RiffPractice';
 
 /**
  * Module Library - Storefront view for all practice modules
+ * 
+ * Features:
+ * - Browse and select from available exercises
+ * - Previous/Next navigation when viewing an exercise
+ * - "Select Another" to return to the list
  */
 export function ModuleLibrary() {
     const [searchQuery, setSearchQuery] = useState('');
@@ -143,44 +148,148 @@ export function ModuleLibrary() {
                 <div className="flex-1 min-h-0">
                     {activeModule === 'rhythm' && <RhythmTraining />}
                     {activeModule === 'notewalking' && <ChordProgressionExercise />}
-                    {activeModule === 'scale' && (
-                        selectedExercise ? (
-                            <div className="h-full bg-background">
-                                <RiffPractice
-                                    repertoireItem={selectedExercise}
-                                    sequences={sequences}
-                                    onExerciseSelect={() => { }}
-                                />
+                    {activeModule === 'scale' && (() => {
+                        const scaleExercises = exercises.filter((e) => e.category === "scale");
+                        const currentIndex = selectedExercise ? scaleExercises.findIndex(e => e.id === selectedExercise.id) : -1;
+                        const hasPrevious = currentIndex > 0;
+                        const hasNext = currentIndex < scaleExercises.length - 1 && currentIndex !== -1;
+
+                        const goToPrevious = () => {
+                            if (hasPrevious) {
+                                setSelectedExercise(scaleExercises[currentIndex - 1]);
+                            }
+                        };
+
+                        const goToNext = () => {
+                            if (hasNext) {
+                                setSelectedExercise(scaleExercises[currentIndex + 1]);
+                            }
+                        };
+
+                        return selectedExercise ? (
+                            <div className="h-full flex flex-col bg-background">
+                                {/* Navigation bar */}
+                                <div className="flex-shrink-0 flex items-center justify-between px-4 py-2 border-b bg-card">
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={goToPrevious}
+                                        disabled={!hasPrevious}
+                                    >
+                                        ← Previous
+                                    </Button>
+                                    <div className="flex items-center gap-4">
+                                        <span className="text-sm text-muted-foreground">
+                                            {currentIndex + 1} / {scaleExercises.length}
+                                        </span>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => setSelectedExercise(null)}
+                                        >
+                                            Select Another
+                                        </Button>
+                                    </div>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={goToNext}
+                                        disabled={!hasNext}
+                                    >
+                                        Next →
+                                    </Button>
+                                </div>
+                                {/* Exercise content */}
+                                <div className="flex-1 min-h-0">
+                                    <RiffPractice
+                                        repertoireItem={selectedExercise}
+                                        sequences={sequences}
+                                        onExerciseSelect={() => { }}
+                                    />
+                                </div>
                             </div>
                         ) : (
                             <div className="h-full overflow-y-auto p-4">
+                                <h3 className="text-lg font-semibold mb-4">Select a Scale</h3>
                                 <ExerciseList
-                                    items={exercises.filter((e) => e.category === "scale")}
+                                    items={scaleExercises}
                                     defaultSort={{ key: "position", dir: "asc" }}
                                     onSelect={setSelectedExercise}
                                 />
                             </div>
-                        )
-                    )}
-                    {activeModule === 'arpeggio' && (
-                        selectedExercise ? (
-                            <div className="h-full bg-background">
-                                <RiffPractice
-                                    repertoireItem={selectedExercise}
-                                    sequences={sequences}
-                                    onExerciseSelect={() => { }}
-                                />
+                        );
+                    })()}
+                    {activeModule === 'arpeggio' && (() => {
+                        const arpeggioExercises = exercises.filter((e) => e.category === "arpeggio");
+                        const currentIndex = selectedExercise ? arpeggioExercises.findIndex(e => e.id === selectedExercise.id) : -1;
+                        const hasPrevious = currentIndex > 0;
+                        const hasNext = currentIndex < arpeggioExercises.length - 1 && currentIndex !== -1;
+
+                        const goToPrevious = () => {
+                            if (hasPrevious) {
+                                setSelectedExercise(arpeggioExercises[currentIndex - 1]);
+                            }
+                        };
+
+                        const goToNext = () => {
+                            if (hasNext) {
+                                setSelectedExercise(arpeggioExercises[currentIndex + 1]);
+                            }
+                        };
+
+                        return selectedExercise ? (
+                            <div className="h-full flex flex-col bg-background">
+                                {/* Navigation bar */}
+                                <div className="flex-shrink-0 flex items-center justify-between px-4 py-2 border-b bg-card">
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={goToPrevious}
+                                        disabled={!hasPrevious}
+                                    >
+                                        ← Previous
+                                    </Button>
+                                    <div className="flex items-center gap-4">
+                                        <span className="text-sm text-muted-foreground">
+                                            {currentIndex + 1} / {arpeggioExercises.length}
+                                        </span>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => setSelectedExercise(null)}
+                                        >
+                                            Select Another
+                                        </Button>
+                                    </div>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={goToNext}
+                                        disabled={!hasNext}
+                                    >
+                                        Next →
+                                    </Button>
+                                </div>
+                                {/* Exercise content */}
+                                <div className="flex-1 min-h-0">
+                                    <RiffPractice
+                                        repertoireItem={selectedExercise}
+                                        sequences={sequences}
+                                        onExerciseSelect={() => { }}
+                                    />
+                                </div>
                             </div>
                         ) : (
                             <div className="h-full overflow-y-auto p-4">
+                                <h3 className="text-lg font-semibold mb-4">Select an Arpeggio</h3>
                                 <ExerciseList
-                                    items={exercises.filter((e) => e.category === "arpeggio")}
+                                    items={arpeggioExercises}
                                     defaultSort={{ key: "difficulty", dir: "asc" }}
                                     onSelect={setSelectedExercise}
                                 />
                             </div>
-                        )
-                    )}
+                        );
+                    })()}
                     {activeModule === 'chord_progressions' && (
                         <div className="flex items-center justify-center h-full">
                             <div className="text-center p-8">

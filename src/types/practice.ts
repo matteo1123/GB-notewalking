@@ -88,8 +88,11 @@ export type ModuleType =
 // Module Configurations
 export interface ScaleModuleConfig {
   module_type: 'scale';
-  scale_id: string;
-  scale_shape_id?: string;
+  current_scale_id?: string;        // Currently active scale (for navigation state)
+  priority_scale_ids?: string[];    // User-defined order (UUIDs to practice first)
+  type_filter?: string;             // Filter by Type field (e.g., "3 Notes Per String")
+  order_by?: 'created_at' | 'name'; // Fallback ordering after priority list is exhausted
+  current_index?: number;           // Current position in the queue
 }
 
 export interface RhythmModuleConfig {
@@ -114,7 +117,11 @@ export interface ChordProgressionsModuleConfig {
 
 export interface ArpeggioModuleConfig {
   module_type: 'arpeggio';
-  arpeggio_id: string;
+  current_arpeggio_id?: string;      // Currently active arpeggio (for navigation state)
+  priority_arpeggio_ids?: string[];  // User-defined order (UUIDs to practice first)
+  type_filter?: string;              // Filter by Type field
+  order_by?: 'created_at' | 'name';  // Fallback ordering
+  current_index?: number;            // Current position in the queue
   pattern?: 'ascending' | 'descending' | 'alternating';
 }
 

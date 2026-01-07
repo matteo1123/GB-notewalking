@@ -407,10 +407,12 @@ export function RhythmTraining({ autoStart = false, sessionId }: RhythmTrainingP
                             isPlaying={isPlaying}
                             onPlayPause={handlePlayPause}
                             onRestart={handleRestart}
+                            drumBeat={drumBeat}
                             onStateChange={(newState) => {
                                 setMode(newState.mode);
                                 setBpm(newState.startBpm);
                                 setLoop(newState.loop);
+                                if (newState.drumBeat !== undefined) setDrumBeat(newState.drumBeat);
                             }}
                             initialState={{
                                 mode,

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { RepertoireItem } from '@/types/repertoire';
 
@@ -41,45 +41,42 @@ export function useExerciseQueue({
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
+    // Prevent duplicate fetches using a ref
+    const fetchingRef = useRef(false);
+    const lastFetchKeyRef = useRef<string>('');
+
+    // Stable key for dependency tracking (prevents infinite loop from array reference)
+    const priorityIdsKey = JSON.stringify(priorityIds);
+
     // Fetch and sort exercises
     useEffect(() => {
+        const fetchKey = `${moduleType}-${priorityIdsKey}-${typeFilter}-${orderBy}`;
+
+        // Skip if already fetching or same request
+        if (fetchingRef.current) return;
+        if (fetchKey === lastFetchKeyRef.current && queue.length > 0) return;
+
         async function loadExercises() {
+            fetchingRef.current = true;
+            lastFetchKeyRef.current = fetchKey;
             setLoading(true);
             setError(null);
 
             try {
                 // Build query for scales/arpeggios
+                // Using select('*') to get all columns since column names vary
                 let query = supabase
                     .from('scales')
-                    .select(`
-            id,
-            name,
-            notes,
-            Type,
-            key,
-            mode,
-            difficulty,
-            description,
-            created_at,
-            scale_shape,
-            position
-          `);
+                    .select('*');
 
-                // Apply type filter if provided
+                // Apply type filter if provided (exact match for enum)
                 if (typeFilter) {
                     query = query.eq('Type', typeFilter);
                 }
 
-                // Apply module type filter (scale vs arpeggio)
-                // The 'Type' field contains values like '3 Notes Per String Scale', 'arpeggio', etc.
-                if (moduleType === 'arpeggio') {
-                    query = query.ilike('Type', '%arpeggio%');
-                } else {
-                    // For scales, exclude arpeggios unless typeFilter is specifically set
-                    if (!typeFilter) {
-                        query = query.not('Type', 'ilike', '%arpeggio%');
-                    }
-                }
+                // NOTE: We don't filter by arpeggio vs scale in the query because
+                // Type is an enum and ilike doesn't work on enums.
+                // We'll filter client-side instead.
 
                 const { data: scales, error: fetchError } = await query;
 
@@ -93,20 +90,44 @@ export function useExerciseQueue({
                     return;
                 }
 
+                // Filter by module type client-side (scale vs arpeggio)
+                // The 'Type' field contains values like '3 Notes Per String Scale', 'arpeggio', etc.
+                let filteredScales = scales;
+                if (!typeFilter) {
+                    if (moduleType === 'arpeggio') {
+                        filteredScales = scales.filter((s: any) =>
+                            s.Type?.toLowerCase().includes('arpeggio')
+                        );
+                    } else {
+                        // For scales, exclude arpeggios
+                        filteredScales = scales.filter((s: any) =>
+                            !s.Type?.toLowerCase().includes('arpeggio')
+                        );
+                    }
+                }
+
+                if (filteredScales.length === 0) {
+                    setQueue([]);
+                    setLoading(false);
+                    return;
+                }
+
                 // Transform to RepertoireItem format
-                const exercises: RepertoireItem[] = scales.map((scale: any) => ({
+                // Using correct column names from database: root_note, notes_json, Position
+                const exercises: RepertoireItem[] = filteredScales.map((scale: any) => ({
                     id: scale.id,
                     name: scale.name || 'Unknown',
                     category: moduleType,
                     difficulty: scale.difficulty || 1,
-                    notes: scale.notes || [],
-                    tonic: scale.key || 'C',
-                    tonality: scale.mode || 'Major',
+                    notes: scale.notes_json ?? [],
+                    tonic: scale.root_note || 'C',
+                    tonality: scale.tonality || 'Major',
                     Type: scale.Type,
                     description: scale.description,
                     created_at: scale.created_at,
-                    position: scale.position,
+                    position: scale.Position,
                     scale_shape: scale.scale_shape,
+                    major_key: scale.major_key,
                 }));
 
                 // Sort: priority exercises first, then by created_at or name
@@ -151,12 +172,13 @@ export function useExerciseQueue({
                 console.error('Error loading exercises:', err);
                 setError(err.message || 'Failed to load exercises');
             } finally {
+                fetchingRef.current = false;
                 setLoading(false);
             }
         }
 
         loadExercises();
-    }, [moduleType, priorityIds, typeFilter, orderBy, initialIndex]);
+    }, [moduleType, priorityIdsKey, typeFilter, orderBy, initialIndex, queue.length]);
 
     // Navigation functions
     const next = useCallback(() => {

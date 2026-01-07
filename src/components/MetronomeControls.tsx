@@ -31,6 +31,7 @@ interface MetronomeControlsProps {
   compact?: boolean;
   isPlaying: boolean;
   initialState?: Partial<MetronomeSettings>;
+  drumBeat?: boolean;
   onPlayPause: () => void;
   onRestart: () => void;
   onStateChange: (state: MetronomeSettings) => void;
@@ -40,6 +41,7 @@ export function MetronomeControls({
   compact = false,
   isPlaying,
   initialState = {},
+  drumBeat: drumBeatProp,
   onPlayPause,
   onRestart,
   onStateChange,
@@ -147,6 +149,10 @@ export function MetronomeControls({
         nextState.loop = initialState.loop;
         changed = true;
       }
+      if (initialState.drumBeat !== undefined && initialState.drumBeat !== prevState.drumBeat) {
+        nextState.drumBeat = initialState.drumBeat;
+        changed = true;
+      }
 
       if (changed) {
         syncingFromPropsRef.current = true;
@@ -163,7 +169,15 @@ export function MetronomeControls({
     initialState.measuresPerIncrement,
     initialState.progressiveStepBpm,
     initialState.loop,
+    initialState.drumBeat,
   ]);
+
+  // Sync drumBeatProp when parent controls it directly
+  useEffect(() => {
+    if (drumBeatProp !== undefined && drumBeatProp !== drumBeat) {
+      updateState({ drumBeat: drumBeatProp });
+    }
+  }, [drumBeatProp]);
 
   useEffect(() => {
     if (syncingFromPropsRef.current) {

@@ -438,7 +438,7 @@ export function ChordProgressionExercise({ autoStart = false, sessionId }: Chord
                     {/* Right Column: Matrix Top, Tuner/Metronome Bottom */}
                     <div className="lg:col-span-2 flex flex-col gap-2 min-h-0">
                         {/* Top: Interval Matrix (Full Width) */}
-                        <div className="flex-1 min-h-0 bg-card border rounded-lg p-4 overflow-hidden flex flex-col">
+                        <div className="flex-shrink-0 bg-card border rounded-lg p-4">
                             <IntervalMatrix
                                 selectedKey={settings.key}
                                 selectedChords={settings.selectedChords}

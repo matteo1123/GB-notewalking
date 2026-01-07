@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useRecorder } from './useRecorder';
 import { useToast } from './use-toast';
+import * as Tone from 'tone';
 
 export type PracticePhase = 'piece' | 'user' | 'playback' | 'idle';
 
@@ -97,6 +98,11 @@ export function usePieceMastery({
     const [loopCount, setLoopCount] = useState(0);
     const [offset, setOffset] = useState(0);
     const [segmentSeconds, setSegmentSeconds] = useState(Number(initialSegmentSeconds));
+    const [pitchShift, setPitchShift] = useState(0); // Semitones (-12 to +12)
+
+    // Pitch shift effect ref
+    const pitchShiftRef = useRef<Tone.PitchShift | null>(null);
+    const mediaSourceConnectedRef = useRef(false);
 
     // Sync state to ref
     const setPhase = (p: PracticePhase) => {
@@ -123,6 +129,7 @@ export function usePieceMastery({
         if (!audioRef.current) {
             audioRef.current = new Audio();
             audioRef.current.preload = 'auto'; // Optimize for tight looping
+            audioRef.current.crossOrigin = 'anonymous'; // Required for Tone.js
         }
         if (audioUrl) {
             audioRef.current.src = audioUrl;
@@ -130,8 +137,43 @@ export function usePieceMastery({
         if (!playbackRef.current) {
             playbackRef.current = new Audio();
         }
-        return () => stopPractice();
+
+        // Initialize pitch shift effect (only once)
+        if (!pitchShiftRef.current) {
+            pitchShiftRef.current = new Tone.PitchShift(0).toDestination();
+        }
+
+        return () => {
+            stopPractice();
+            // Cleanup pitch shift
+            if (pitchShiftRef.current) {
+                pitchShiftRef.current.dispose();
+                pitchShiftRef.current = null;
+            }
+            mediaSourceConnectedRef.current = false;
+        };
     }, [audioUrl]);
+
+    // Connect audio element to Tone.js pitch shift when playing
+    useEffect(() => {
+        if (isPlaying && audioRef.current && pitchShiftRef.current && !mediaSourceConnectedRef.current) {
+            // Need to start Tone context
+            Tone.start().then(() => {
+                if (audioRef.current && pitchShiftRef.current) {
+                    const source = Tone.getContext().createMediaElementSource(audioRef.current);
+                    Tone.connect(source, pitchShiftRef.current);
+                    mediaSourceConnectedRef.current = true;
+                }
+            }).catch(e => console.error('Tone.js start failed:', e));
+        }
+    }, [isPlaying]);
+
+    // Update pitch shift value dynamically
+    useEffect(() => {
+        if (pitchShiftRef.current) {
+            pitchShiftRef.current.pitch = pitchShift;
+        }
+    }, [pitchShift]);
 
     // Phase Transition Logic
     const transitionPhase = useCallback(async () => {
@@ -299,7 +341,8 @@ export function usePieceMastery({
             loopCount,
             audioRef,
             offset,
-            segmentSeconds
+            segmentSeconds,
+            pitchShift
         },
         controls: {
             togglePlay,
@@ -307,7 +350,8 @@ export function usePieceMastery({
             prevBlock,
             setBlock,
             setOffset,
-            setSegmentSeconds
+            setSegmentSeconds,
+            setPitchShift
         }
     };
 }

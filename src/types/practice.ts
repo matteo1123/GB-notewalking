@@ -91,6 +91,7 @@ export interface ScaleModuleConfig {
   current_scale_id?: string;        // Currently active scale (for navigation state)
   priority_scale_ids?: string[];    // User-defined order (UUIDs to practice first)
   type_filter?: string;             // Filter by Type field (e.g., "3 Notes Per String")
+  group_by_shape?: boolean;         // If true, show only one exercise per scale_shape
   order_by?: 'created_at' | 'name'; // Fallback ordering after priority list is exhausted
   current_index?: number;           // Current position in the queue
 }

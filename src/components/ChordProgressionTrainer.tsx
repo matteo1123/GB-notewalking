@@ -38,6 +38,7 @@ export function ChordProgressionTrainer() {
     const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
     const [autoRecordEnabled, setAutoRecordEnabled] = useState(false);
     const [tickCount, setTickCount] = useState(0);
+    const [drumBeat, setDrumBeat] = useState(false);
 
     // New State for "Real Chords" Mode
     const [progressions, setProgressions] = useState<any[]>([]);
@@ -105,6 +106,7 @@ export function ChordProgressionTrainer() {
         endBpm: bpm,
         measures: 999,
         muted: metronomeMuted,
+        drumBeat,
         onTick: (state) => {
             setTickCount(prev => prev + 1);
 
@@ -385,10 +387,12 @@ export function ChordProgressionTrainer() {
                                         isPlaying={isPlaying}
                                         onPlayPause={handlePlayPause}
                                         onRestart={handleRestart}
+                                        drumBeat={drumBeat}
                                         onStateChange={(newState) => {
                                             setMode(newState.mode);
                                             setBpm(newState.startBpm);
                                             setLoop(newState.loop);
+                                            if (newState.drumBeat !== undefined) setDrumBeat(newState.drumBeat);
                                         }}
                                         initialState={{
                                             mode,

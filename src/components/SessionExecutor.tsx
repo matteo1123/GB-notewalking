@@ -9,6 +9,9 @@ import type { SessionBlock } from '@/lib/sessionGenerator';
 import { RhythmTraining } from './RhythmTraining';
 import { ChordProgressionExercise } from './ChordProgressionExercise';
 import { ScalePracticeSession } from './ScalePracticeSession';
+import { PieceMastery } from './piece-mastery/PieceMastery';
+import { PieceList } from './piece-mastery/PieceList';
+import type { Piece } from './piece-mastery/types';
 
 /**
  * Session Executor - Takes user through a practice session
@@ -27,6 +30,7 @@ export function SessionExecutor({ sessionPlan, sessionId, onComplete, onExit }: 
     const [elapsedTime, setElapsedTime] = useState(0); // seconds
     const [isPaused, setIsPaused] = useState(false);
     const [isRunning, setIsRunning] = useState(false);
+    const [selectedPiece, setSelectedPiece] = useState<Piece | null>(null);
 
     const currentBlock = sessionPlan[currentBlockIndex];
     const totalBlocks = sessionPlan.length;
@@ -145,7 +149,7 @@ export function SessionExecutor({ sessionPlan, sessionId, onComplete, onExit }: 
 
             {/* Module Content - Takes remaining space, no overflow */}
             <div className="flex-1 min-h-0 overflow-hidden">
-                {renderModuleContent(currentBlock, sessionId)}
+                {renderModuleContent(currentBlock, sessionId, selectedPiece, setSelectedPiece)}
             </div>
         </div>
     );
@@ -155,7 +159,12 @@ export function SessionExecutor({ sessionPlan, sessionId, onComplete, onExit }: 
  * Render the appropriate module based on block type
  * Pure flexbox layout - NO OVERFLOW EVER
  */
-function renderModuleContent(block: SessionBlock, sessionId?: string) {
+function renderModuleContent(
+    block: SessionBlock,
+    sessionId?: string,
+    selectedPiece?: Piece | null,
+    setSelectedPiece?: (piece: Piece | null) => void
+) {
     switch (block.module_type) {
         case 'rhythm':
             return (
@@ -180,6 +189,24 @@ function renderModuleContent(block: SessionBlock, sessionId?: string) {
                         sessionId={sessionId}
                         moduleType={block.module_type as 'scale' | 'arpeggio'}
                         specificExerciseId={(block.config as any)?.exercise_id}
+                    />
+                </div>
+            );
+
+        case 'piece_mastery':
+            // Show PieceList for selection, or PieceMastery once a piece is chosen
+            if (!selectedPiece) {
+                return (
+                    <div className="h-full overflow-auto">
+                        <PieceList onSelectPiece={(piece) => setSelectedPiece?.(piece)} />
+                    </div>
+                );
+            }
+            return (
+                <div className="h-full flex flex-col overflow-hidden">
+                    <PieceMastery
+                        piece={selectedPiece}
+                        onBack={() => setSelectedPiece?.(null)}
                     />
                 </div>
             );

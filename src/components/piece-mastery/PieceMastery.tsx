@@ -29,7 +29,7 @@ export function PieceMastery({ piece, onBack }: PieceMasteryProps) {
         }
     });
 
-    const { phase, isPlaying, currentBlockIndex, loopRange, currentTime, duration, loopCount, offset, segmentSeconds } = state;
+    const { phase, isPlaying, currentBlockIndex, loopRange, currentTime, duration, loopCount, offset, segmentSeconds, pitchShift } = state;
 
     // Calculate progress percentages for visualization
     const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
@@ -190,6 +190,31 @@ export function PieceMastery({ piece, onBack }: PieceMasteryProps) {
                         <Button variant="ghost" size="sm" onClick={() => controls.setBlock(currentBlockIndex)}>
                             <RotateCcw className="h-4 w-4 mr-2" /> Restart Block
                         </Button>
+                    </div>
+
+                    {/* Pitch Shift Control */}
+                    <div className="bg-muted/50 rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-medium flex items-center gap-2">
+                                🎵 Pitch Shift
+                            </span>
+                            <Badge variant={pitchShift === 0 ? "secondary" : "default"}>
+                                {pitchShift === 0 ? "Original" : `${pitchShift > 0 ? "+" : ""}${pitchShift} semitone${Math.abs(pitchShift) !== 1 ? "s" : ""}`}
+                            </Badge>
+                        </div>
+                        <Slider
+                            value={[pitchShift]}
+                            min={-6}
+                            max={6}
+                            step={1}
+                            onValueChange={([value]) => controls.setPitchShift(value)}
+                            className="py-2"
+                        />
+                        <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
+                            <span>-6</span>
+                            <span>0</span>
+                            <span>+6</span>
+                        </div>
                     </div>
 
                 </div>

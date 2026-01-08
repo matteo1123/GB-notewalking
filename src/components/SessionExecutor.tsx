@@ -189,6 +189,7 @@ function renderModuleContent(
                         sessionId={sessionId}
                         moduleType={block.module_type as 'scale' | 'arpeggio'}
                         specificExerciseId={(block.config as any)?.exercise_id}
+                        moduleConfig={block.config as any}
                     />
                 </div>
             );

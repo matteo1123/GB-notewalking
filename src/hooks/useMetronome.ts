@@ -24,6 +24,7 @@ export interface MetronomeSettings {
   measuresPerBpmChange?: number;
   progressiveStepBpm?: number;
   onTick?: (state: MetronomeState) => void;
+  onComplete?: () => void; // Called when progressive/speed-trainer cycle finishes
   loop?: boolean;
   muted?: boolean;
   drumBeat?: boolean; // When true, plays kick on 1, snare on 3
@@ -306,10 +307,20 @@ export function useMetronome(settings: MetronomeSettings) {
           plannedMeasures > 0 &&
           measureCountRef.current > plannedMeasures
         ) {
-          if (currentSettings.mode === "progressive" || currentSettings.loop) {
+          // Cycle complete!
+          if (currentSettings.loop || currentSettings.mode === "progressive") {
             progressiveRoundRef.current += 1;
             measureCountRef.current = 1;
             beatCountRef.current = 0;
+          }
+
+          // Fire onComplete and optionally stop
+          if (!currentSettings.loop) {
+            currentSettings.onComplete?.();
+            // Stop if not looping
+            isPlayingRef.current = false;
+            setState(prev => ({ ...prev, isPlaying: false }));
+            return;
           }
         }
       }

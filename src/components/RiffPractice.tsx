@@ -24,6 +24,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Tables } from "@/integrations/supabase/types";
 import { PostgrestError } from "@supabase/supabase-js";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePracticeSettings } from "@/contexts/PracticeSettingsContext";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Checkbox } from "./ui/checkbox";
@@ -98,12 +99,16 @@ const RiffPractice = ({
 }: RiffPracticeProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { settings: practiceSettings } = usePracticeSettings();
   const [noteIndex, setNoteIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(autoStart);
-  const [mode, setMode] = useState<MetronomeMode>(
-    (lessonExercise?.metronome_mode as MetronomeMode) || "regular"
-  );
-  const [loop, setLoop] = useState(true);
+
+  // Determine mode: Use progressive when in controlled session + settings say so
+  const effectiveMode: MetronomeMode = isControlledSession && practiceSettings.practiceMode === 'progressive'
+    ? 'progressive'
+    : (lessonExercise?.metronome_mode as MetronomeMode) || 'regular';
+  const [mode, setMode] = useState<MetronomeMode>(effectiveMode);
+  const [loop, setLoop] = useState(!isControlledSession || !practiceSettings.autoAdvance);
   const [startTime, setStartTime] = useState<number | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [metronomeBpm, setMetronomeBpm] = useState(lessonExercise?.starting_bpm || 80);
@@ -265,13 +270,31 @@ const RiffPractice = ({
 
   const [drumBeat, setDrumBeat] = useState(false);
 
-  const metronomeSettings: MetronomeSettings = {
-    mode,
-    startBpm: lessonExercise?.starting_bpm || metronomeBpm,
-    endBpm: lessonExercise?.target_bpm || metronomeBpm,
+  // Calculate starting BPM - in session mode, use last practiced BPM + increment
+  const startingBpm = useMemo(() => {
+    const lastBpm = (practiceLog as any)?.perfect_bpm || (practiceLog as any)?.max_bpm;
+    if (isControlledSession && practiceSettings.practiceMode === 'progressive' && lastBpm) {
+      return Math.min(lastBpm + practiceSettings.bpmIncrement, 200);
+    }
+    return lessonExercise?.starting_bpm || metronomeBpm;
+  }, [isControlledSession, practiceSettings.practiceMode, practiceSettings.bpmIncrement, practiceLog, lessonExercise?.starting_bpm, metronomeBpm]);
+
+  const targetBpm = useMemo(() => {
+    if (isControlledSession && practiceSettings.practiceMode === 'progressive') {
+      return Math.min(startingBpm + 40, 200); // Target is 40 BPM higher
+    }
+    return lessonExercise?.target_bpm || metronomeBpm;
+  }, [isControlledSession, practiceSettings.practiceMode, startingBpm, lessonExercise?.target_bpm, metronomeBpm]);
+
+  const metronomeSettings = {
+    mode: mode,
+    loop: loop,
+    startBpm: startingBpm,
+    endBpm: targetBpm,
     measures: lessonExercise ? (lessonExercise.increments || 1) * (lessonExercise.measures_per_bpm || 4) : 8,
     measuresPerBpmChange: lessonExercise?.measures_per_bpm || 4,
     drumBeat,
+    onComplete: isControlledSession && practiceSettings.autoAdvance ? onComplete : undefined,
   };
 
   const metronome = useMetronome({

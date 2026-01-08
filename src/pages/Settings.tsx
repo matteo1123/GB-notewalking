@@ -1,15 +1,18 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
+import { usePracticeSettings } from "@/contexts/PracticeSettingsContext";
 
 const Settings = () => {
   const { user } = useAuth();
   const [settings, setSettings] = useState({ autoRecord: false });
   const [loading, setLoading] = useState(true);
+  const { settings: practiceSettings, updateSettings: updatePracticeSettings, isLoading: practiceLoading } = usePracticeSettings();
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -47,15 +50,16 @@ const Settings = () => {
     }
   };
 
-  if (loading) {
+  if (loading || practiceLoading) {
     return <div>Loading...</div>;
   }
 
   return (
-    <div className="p-4">
+    <div className="p-4 space-y-6 max-w-2xl mx-auto">
+      {/* General Settings */}
       <Card>
         <CardHeader>
-          <CardTitle>User Settings</CardTitle>
+          <CardTitle>General Settings</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
@@ -64,6 +68,97 @@ const Settings = () => {
               id="auto-record"
               checked={settings.autoRecord}
               onCheckedChange={(value) => handleSettingChange("autoRecord", value)}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Practice Session Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Practice Session Settings</CardTitle>
+          <CardDescription>Configure how exercises behave during practice sessions</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Practice Mode */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>Practice Mode</Label>
+                <p className="text-sm text-muted-foreground">
+                  {practiceSettings.practiceMode === 'progressive'
+                    ? 'Progressive: BPM increases until target, then advances'
+                    : 'Static: Fixed BPM for a set duration'}
+                </p>
+              </div>
+              <div className="flex gap-1 bg-muted rounded-lg p-1">
+                <Button
+                  size="sm"
+                  variant={practiceSettings.practiceMode === 'static' ? 'default' : 'ghost'}
+                  onClick={() => updatePracticeSettings({ practiceMode: 'static' })}
+                >
+                  Static
+                </Button>
+                <Button
+                  size="sm"
+                  variant={practiceSettings.practiceMode === 'progressive' ? 'default' : 'ghost'}
+                  onClick={() => updatePracticeSettings({ practiceMode: 'progressive' })}
+                >
+                  Progressive
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Exercise Duration (for static mode) */}
+          {practiceSettings.practiceMode === 'static' && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Exercise Duration</Label>
+                <span className="text-sm font-medium">{practiceSettings.exerciseDurationMinutes} min</span>
+              </div>
+              <Slider
+                value={[practiceSettings.exerciseDurationMinutes]}
+                min={1}
+                max={10}
+                step={1}
+                onValueChange={([value]) => updatePracticeSettings({ exerciseDurationMinutes: value })}
+              />
+            </div>
+          )}
+
+          {/* BPM Increment (for progressive mode) */}
+          {practiceSettings.practiceMode === 'progressive' && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>BPM Increment</Label>
+                <span className="text-sm font-medium">+{practiceSettings.bpmIncrement} BPM</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Start this many BPM higher than your last practice
+              </p>
+              <Slider
+                value={[practiceSettings.bpmIncrement]}
+                min={1}
+                max={15}
+                step={1}
+                onValueChange={([value]) => updatePracticeSettings({ bpmIncrement: value })}
+              />
+            </div>
+          )}
+
+          {/* Auto-Advance */}
+          <div className="flex items-center justify-between">
+            <div>
+              <Label htmlFor="auto-advance">Auto-Advance</Label>
+              <p className="text-sm text-muted-foreground">
+                Automatically move to next exercise after completion
+              </p>
+            </div>
+            <Switch
+              id="auto-advance"
+              checked={practiceSettings.autoAdvance}
+              onCheckedChange={(value) => updatePracticeSettings({ autoAdvance: value })}
             />
           </div>
         </CardContent>

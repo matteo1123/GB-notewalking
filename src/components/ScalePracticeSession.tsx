@@ -181,6 +181,7 @@ export function ScalePracticeSession({
                     sequences={sequences}
                     autoStart={autoStart}
                     isControlledSession={true}
+                    onComplete={handleNext}
                 />
             </div>
         </div>

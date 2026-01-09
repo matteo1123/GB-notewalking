@@ -307,21 +307,20 @@ export function useMetronome(settings: MetronomeSettings) {
           plannedMeasures > 0 &&
           measureCountRef.current > plannedMeasures
         ) {
-          // Cycle complete!
-          if (currentSettings.loop || currentSettings.mode === "progressive") {
-            progressiveRoundRef.current += 1;
-            measureCountRef.current = 1;
-            beatCountRef.current = 0;
-          }
+          // Cycle complete - always reset for progressive and speed-trainer
+          progressiveRoundRef.current += 1;
+          measureCountRef.current = 1;
+          beatCountRef.current = 0;
 
-          // Fire onComplete and optionally stop
-          if (!currentSettings.loop) {
+          // If loop=false (session auto-advance mode), fire onComplete and STOP
+          // Otherwise (loop=true, which is default), continue looping forever
+          if (currentSettings.loop === false) {
             currentSettings.onComplete?.();
-            // Stop if not looping
             isPlayingRef.current = false;
             setState(prev => ({ ...prev, isPlaying: false }));
             return;
           }
+          // If loop=true (default), just continue - the counters are already reset
         }
       }
     }

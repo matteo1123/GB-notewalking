@@ -61,6 +61,7 @@ export function useMetronome(settings: MetronomeSettings) {
   const kickBufferRef = useRef<AudioBuffer | null>(null);
   const snareBufferRef = useRef<AudioBuffer | null>(null);
   const samplesLoadedRef = useRef(false);
+  const skipFirstBeatRef = useRef(false); // Skip sound on first beat after restart
 
   useEffect(() => {
     settingsRef.current = settings;
@@ -278,7 +279,12 @@ export function useMetronome(settings: MetronomeSettings) {
       progressiveRoundRef.current
     );
 
-    playClick(beat);
+    // Skip sound on first beat after restart (to avoid rapid clicks when adjusting settings)
+    if (skipFirstBeatRef.current) {
+      skipFirstBeatRef.current = false;
+    } else {
+      playClick(beat);
+    }
 
     const nextState: MetronomeState = {
       isPlaying: true,
@@ -369,6 +375,7 @@ export function useMetronome(settings: MetronomeSettings) {
     }));
 
     clearScheduledBeat();
+    skipFirstBeatRef.current = true; // Silent first beat to avoid click spam when adjusting
     scheduleNextBeat();
   }, [initAudioContext, scheduleNextBeat, clearScheduledBeat]);
 

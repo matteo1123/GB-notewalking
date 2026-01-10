@@ -1,19 +1,22 @@
 .fretboard-area {
   display: flex;
   align-items: center;
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 .open-notes-container {
   display: grid;
-  grid-template-columns: 50px;
-  grid-template-rows: repeat(6, 30px);
+  grid-template-columns: minmax(30px, 50px);
+  grid-template-rows: repeat(6, minmax(18px, 30px));
   margin-right: 5px;
   background-color: #1a1a1a;
   border: 2px solid #666;
   border-right: 4px solid #fff;
   border-radius: 4px 0 0 4px;
   position: relative;
+  flex-shrink: 0;
 }
 
 .open-notes-container::before {
@@ -28,16 +31,18 @@
 }
 
 .fretboard-container {
-  overflow-x: visible;
+  overflow-x: hidden;
+  max-width: 100%;
 }
 
 .fretboard {
   display: grid;
-  grid-template-columns: repeat(24, 50px);
-  grid-template-rows: repeat(6, 30px);
+  grid-template-columns: repeat(24, minmax(20px, 1fr));
+  grid-template-rows: repeat(6, minmax(18px, 30px));
   position: relative;
   background-color: #000;
-  width: 1200px;
+  width: 100%;
+  max-width: 1200px;
   border: 2px solid #fff;
   border-left-width: 5px;
 }
@@ -76,8 +81,8 @@
 }
 
 .dot {
-  width: 22px;
-  height: 22px;
+  width: clamp(14px, 3vw, 22px);
+  height: clamp(14px, 3vw, 22px);
   border-radius: 50%;
   background-color: #ccc;
   position: absolute;
@@ -123,7 +128,7 @@
 }
 
 .degree-number {
-  font-size: 12px;
+  font-size: clamp(8px, 1.5vw, 12px);
   font-weight: bold;
   color: white;
   text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
@@ -191,4 +196,62 @@
   z-index: 10;
   transform: translate(-50%, -50%) scale(1.4) !important;
   /* Ensure visibility over others */
+}
+
+/* Mobile landscape optimization */
+@media (max-width: 900px) and (orientation: landscape) {
+  .fretboard-area {
+    margin-bottom: 0.25rem;
+  }
+
+  .open-notes-container {
+    grid-template-columns: 25px;
+    grid-template-rows: repeat(6, 16px);
+    margin-right: 3px;
+  }
+
+  .open-notes-container::before {
+    font-size: 10px;
+    top: -16px;
+  }
+
+  .fretboard {
+    grid-template-rows: repeat(6, 16px);
+  }
+
+  .dot {
+    width: 12px;
+    height: 12px;
+  }
+
+  .degree-number {
+    font-size: 8px;
+  }
+
+  .marker {
+    width: 10px;
+    height: 10px;
+  }
+}
+
+/* Compact mobile portrait */
+@media (max-width: 500px) {
+  .fretboard-area {
+    margin-bottom: 0.25rem;
+  }
+
+  .open-notes-container {
+    grid-template-columns: 20px;
+    grid-template-rows: repeat(6, 14px);
+  }
+
+  .fretboard {
+    grid-template-columns: repeat(24, minmax(12px, 1fr));
+    grid-template-rows: repeat(6, 14px);
+  }
+
+  .dot {
+    width: 10px;
+    height: 10px;
+  }
 }

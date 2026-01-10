@@ -35,16 +35,12 @@ All colors MUST be HSL.
     --tempo-glow: 25 95% 53%;
 
     /* Gradients */
-    --gradient-primary: linear-gradient(
-      135deg,
-      hsl(25 95% 53%),
-      hsl(35 90% 60%)
-    );
-    --gradient-card: linear-gradient(
-      145deg,
-      hsl(220 26% 10%),
-      hsl(220 20% 12%)
-    );
+    --gradient-primary: linear-gradient(135deg,
+        hsl(25 95% 53%),
+        hsl(35 90% 60%));
+    --gradient-card: linear-gradient(145deg,
+        hsl(220 26% 10%),
+        hsl(220 20% 12%));
 
     /* Shadows */
     --shadow-glow: 0 0 40px hsl(25 95% 53% / 0.3);
@@ -131,13 +127,53 @@ All colors MUST be HSL.
   scrollbar-color: hsl(var(--border)) transparent;
   position: relative;
 }
+
 .animated-scrollbar::-webkit-scrollbar {
   height: 6px;
 }
+
 .animated-scrollbar::-webkit-scrollbar-track {
   background: transparent;
 }
+
 .animated-scrollbar::-webkit-scrollbar-thumb {
   background-color: hsl(var(--border));
   border-radius: 9999px;
+}
+
+/* Mobile-first compact styles */
+@media (max-width: 768px) {
+  .bpm-control-area {
+    padding: 0.5rem;
+  }
+
+  .bpm-control-area h2 {
+    font-size: 1rem;
+    line-height: 1.25;
+  }
+
+  /* Reduce spacing in practice module header */
+  .bpm-control-area .space-y-4 {
+    gap: 0.5rem;
+  }
+}
+
+/* Landscape orientation styles - maximize practice area */
+@media (orientation: landscape) and (max-height: 500px) {
+  .bpm-control-area>.flex-shrink-0 {
+    padding: 0.25rem 0.5rem;
+  }
+
+  .bpm-control-area h2 {
+    font-size: 0.875rem;
+  }
+}
+
+/* Ensure flex containers fill available height */
+.h-full {
+  height: 100%;
+}
+
+.min-h-0 {
+  min-height: 0;
 }

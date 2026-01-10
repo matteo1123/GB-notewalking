@@ -8,7 +8,7 @@ import { ChordProgressionExercise } from './ChordProgressionExercise';
 import ExerciseList from './ExerciseList';
 import { supabase } from '@/integrations/supabase/client';
 import { MODULE_REGISTRY } from '@/types/modules';
-import type { ModuleType, ScaleModuleConfig } from '@/types/practice';
+import type { ModuleType, ScaleModuleConfig, ArpeggioModuleConfig } from '@/types/practice';
 import type { RepertoireItem } from '@/types/repertoire';
 import { PieceList } from './piece-mastery/PieceList';
 import { PieceMastery } from './piece-mastery/PieceMastery';
@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/select";
 
 import RiffPractice from './RiffPractice';
+import { ExercisePracticeModule } from './ExercisePracticeModule';
 import { useModuleConfig } from '@/hooks/useModuleConfig';
 import { usePracticeSession } from '@/hooks/usePracticeSession';
 import { SessionBuilder } from '@/components/SessionBuilder';
@@ -67,6 +68,15 @@ export function ModuleLibrary() {
         type_filter: undefined,
         priority_scale_ids: [],
         group_by_shape: true,
+        order_by: 'created_at',
+        current_index: 0,
+    });
+
+    // Arpeggio module configuration (new - matches scale config pattern)
+    const [arpeggioConfig, setArpeggioConfig] = useState<ArpeggioModuleConfig>({
+        module_type: 'arpeggio',
+        type_filter: undefined,
+        priority_arpeggio_ids: [],
         order_by: 'created_at',
         current_index: 0,
     });
@@ -142,11 +152,11 @@ export function ModuleLibrary() {
         loadData();
     }, []);
 
-    // Get unique Type values for filter dropdown
+    // Get unique Type values for filter dropdown (for both scale and arpeggio)
     const availableTypes = useMemo(() => {
         const types = new Set<string>();
         exercises.forEach(e => {
-            if (e.Type && e.category === 'scale') {
+            if (e.Type && (e.category === 'scale' || e.category === 'arpeggio')) {
                 types.add(e.Type);
             }
         });
@@ -292,323 +302,36 @@ export function ModuleLibrary() {
                 <div className="flex-1 min-h-0">
                     {activeModule === 'rhythm' && <RhythmTraining />}
                     {activeModule === 'notewalking' && <ChordProgressionExercise />}
-                    {activeModule === 'scale' && (() => {
-                        const scaleExercises = processedScaleExercises;
-                        const currentIndex = selectedExercise ? scaleExercises.findIndex(e => e.id === selectedExercise.id) : -1;
-                        const hasPrevious = currentIndex > 0;
-                        const hasNext = currentIndex < scaleExercises.length - 1 && currentIndex !== -1;
-                        const isPriority = selectedExercise && (scaleConfig.priority_scale_ids || []).includes(selectedExercise.id);
-
-                        const goToPrevious = () => {
-                            if (hasPrevious) {
-                                setSelectedExercise(scaleExercises[currentIndex - 1]);
-                            }
-                        };
-
-                        const goToNext = () => {
-                            if (hasNext) {
-                                setSelectedExercise(scaleExercises[currentIndex + 1]);
-                            }
-                        };
-
-                        const togglePriority = () => {
-                            if (!selectedExercise) return;
-                            setScaleConfig(prev => {
-                                const ids = prev.priority_scale_ids || [];
-                                if (ids.includes(selectedExercise.id)) {
-                                    return { ...prev, priority_scale_ids: ids.filter(id => id !== selectedExercise.id) };
+                    {(activeModule === 'scale' || activeModule === 'arpeggio') && (
+                        <ExercisePracticeModule
+                            moduleType={activeModule}
+                            exercises={exercises}
+                            sequences={sequences}
+                            selectedExercise={selectedExercise}
+                            onSelectExercise={setSelectedExercise}
+                            config={activeModule === 'scale' ? scaleConfig : arpeggioConfig}
+                            onConfigChange={(newConfig) => {
+                                if (activeModule === 'scale') {
+                                    setScaleConfig(newConfig as ScaleModuleConfig);
                                 } else {
-                                    return { ...prev, priority_scale_ids: [...ids, selectedExercise.id] };
+                                    setArpeggioConfig(newConfig as ArpeggioModuleConfig);
                                 }
-                            });
-                        };
-
-                        return selectedExercise ? (
-                            <div className="h-full flex flex-col bg-background">
-                                {/* Navigation bar */}
-                                <div className="flex-shrink-0 flex items-center justify-between px-4 py-2 border-b bg-card gap-2">
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={goToPrevious}
-                                        disabled={!hasPrevious}
-                                    >
-                                        ← Previous
-                                    </Button>
-                                    <div className="flex items-center gap-2">
-                                        {/* Settings dropdown */}
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button variant="outline" size="sm" className="gap-1">
-                                                    <Settings className="w-4 h-4" />
-                                                    {scaleConfig.type_filter && (
-                                                        <span className="text-xs bg-primary/20 px-1 rounded">
-                                                            {scaleConfig.type_filter.split(' ')[0]}
-                                                        </span>
-                                                    )}
-                                                    {(scaleConfig.priority_scale_ids?.length || 0) > 0 && (
-                                                        <span className="text-xs bg-yellow-500/20 px-1 rounded">
-                                                            {scaleConfig.priority_scale_ids?.length}★
-                                                        </span>
-                                                    )}
-                                                    {!scaleConfig.group_by_shape && (
-                                                        <span className="text-xs bg-blue-500/20 px-1 rounded">
-                                                            All
-                                                        </span>
-                                                    )}
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="center" className="w-56">
-                                                <DropdownMenuLabel>Scale Settings</DropdownMenuLabel>
-                                                <DropdownMenuSeparator />
-
-                                                {/* Type Filter */}
-                                                <div className="px-2 py-1.5">
-                                                    <label className="text-xs text-muted-foreground mb-1 block">Type Filter</label>
-                                                    <Select
-                                                        value={scaleConfig.type_filter || "all"}
-                                                        onValueChange={(value) => setScaleConfig(prev => ({
-                                                            ...prev,
-                                                            type_filter: value === "all" ? undefined : value
-                                                        }))}
-                                                    >
-                                                        <SelectTrigger className="h-8">
-                                                            <SelectValue placeholder="All Types" />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            <SelectItem value="all">All Types</SelectItem>
-                                                            {availableTypes.map(type => (
-                                                                <SelectItem key={type} value={type}>{type}</SelectItem>
-                                                            ))}
-                                                        </SelectContent>
-                                                    </Select>
-                                                </div>
-
-                                                <DropdownMenuSeparator />
-
-                                                {/* Group by shape toggle */}
-                                                <DropdownMenuItem onClick={() => setScaleConfig(prev => ({
-                                                    ...prev,
-                                                    group_by_shape: !prev.group_by_shape
-                                                }))}>
-                                                    {scaleConfig.group_by_shape ? '✓ ' : '  '}
-                                                    One per scale shape
-                                                </DropdownMenuItem>
-
-                                                <DropdownMenuSeparator />
-
-                                                {/* Priority info */}
-                                                <div className="px-2 py-1.5 text-xs text-muted-foreground">
-                                                    {(scaleConfig.priority_scale_ids?.length || 0) > 0
-                                                        ? `${scaleConfig.priority_scale_ids?.length} priority exercise(s)`
-                                                        : 'No priority exercises'
-                                                    }
-                                                </div>
-                                                {(scaleConfig.priority_scale_ids?.length || 0) > 0 && (
-                                                    <DropdownMenuItem onClick={() => setScaleConfig(prev => ({
-                                                        ...prev,
-                                                        priority_scale_ids: []
-                                                    }))}>
-                                                        Clear all priorities
-                                                    </DropdownMenuItem>
-                                                )}
-
-                                                <DropdownMenuSeparator />
-
-                                                {/* Save Config Button */}
-                                                <DropdownMenuItem onClick={() => setSaveDialogOpen(true)} className="gap-2">
-                                                    <Save className="w-4 h-4" />
-                                                    Save as Module Instance
-                                                </DropdownMenuItem>
-
-                                                {/* Reset to Default - only show if config has any customizations */}
-                                                {(scaleConfig.type_filter ||
-                                                    (scaleConfig.priority_scale_ids?.length || 0) > 0 ||
-                                                    !scaleConfig.group_by_shape) && (
-                                                        <DropdownMenuItem
-                                                            onClick={() => setScaleConfig({
-                                                                module_type: 'scale',
-                                                                type_filter: undefined,
-                                                                priority_scale_ids: [],
-                                                                group_by_shape: true,
-                                                                order_by: 'created_at',
-                                                                current_index: 0,
-                                                            })}
-                                                            className="text-muted-foreground"
-                                                        >
-                                                            Reset to Default
-                                                        </DropdownMenuItem>
-                                                    )}
-
-                                                {/* Show saved instances if any */}
-                                                {moduleConfig.savedInstances.length > 0 && (
-                                                    <>
-                                                        <DropdownMenuSeparator />
-                                                        <DropdownMenuLabel className="text-xs">Saved Configurations</DropdownMenuLabel>
-                                                        {moduleConfig.savedInstances.map((instance) => (
-                                                            <DropdownMenuItem
-                                                                key={instance.id}
-                                                                onClick={async () => {
-                                                                    const config = await moduleConfig.loadConfig(instance.id);
-                                                                    if (config && config.module_type === 'scale') {
-                                                                        setScaleConfig(config as ScaleModuleConfig);
-                                                                    }
-                                                                }}
-                                                            >
-                                                                {instance.name}
-                                                            </DropdownMenuItem>
-                                                        ))}
-                                                    </>
-                                                )}
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
-
-                                        {/* Priority toggle for current exercise */}
-                                        <Button
-                                            variant={isPriority ? "default" : "outline"}
-                                            size="sm"
-                                            onClick={togglePriority}
-                                            title={isPriority ? "Remove from priority" : "Add to priority"}
-                                        >
-                                            {isPriority ? <Star className="w-4 h-4 fill-current" /> : <StarOff className="w-4 h-4" />}
-                                        </Button>
-
-                                        <span className="text-sm text-muted-foreground">
-                                            {currentIndex + 1} / {scaleExercises.length}
-                                        </span>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => setSelectedExercise(null)}
-                                        >
-                                            Select Another
-                                        </Button>
-                                    </div>
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={goToNext}
-                                        disabled={!hasNext}
-                                    >
-                                        Next →
-                                    </Button>
-                                </div>
-                                {/* Exercise content */}
-                                <div className="flex-1 min-h-0">
-                                    <RiffPractice
-                                        repertoireItem={selectedExercise}
-                                        sequences={sequences}
-                                        onExerciseSelect={() => { }}
-                                    />
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="h-full overflow-y-auto p-4">
-                                <div className="flex items-center justify-between mb-4">
-                                    <h3 className="text-lg font-semibold">Select a Scale</h3>
-                                    <div className="flex items-center gap-2">
-                                        {/* Type filter in list view too */}
-                                        <Select
-                                            value={scaleConfig.type_filter || "all"}
-                                            onValueChange={(value) => setScaleConfig(prev => ({
-                                                ...prev,
-                                                type_filter: value === "all" ? undefined : value
-                                            }))}
-                                        >
-                                            <SelectTrigger className="h-8 w-48">
-                                                <SelectValue placeholder="All Types" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="all">All Types</SelectItem>
-                                                {availableTypes.map(type => (
-                                                    <SelectItem key={type} value={type}>{type}</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        <span className="text-sm text-muted-foreground">
-                                            {scaleExercises.length} exercises
-                                        </span>
-                                    </div>
-                                </div>
-                                <ExerciseList
-                                    items={scaleExercises}
-                                    defaultSort={{ key: "position", dir: "asc" }}
-                                    onSelect={setSelectedExercise}
-                                />
-                            </div>
-                        );
-                    })()}
-                    {activeModule === 'arpeggio' && (() => {
-                        const arpeggioExercises = exercises.filter((e) => e.category === "arpeggio");
-                        const currentIndex = selectedExercise ? arpeggioExercises.findIndex(e => e.id === selectedExercise.id) : -1;
-                        const hasPrevious = currentIndex > 0;
-                        const hasNext = currentIndex < arpeggioExercises.length - 1 && currentIndex !== -1;
-
-                        const goToPrevious = () => {
-                            if (hasPrevious) {
-                                setSelectedExercise(arpeggioExercises[currentIndex - 1]);
-                            }
-                        };
-
-                        const goToNext = () => {
-                            if (hasNext) {
-                                setSelectedExercise(arpeggioExercises[currentIndex + 1]);
-                            }
-                        };
-
-                        return selectedExercise ? (
-                            <div className="h-full flex flex-col bg-background">
-                                {/* Navigation bar */}
-                                <div className="flex-shrink-0 flex items-center justify-between px-4 py-2 border-b bg-card">
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={goToPrevious}
-                                        disabled={!hasPrevious}
-                                    >
-                                        ← Previous
-                                    </Button>
-                                    <div className="flex items-center gap-4">
-                                        <span className="text-sm text-muted-foreground">
-                                            {currentIndex + 1} / {arpeggioExercises.length}
-                                        </span>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => setSelectedExercise(null)}
-                                        >
-                                            Select Another
-                                        </Button>
-                                    </div>
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={goToNext}
-                                        disabled={!hasNext}
-                                    >
-                                        Next →
-                                    </Button>
-                                </div>
-                                {/* Exercise content */}
-                                <div className="flex-1 min-h-0">
-                                    <RiffPractice
-                                        repertoireItem={selectedExercise}
-                                        sequences={sequences}
-                                        onExerciseSelect={() => { }}
-                                    />
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="h-full overflow-y-auto p-4">
-                                <h3 className="text-lg font-semibold mb-4">Select an Arpeggio</h3>
-                                <ExerciseList
-                                    items={arpeggioExercises}
-                                    defaultSort={{ key: "position", dir: "asc" }}
-                                    onSelect={setSelectedExercise}
-                                />
-                            </div>
-                        );
-                    })()}
+                            }}
+                            availableTypes={availableTypes}
+                            onSaveConfig={() => setSaveDialogOpen(true)}
+                            savedInstances={moduleConfig.savedInstances}
+                            onLoadInstance={async (id) => {
+                                const config = await moduleConfig.loadConfig(id);
+                                if (config) {
+                                    if (config.module_type === 'scale') {
+                                        setScaleConfig(config as ScaleModuleConfig);
+                                    } else if (config.module_type === 'arpeggio') {
+                                        setArpeggioConfig(config as ArpeggioModuleConfig);
+                                    }
+                                }
+                            }}
+                        />
+                    )}
                     {activeModule === 'chord_progressions' && (
                         <div className="flex items-center justify-center h-full">
                             <div className="text-center p-8">

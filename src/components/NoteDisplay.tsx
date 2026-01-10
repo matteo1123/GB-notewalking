@@ -127,11 +127,11 @@ const NoteDisplay = ({
 
   return (
     <div className={`bg-card rounded-lg border border-border ${displayMode === 'fretboard' ? 'p-0' : 'p-4'} ${className}`}>
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-lg font-semibold capitalize">{displayMode}</h3>
-        <div className="flex items-center gap-4">
+      <div className="flex justify-between items-center mb-1 sm:mb-4 px-1 sm:px-0">
+        <h3 className="text-sm sm:text-lg font-semibold capitalize">{displayMode}</h3>
+        <div className="flex items-center gap-2 sm:gap-4">
           {displayMode === 'fretboard' && (
-            <div className="flex items-center space-x-2">
+            <div className="hidden sm:flex items-center space-x-2">
               <Switch
                 id="single-note-mode"
                 checked={showSingleNote}
@@ -141,10 +141,10 @@ const NoteDisplay = ({
             </div>
           )}
           <Tabs value={displayMode} onValueChange={(value) => setDisplayMode(value as 'tablature' | 'grid' | 'fretboard')} className="w-auto">
-            <TabsList>
-              <TabsTrigger value="tablature">Tablature</TabsTrigger>
-              <TabsTrigger value="grid">Grid</TabsTrigger>
-              <TabsTrigger value="fretboard">Fretboard</TabsTrigger>
+            <TabsList className="h-8 sm:h-10">
+              <TabsTrigger value="tablature" className="text-xs sm:text-sm px-2 sm:px-3">Tab</TabsTrigger>
+              <TabsTrigger value="grid" className="text-xs sm:text-sm px-2 sm:px-3">Grid</TabsTrigger>
+              <TabsTrigger value="fretboard" className="text-xs sm:text-sm px-2 sm:px-3">Frets</TabsTrigger>
             </TabsList>
           </Tabs>
         </div>
@@ -275,8 +275,9 @@ const NoteDisplay = ({
           </div>
         ) : (
           <>
-            <div className="flex items-center gap-4 mb-4">
+            <div className="flex items-center gap-2 sm:gap-4 mb-2 sm:mb-4 flex-wrap">
               <Button
+                size="sm"
                 onClick={() => {
                   if (setIsLearning) {
                     const newIsLearning = !isLearning;
@@ -289,7 +290,7 @@ const NoteDisplay = ({
                   }
                 }}
               >
-                {isLearning ? "Stop Learning" : "Help Me Learn"}
+                {isLearning ? "Stop" : "Learn"}
               </Button>
               {isLearning && (
                 <>

@@ -231,7 +231,7 @@ export function EarTrainingWrapper({
     }, [simpleNotes]);
 
     return (
-        <div className="space-y-4">
+        <div className="space-y-1 sm:space-y-4">
             {/* Ear Training Toggle & Mode Indicator */}
             <div className="flex justify-between items-center">
                 {/* Badge removed as requested since Identify is the only mode */}
@@ -276,14 +276,14 @@ export function EarTrainingWrapper({
 
             {/* Instructions */}
             {earTrainingEnabled && (
-                <div className="mb-4 p-4 bg-muted/50 rounded-lg border border-border">
+                <div className="mb-1 sm:mb-4 p-2 sm:p-4 bg-muted/50 rounded-lg border border-border">
                     {earTraining.isPlaying && (
-                        <p className="text-center text-lg font-medium">
+                        <p className="text-center text-sm sm:text-lg font-medium">
                             🎵 Listen to the note...
                         </p>
                     )}
-                    <p className="text-center text-lg font-medium text-blue-600">
-                        👆 Click the note you just heard on the fretboard!
+                    <p className="text-center text-sm sm:text-lg font-medium text-blue-600">
+                        👆 Click the note you heard!
                     </p>
 
                     {feedbackMessage && (

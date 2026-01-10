@@ -575,14 +575,14 @@ const RiffPractice = ({
 
   return (
     <>
-      <div className="flex flex-col h-screen bg-background text-foreground overflow-hidden bpm-control-area">
-        <div className="flex-shrink-0 bg-card border-b border-border p-4">
+      <div className="flex flex-col h-full bg-background text-foreground overflow-hidden bpm-control-area">
+        <div className="flex-shrink-0 bg-card border-b border-border p-2 sm:p-4">
           <div className="flex justify-between items-start">
             {/* Left side: Exercise Info and Controls */}
             <div className="flex flex-col space-y-4">
-              <div className="flex items-center gap-4">
-                <h2 className="text-2xl font-bold">{repertoireItem.name}</h2>
-                <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
+                <h2 className="text-lg sm:text-2xl font-bold">{repertoireItem.name}</h2>
+                <div className="hidden sm:flex items-center gap-2">
                   <Label htmlFor="harmonic-context" className="text-sm">Harmonic Context</Label>
                   <Select
                     value={harmonicContext}
@@ -626,7 +626,7 @@ const RiffPractice = ({
                   </Select>
                 </div>
               </div>
-              <div>
+              <div className="hidden sm:block">
                 <div className="flex items-center gap-2 text-sm mt-1">
                   <span className="px-2 py-0.5 bg-secondary rounded-full text-secondary-foreground">
                     {repertoireItem.category}
@@ -636,7 +636,7 @@ const RiffPractice = ({
                   </span>
                 </div>
               </div>
-              <div className="flex items-center gap-4">
+              <div className="hidden sm:flex items-center gap-4">
                 <div className="flex items-center space-x-2">
                   <Checkbox
                     id="auto-record"
@@ -651,7 +651,7 @@ const RiffPractice = ({
                   )}
                 </div>
               </div>
-              <div>
+              <div className="hidden sm:block">
                 <Select
                   value={activeSequence?.id.toString()}
                   onValueChange={(value) => {
@@ -741,7 +741,7 @@ const RiffPractice = ({
             </div>
           </div>
         </div>
-        <main className="flex-grow h-[calc(100vh-10rem)]">
+        <main className="flex-1 min-h-0 overflow-hidden">
           <NoteDisplay
             notes={displayNotes}
             major_key={harmonicContext}

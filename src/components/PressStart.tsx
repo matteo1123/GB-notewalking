@@ -392,8 +392,8 @@ export function PressStart() {
         <div className="space-y-6">
             {/* Header */}
             <div className="text-center">
-                <h1 className="text-4xl font-bold mb-2">Ready to Practice?</h1>
-                <p className="text-muted-foreground text-lg">
+                <h1 className="text-2xl sm:text-4xl font-bold mb-1 sm:mb-2">Ready to Practice?</h1>
+                <p className="text-muted-foreground text-sm sm:text-lg">
                     Your personalized session is one click away
                 </p>
             </div>
@@ -466,16 +466,16 @@ export function PressStart() {
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
-                        {/* Duration Buttons */}
-                        <div className="grid grid-cols-5 gap-3">
+                        {/* Duration Buttons - wrap on mobile */}
+                        <div className="flex flex-wrap gap-2 sm:gap-3 justify-center">
                             {durationOptions.map((minutes) => (
                                 <Button
                                     key={minutes}
                                     variant={selectedDuration === minutes ? 'default' : 'outline'}
                                     onClick={() => setSelectedDuration(minutes)}
-                                    className="h-20 flex flex-col"
+                                    className="h-14 sm:h-20 min-w-[60px] sm:min-w-[80px] flex flex-col"
                                 >
-                                    <span className="text-2xl font-bold">{minutes}</span>
+                                    <span className="text-lg sm:text-2xl font-bold">{minutes}</span>
                                     <span className="text-xs">min</span>
                                 </Button>
                             ))}

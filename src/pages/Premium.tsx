@@ -307,53 +307,58 @@ const Premium = () => {
 
   return (
     <div className="fixed inset-0 flex flex-col bg-background overflow-hidden">
-      {/* Fixed Header with Back Button */}
-      <div className="flex-shrink-0 border-b bg-card px-4 py-2 flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      {/* Fixed Header with Back Button - compact on mobile */}
+      <div className="flex-shrink-0 border-b bg-card px-2 sm:px-4 py-1 sm:py-2 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <Button
             variant="ghost"
             size="sm"
             onClick={() => window.location.href = '/'}
-            className="gap-2"
+            className="gap-1 sm:gap-2 px-2 sm:px-3"
           >
-            ← Back
+            <span className="hidden sm:inline">←</span> Back
           </Button>
-          <h2 className="font-semibold">Guitar Brain</h2>
-          {isPremium && <span className="text-xs bg-gradient-to-r from-yellow-400 to-orange-500 text-black font-bold px-2 py-0.5 rounded-full">PREMIUM</span>}
+          <h2 className="font-semibold text-sm sm:text-base truncate">Guitar Brain</h2>
+          {isPremium && <span className="text-xs bg-gradient-to-r from-yellow-400 to-orange-500 text-black font-bold px-1.5 sm:px-2 py-0.5 rounded-full hidden sm:inline">PREMIUM</span>}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 sm:gap-2">
           {!isPremium && (
             <Button
               size="sm"
               variant="default"
-              className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white border-0"
+              className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white border-0 text-xs sm:text-sm px-2 sm:px-3"
               onClick={handleSubscribe}
               disabled={isSubscribing}
             >
-              {isSubscribing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Upgrade ($9.99/mo)
+              {isSubscribing && <Loader2 className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" />}
+              <span className="hidden sm:inline">Upgrade ($9.99/mo)</span>
+              <span className="sm:hidden">Upgrade</span>
             </Button>
           )}
           <Button
             variant="ghost"
             size="sm"
             onClick={() => window.location.href = '/profile'}
+            className="px-2 sm:px-3"
           >
-            Profile
+            <span className="hidden sm:inline">Profile</span>
+            <span className="sm:hidden">👤</span>
           </Button>
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col min-h-0 overflow-hidden p-4">
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden p-2 sm:p-4">
         {/* Content */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0 overflow-hidden">
-          <TabsList className="grid w-full grid-cols-5 flex-shrink-0 mb-4">
-            <TabsTrigger value="start">🚀 Start</TabsTrigger>
-            <TabsTrigger value="priorities">⚙️ Priorities</TabsTrigger>
-            <TabsTrigger value="progress">📊 Progress</TabsTrigger>
-            <TabsTrigger value="modules">🎯 Modules</TabsTrigger>
-            <TabsTrigger value="sessions">📚 Lessons</TabsTrigger>
-          </TabsList>
+          <div className="overflow-x-auto flex-shrink-0 mb-2 sm:mb-4 -mx-2 px-2">
+            <TabsList className="inline-flex w-auto min-w-full sm:grid sm:grid-cols-5 gap-1">
+              <TabsTrigger value="start" className="text-xs sm:text-sm px-2 sm:px-4 whitespace-nowrap">🚀 Start</TabsTrigger>
+              <TabsTrigger value="priorities" className="text-xs sm:text-sm px-2 sm:px-4 whitespace-nowrap">⚙️ Priorities</TabsTrigger>
+              <TabsTrigger value="progress" className="text-xs sm:text-sm px-2 sm:px-4 whitespace-nowrap">📊 Progress</TabsTrigger>
+              <TabsTrigger value="modules" className="text-xs sm:text-sm px-2 sm:px-4 whitespace-nowrap">🎯 Modules</TabsTrigger>
+              <TabsTrigger value="sessions" className="text-xs sm:text-sm px-2 sm:px-4 whitespace-nowrap">📚 Lessons</TabsTrigger>
+            </TabsList>
+          </div>
 
           <TabsContent value="start" className="flex-1 min-h-0 overflow-y-auto data-[state=active]:block p-6">
             <PressStart />

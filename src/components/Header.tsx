@@ -1,20 +1,22 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { Button } from '@/components/ui/button';
-import { Music, Crown, LogIn, LogOut, Home } from 'lucide-react';
+import { Music, Crown, LogIn, LogOut, Home, Menu, X } from 'lucide-react';
 
 const Header = () => {
   const { user, signOut } = useAuth();
   const userRole = useUserRole();
   const location = useLocation();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
-    <header className="max-w-4xl mx-auto">
-      <div className="text-center space-y-2">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex-1">
+    <header className="max-w-4xl mx-auto relative">
+      <div className="text-center">
+        <div className="flex items-center justify-between mb-2 sm:mb-4">
+          {/* Left: Home link - hidden on mobile */}
+          <div className="flex-1 hidden sm:block">
             {location.pathname !== '/' && (
               <Link
                 to="/"
@@ -25,13 +27,17 @@ const Header = () => {
               </Link>
             )}
           </div>
-          <div className="flex items-center gap-3">
-            <Music className="h-8 w-8 text-primary" />
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+
+          {/* Center: Logo - smaller on mobile */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Music className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
+            <h1 className="text-2xl sm:text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
               <Link to="/">Guitar Brain</Link>
             </h1>
           </div>
-          <div className="flex-1 flex justify-end gap-2">
+
+          {/* Right: Desktop nav buttons */}
+          <div className="flex-1 hidden sm:flex justify-end gap-2">
             {userRole === 'admin' && (
               <Link to="/admin" state={{ reset: location.pathname.startsWith('/admin') }}>
                 <Button variant="outline" className="flex items-center gap-2">
@@ -70,7 +76,81 @@ const Header = () => {
               </Link>
             )}
           </div>
+
+          {/* Mobile: Hamburger button */}
+          <div className="flex-1 flex justify-end sm:hidden">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="p-1"
+            >
+              {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+            </Button>
+          </div>
         </div>
+
+        {/* Mobile menu dropdown */}
+        {mobileMenuOpen && (
+          <div className="sm:hidden absolute right-0 top-full z-50 bg-card border rounded-lg shadow-lg p-2 min-w-[160px]">
+            <div className="flex flex-col gap-1">
+              <Link
+                to="/"
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-3 py-2 hover:bg-muted rounded-md text-sm"
+              >
+                Home
+              </Link>
+              {userRole === 'admin' && (
+                <Link
+                  to="/admin"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="px-3 py-2 hover:bg-muted rounded-md text-sm"
+                >
+                  Admin
+                </Link>
+              )}
+              <Link
+                to="/premium"
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-3 py-2 hover:bg-muted rounded-md text-sm flex items-center gap-2"
+              >
+                <Crown className="h-4 w-4" />
+                Premium
+              </Link>
+              {user && (
+                <Link
+                  to="/profile"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="px-3 py-2 hover:bg-muted rounded-md text-sm"
+                >
+                  Profile
+                </Link>
+              )}
+              {user ? (
+                <button
+                  onClick={() => {
+                    signOut();
+                    setMobileMenuOpen(false);
+                  }}
+                  className="px-3 py-2 hover:bg-muted rounded-md text-sm text-left flex items-center gap-2"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Sign Out
+                </button>
+              ) : (
+                <Link
+                  to="/auth"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="px-3 py-2 hover:bg-muted rounded-md text-sm flex items-center gap-2"
+                >
+                  <LogIn className="h-4 w-4" />
+                  Sign In
+                </Link>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </header>
   );

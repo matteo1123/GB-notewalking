@@ -86,12 +86,12 @@ export function ModuleCard({
                 </div>
             )}
 
-            {/* Action Buttons */}
-            <div className="p-4 flex gap-2">
+            {/* Action Buttons - stack on mobile */}
+            <div className="p-3 sm:p-4 flex flex-col sm:flex-row gap-2">
                 <Button
                     onClick={onTryNow}
                     className="flex-1 gap-2"
-                    size="lg"
+                    size="default"
                 >
                     <Play className="w-4 h-4" />
                     Try Now
@@ -100,15 +100,17 @@ export function ModuleCard({
                     onClick={onAddToRoutine}
                     variant="outline"
                     className="flex-1 gap-2"
-                    size="lg"
+                    size="default"
                 >
                     <Plus className="w-4 h-4" />
-                    Add to Routine
+                    <span className="hidden sm:inline">Add to Routine</span>
+                    <span className="sm:hidden">Add</span>
                 </Button>
                 <Button
                     onClick={onViewDetails}
                     variant="ghost"
                     size="icon"
+                    className="hidden sm:flex"
                 >
                     <Info className="w-4 h-4" />
                 </Button>

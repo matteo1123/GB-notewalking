@@ -579,7 +579,7 @@ const RiffPractice = ({
         <div className="flex-shrink-0 bg-card border-b border-border p-2 sm:p-4">
           <div className="flex justify-between items-start">
             {/* Left side: Exercise Info and Controls */}
-            <div className="flex flex-col space-y-4">
+            <div className="flex flex-col space-y-1 sm:space-y-4">
               <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
                 <h2 className="text-lg sm:text-2xl font-bold">{repertoireItem.name}</h2>
                 <div className="hidden sm:flex items-center gap-2">
@@ -609,7 +609,7 @@ const RiffPractice = ({
                   </div>
                 </div>
               </div>
-              <div className="flex items-center gap-4">
+              <div className="hidden sm:flex items-center gap-4">
                 <div className="flex items-center gap-2">
                   <Label htmlFor="tonal-context" className="text-sm">Tonal Context</Label>
                   <Select value={tonalContext} onValueChange={setTonalContext}>

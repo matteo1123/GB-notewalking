@@ -139,10 +139,10 @@ export function PriorityManager({ onStart }: PriorityManagerProps) {
     }
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
             <div>
-                <h2 className="text-2xl font-bold mb-2">Your Practice Priorities</h2>
-                <p className="text-muted-foreground">
+                <h2 className="text-xl sm:text-2xl font-bold mb-1 sm:mb-2">Your Practice Priorities</h2>
+                <p className="text-muted-foreground text-sm sm:text-base">
                     Set your practice priorities. Higher weight = more practice time allocated.
                 </p>
             </div>
@@ -199,17 +199,17 @@ export function PriorityManager({ onStart }: PriorityManagerProps) {
                                         </Button>
                                     </div>
                                 </CardHeader>
-                                <CardContent className="space-y-4">
+                                <CardContent className="space-y-3 sm:space-y-4 pt-2 sm:pt-4">
                                     {/* Weight Slider */}
                                     <div>
-                                        <div className="flex items-center justify-between mb-2">
-                                            <span className="text-sm font-medium">Priority Weight</span>
-                                            <div className="flex items-center gap-2">
-                                                <Badge variant="secondary">
+                                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2 mb-2">
+                                            <span className="text-xs sm:text-sm font-medium">Priority Weight</span>
+                                            <div className="flex items-center gap-1 sm:gap-2">
+                                                <Badge variant="secondary" className="text-xs">
                                                     {priority.weight}/10
                                                 </Badge>
-                                                <Badge variant="outline">
-                                                    ~{timePercentage}% of session
+                                                <Badge variant="outline" className="text-xs">
+                                                    ~{timePercentage}%
                                                 </Badge>
                                             </div>
                                         </div>
@@ -262,21 +262,21 @@ export function PriorityManager({ onStart }: PriorityManagerProps) {
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 {availableModules.map((moduleType) => {
                                     const metadata = MODULE_REGISTRY[moduleType];
                                     return (
                                         <Button
                                             key={moduleType}
                                             variant="outline"
-                                            className="h-auto py-4 flex flex-col items-start gap-2"
+                                            className="h-auto py-3 sm:py-4 flex flex-col items-start gap-1 sm:gap-2"
                                             onClick={() => handleAddPriority(moduleType)}
                                         >
                                             <div className="flex items-center gap-2">
-                                                <span className="text-2xl">{metadata.icon}</span>
-                                                <span className="font-semibold">{metadata.name}</span>
+                                                <span className="text-xl sm:text-2xl">{metadata.icon}</span>
+                                                <span className="font-semibold text-sm sm:text-base">{metadata.name}</span>
                                             </div>
-                                            <span className="text-xs text-muted-foreground text-left">
+                                            <span className="text-xs text-muted-foreground text-left line-clamp-2">
                                                 {metadata.shortDescription}
                                             </span>
                                         </Button>

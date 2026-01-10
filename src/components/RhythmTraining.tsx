@@ -1,5 +1,14 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { generateRhythmPattern, patternToNotation, getSubdivisionLabels, type RhythmPattern } from "@/lib/rhythmGenerator";
+import {
+    generateRhythmPattern,
+    patternToNotation,
+    getSubdivisionLabels,
+    getNextSystematicIndex,
+    SYSTEMATIC_SEQUENCE_LENGTH,
+    type RhythmPattern,
+    type RhythmMode,
+    type DeviationOptions,
+} from "@/lib/rhythmGenerator";
 import { useMetronome, MetronomeSettings } from "@/hooks/useMetronome";
 import { useBpmControls } from "@/hooks/useBpmControls";
 import { useAutoRecording } from "@/hooks/useAutoRecording";
@@ -11,21 +20,32 @@ import { Button } from "./ui/button";
 import { Slider } from "./ui/slider";
 import { Label } from "./ui/label";
 import { Switch } from "./ui/switch";
-import { SkipForward, ChevronLeft, ChevronRight, Check, Mic, Settings, ChevronUp } from "lucide-react";
+import { Checkbox } from "./ui/checkbox";
+import { SkipForward, ChevronLeft, ChevronRight, Check, Mic, Settings, ChevronUp, Shuffle, ListOrdered } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui/collapsible";
 import { ForceLandscapeWrapper } from "./ForceLandscapeWrapper";
 
 interface RhythmTrainingProps {
     autoStart?: boolean;
-    sessionId?: string; // Practice session ID for linking logs
+    sessionId?: string;
 }
 
 export function RhythmTraining({ autoStart = false, sessionId }: RhythmTrainingProps) {
+    // Rhythm mode and deviation types
+    const [rhythmMode, setRhythmMode] = useState<RhythmMode>('random');
+    const [deviationTypes, setDeviationTypes] = useState<DeviationOptions>({ skip: true, triplet: false });
+    const [systematicIndex, setSystematicIndex] = useState(0);
+
+    // Pattern state
     const [level, setLevel] = useState(0);
-    const [pattern, setPattern] = useState<RhythmPattern>(() => generateRhythmPattern(0));
+    const [pattern, setPattern] = useState<RhythmPattern>(() => generateRhythmPattern({
+        mode: 'random',
+        deviationTypes: { skip: true, triplet: false },
+        level: 0,
+    }));
     const [isPlaying, setIsPlaying] = useState(false);
-    const [bpm, setBpm] = useState(60); // Start slower for rhythm practice
-    const [mode, setMode] = useState<MetronomeMode>("regular");
+    const [bpm, setBpm] = useState(60);
+    const [metronomeMode, setMetronomeMode] = useState<MetronomeMode>("regular");
     const [loop, setLoop] = useState(true);
     const [drumBeat, setDrumBeat] = useState(false);
     const [tickCount, setTickCount] = useState(0);
@@ -77,7 +97,7 @@ export function RhythmTraining({ autoStart = false, sessionId }: RhythmTrainingP
 
     // Metronome setup with auto-switch logic
     const metronomeSettings: MetronomeSettings = {
-        mode,
+        mode: metronomeMode,
         startBpm: bpm,
         endBpm: bpm,
         measures: 999,
@@ -122,13 +142,17 @@ export function RhythmTraining({ autoStart = false, sessionId }: RhythmTrainingP
         isEnabled: true,
     });
 
-    // Generate new pattern for current level
+    // Generate new pattern based on current settings
     const generateNewPattern = useCallback(() => {
-        const newPattern = generateRhythmPattern(level);
-        setPattern(newPattern);
+        setPattern(generateRhythmPattern({
+            mode: rhythmMode,
+            deviationTypes,
+            level: level,
+            systematicIndex: level
+        }));
         setHasConfirmed(false);
         beatCountRef.current = 0;
-    }, [level]);
+    }, [level, rhythmMode, deviationTypes]);
 
     // Handle play/pause
     const handlePlayPause = useCallback(() => {
@@ -150,16 +174,66 @@ export function RhythmTraining({ autoStart = false, sessionId }: RhythmTrainingP
 
     // Handle next pattern
     const handleNext = useCallback(() => {
-        generateNewPattern();
-    }, [generateNewPattern]);
+        if (rhythmMode === 'systematic') {
+            // In systematic mode, next means next index
+            const nextIndex = getNextSystematicIndex(level);
+            setLevel(nextIndex);
+            // generateNewPattern will be called by effect or we call it directly with new level
+            // Better to just set level and let effect handle it, OR call generator directly
+            setPattern(generateRhythmPattern({
+                mode: 'systematic',
+                deviationTypes,
+                level: nextIndex,
+                systematicIndex: nextIndex
+            }));
+            setHasConfirmed(false);
+            beatCountRef.current = 0;
+        } else {
+            generateNewPattern();
+        }
+    }, [rhythmMode, level, deviationTypes, generateNewPattern]);
 
     // Handle level change
     const handleLevelChange = useCallback((newLevel: number) => {
         setLevel(newLevel);
-        setPattern(generateRhythmPattern(newLevel));
+        setPattern(generateRhythmPattern({
+            mode: rhythmMode,
+            deviationTypes,
+            level: newLevel,
+            systematicIndex: newLevel
+        }));
         setHasConfirmed(false);
         beatCountRef.current = 0;
-    }, []);
+    }, [rhythmMode, deviationTypes]);
+
+    // Handle settings changes
+    const toggleMode = () => {
+        const newMode = rhythmMode === 'random' ? 'systematic' : 'random';
+        setRhythmMode(newMode);
+        // Reset level to 0 when switching modes for clarity
+        setLevel(0);
+        setPattern(generateRhythmPattern({
+            mode: newMode,
+            deviationTypes,
+            level: 0,
+            systematicIndex: 0
+        }));
+    };
+
+    const toggleDeviation = (type: 'skip' | 'triplet') => {
+        const newTypes = { ...deviationTypes, [type]: !deviationTypes[type] };
+        // Ensure at least one is selected
+        if (!newTypes.skip && !newTypes.triplet) return;
+
+        setDeviationTypes(newTypes);
+        setPattern(generateRhythmPattern({
+            mode: rhythmMode,
+            deviationTypes: newTypes,
+            level,
+            systematicIndex: level
+        }));
+    };
+
 
     // Handle user confirmation - they played it correctly
     const handleConfirm = useCallback(() => {
@@ -169,11 +243,8 @@ export function RhythmTraining({ autoStart = false, sessionId }: RhythmTrainingP
     // Handle "Next Rhythm" - move to harder level
     const handleNextRhythm = useCallback(() => {
         const newLevel = Math.min(level + 1, 15); // Cap at 15
-        setLevel(newLevel);
-        setPattern(generateRhythmPattern(newLevel));
-        setHasConfirmed(false);
-        beatCountRef.current = 0;
-    }, [level]);
+        handleLevelChange(newLevel);
+    }, [level, handleLevelChange]);
 
     // Handle recording via the existing auto-recording hook
     const handleRecord = useCallback(() => {
@@ -231,7 +302,7 @@ export function RhythmTraining({ autoStart = false, sessionId }: RhythmTrainingP
                         {/* Pattern name - minimal on mobile */}
                         <div className="text-center mb-1 sm:mb-6">
                             <h2 className="text-xs sm:text-2xl font-semibold">{pattern.name}</h2>
-                            <p className="text-xs sm:text-base text-muted-foreground hidden sm:block">{pattern.description}</p>
+                            {/* Description removed as requested */}
                         </div>
 
                         {/* Subdivision Labels - small on mobile */}
@@ -270,6 +341,52 @@ export function RhythmTraining({ autoStart = false, sessionId }: RhythmTrainingP
                     <div className="flex-shrink-0 flex flex-col sm:grid sm:grid-cols-2 gap-1 sm:gap-3">
                         {/* Mobile: Just the essentials - stacked buttons */}
                         <div className="bg-card border border-border rounded-lg p-2 sm:p-4 space-y-2 sm:space-y-4">
+                            {/* Mode & Deviation Toggles */}
+                            <div className="flex flex-col gap-2">
+                                {/* Mode Toggle */}
+                                <div className="flex bg-muted/30 p-1 rounded-lg">
+                                    <Button
+                                        variant={rhythmMode === 'systematic' ? 'default' : 'ghost'}
+                                        size="sm"
+                                        onClick={() => rhythmMode !== 'systematic' && toggleMode()}
+                                        className="flex-1 h-7 text-xs"
+                                    >
+                                        <ListOrdered className="w-3 h-3 mr-1" />
+                                        Systematic
+                                    </Button>
+                                    <Button
+                                        variant={rhythmMode === 'random' ? 'default' : 'ghost'}
+                                        size="sm"
+                                        onClick={() => rhythmMode !== 'random' && toggleMode()}
+                                        className="flex-1 h-7 text-xs"
+                                    >
+                                        <Shuffle className="w-3 h-3 mr-1" />
+                                        Random
+                                    </Button>
+                                </div>
+
+                                {/* Deviation Types */}
+                                <div className="flex items-center justify-between px-1">
+                                    <div className="flex items-center space-x-2">
+                                        <Checkbox
+                                            id="dev-triplet"
+                                            checked={deviationTypes.triplet}
+                                            onCheckedChange={() => toggleDeviation('triplet')}
+                                        />
+                                        <Label htmlFor="dev-triplet" className="text-xs sm:text-sm cursor-pointer">Triplet</Label>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                        <Checkbox
+                                            id="dev-skip"
+                                            checked={deviationTypes.skip}
+                                            onCheckedChange={() => toggleDeviation('skip')}
+                                        />
+                                        <Label htmlFor="dev-skip" className="text-xs sm:text-sm cursor-pointer">Skip</Label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="h-px bg-border" />
                             {/* Level nav - inline on mobile */}
                             <div className="flex items-center gap-1 sm:gap-2">
                                 <Button
@@ -398,13 +515,13 @@ export function RhythmTraining({ autoStart = false, sessionId }: RhythmTrainingP
                                 onRestart={handleRestart}
                                 drumBeat={drumBeat}
                                 onStateChange={(newState) => {
-                                    setMode(newState.mode);
+                                    setMetronomeMode(newState.mode);
                                     setBpm(newState.startBpm);
                                     setLoop(newState.loop);
                                     if (newState.drumBeat !== undefined) setDrumBeat(newState.drumBeat);
                                 }}
                                 initialState={{
-                                    mode,
+                                    mode: metronomeMode,
                                     startBpm: bpm,
                                     endBpm: bpm + 40,
                                     increments: 8,

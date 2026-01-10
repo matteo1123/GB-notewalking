@@ -13,6 +13,7 @@ import { Label } from "./ui/label";
 import { Switch } from "./ui/switch";
 import { SkipForward, ChevronLeft, ChevronRight, Check, Mic, Settings, ChevronUp } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui/collapsible";
+import { ForceLandscapeWrapper } from "./ForceLandscapeWrapper";
 
 interface RhythmTrainingProps {
     autoStart?: boolean;
@@ -191,243 +192,232 @@ export function RhythmTraining({ autoStart = false, sessionId }: RhythmTrainingP
     }, [level, handleLevelChange]);
 
     return (
-        <div className="flex flex-col h-full bpm-control-area">
-            <div className="flex-1 flex flex-col p-3 min-h-0 overflow-hidden">
-                {/* Header */}
-                <div className="flex-shrink-0 flex justify-between items-center mb-3">
-                    <div>
-                        <h1 className="text-2xl font-bold">Rhythm Training</h1>
-                        <p className="text-sm text-muted-foreground">
-                            Master 16th note strumming patterns
+        <ForceLandscapeWrapper>
+            <div className="flex flex-col h-full bpm-control-area">
+                <div className="flex-1 flex flex-col p-2 sm:p-3 min-h-0 overflow-hidden">
+                    {/* Header - ULTRA compact on mobile, hide subtitle */}
+                    <div className="flex-shrink-0 flex justify-between items-center mb-1 sm:mb-3">
+                        <div className="flex items-center gap-2">
+                            <h1 className="text-sm sm:text-2xl font-bold">Rhythm</h1>
+                            <span className="text-xs bg-muted px-1.5 py-0.5 rounded">L{level}</span>
+                        </div>
+                        <BeatVisualizer
+                            currentBeat={metronome.state.currentBeat}
+                            isPlaying={metronome.state.isPlaying}
+                            currentBpm={metronome.state.isPlaying ? metronome.state.currentBpm : bpm}
+                        />
+                    </div>
+
+                    {/* Recording indicators - hidden on mobile to save space */}
+                    {recording.countdown && (
+                        <div className="hidden sm:flex flex-shrink-0 mb-2 bg-yellow-500/20 border border-yellow-500/50 rounded-lg p-2 items-center justify-center">
+                            <span className="text-sm font-semibold text-yellow-700 dark:text-yellow-400 animate-pulse">
+                                Recording in {recording.countdown} clicks...
+                            </span>
+                        </div>
+                    )}
+
+                    {recording.isRecording && (
+                        <div className="flex-shrink-0 mb-1 sm:mb-2 bg-red-500/20 border border-red-500/50 rounded-lg p-1 sm:p-2 flex items-center justify-center gap-1 sm:gap-2">
+                            <div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-red-500 animate-pulse" />
+                            <span className="text-xs sm:text-sm font-semibold text-red-700 dark:text-red-400">
+                                REC
+                            </span>
+                        </div>
+                    )}
+
+                    {/* RHYTHM NOTATION - THE MAIN CONTENT - 40%+ of screen on mobile */}
+                    <div className="flex-1 bg-card border border-border rounded-lg p-1 sm:p-6 mb-1 sm:mb-3 flex flex-col items-center justify-center min-h-[40vh] sm:min-h-0">
+                        {/* Pattern name - minimal on mobile */}
+                        <div className="text-center mb-1 sm:mb-6">
+                            <h2 className="text-xs sm:text-2xl font-semibold">{pattern.name}</h2>
+                            <p className="text-xs sm:text-base text-muted-foreground hidden sm:block">{pattern.description}</p>
+                        </div>
+
+                        {/* Subdivision Labels - small on mobile */}
+                        <div className="text-xs sm:text-xl font-mono text-muted-foreground mb-1 sm:mb-2 tracking-wide sm:tracking-wider">
+                            {getSubdivisionLabels()}
+                        </div>
+
+                        {/* ========== RHYTHM NOTATION - MASSIVE ON MOBILE ========== */}
+                        <div className="text-4xl sm:text-5xl font-mono mb-1 sm:mb-6 tracking-tight sm:tracking-wider font-bold leading-tight">
+                            {patternToNotation(pattern)}
+                        </div>
+
+                        {/* Deviations count - compact mobile */}
+                        <p className="text-xs text-muted-foreground">
+                            {pattern.deviationCount} {pattern.deviationCount === 1 ? 'skip' : 'skips'}
                         </p>
-                    </div>
-                    <BeatVisualizer
-                        currentBeat={metronome.state.currentBeat}
-                        isPlaying={metronome.state.isPlaying}
-                        currentBpm={metronome.state.isPlaying ? metronome.state.currentBpm : bpm}
-                    />
-                </div>
 
-                {/* Recording Countdown */}
-                {recording.countdown && (
-                    <div className="flex-shrink-0 mb-2 bg-yellow-500/20 border border-yellow-500/50 rounded-lg p-2 flex items-center justify-center">
-                        <span className="text-sm font-semibold text-yellow-700 dark:text-yellow-400 animate-pulse">
-                            Recording in {recording.countdown} clicks...
-                        </span>
-                    </div>
-                )}
-
-                {/* Recording Indicator */}
-                {recording.isRecording && (
-                    <div className="flex-shrink-0 mb-2 bg-red-500/20 border border-red-500/50 rounded-lg p-2 flex items-center justify-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
-                        <span className="text-sm font-semibold text-red-700 dark:text-red-400">
-                            RECORDING
-                        </span>
-                    </div>
-                )}
-
-                {/* Pattern Display - takes remaining space */}
-                <div className="flex-1 bg-card border border-border rounded-lg p-6 mb-3 flex flex-col items-center justify-center min-h-0 overflow-auto">
-                    <div className="text-center mb-6">
-                        <h2 className="text-2xl font-semibold mb-2">{pattern.name}</h2>
-                        <p className="text-base text-muted-foreground">{pattern.description}</p>
-                        <p className="text-sm text-muted-foreground mt-2">
-                            Level {pattern.level} • {pattern.deviationCount} {pattern.deviationCount === 1 ? 'deviation' : 'deviations'}
-                        </p>
-                    </div>
-
-                    {/* Subdivision Labels */}
-                    <div className="text-xl font-mono text-muted-foreground mb-2 tracking-wider">
-                        {getSubdivisionLabels()}
-                    </div>
-
-                    {/* Rhythm Notation */}
-                    <div className="text-5xl font-mono mb-6 tracking-wider font-bold">
-                        {patternToNotation(pattern)}
-                    </div>
-
-                    {/* Legend */}
-                    <div className="flex gap-6 text-sm text-muted-foreground">
-                        <div className="flex items-center gap-2">
-                            <span className="text-2xl">↓</span>
-                            <span>Down strum</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <span className="text-2xl">↑</span>
-                            <span>Up strum</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <span className="text-2xl">·</span>
-                            <span>Skip (rest)</span>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Controls - fixed height at bottom */}
-                <div className="flex-shrink-0 grid grid-cols-1 lg:grid-cols-2 gap-3">
-                    {/* Left: Level Control & Confirmation Flow */}
-                    <div className="bg-card border border-border rounded-lg p-4 space-y-4">
-                        {/* Level slider with prev/next buttons */}
-                        <div>
-                            <div className="flex items-center justify-between mb-2">
-                                <Label>Difficulty Level</Label>
-                                <span className="text-sm font-semibold">{level}</span>
+                        {/* Legend - hide on mobile */}
+                        <div className="hidden sm:flex gap-6 text-sm text-muted-foreground mt-4">
+                            <div className="flex items-center gap-2">
+                                <span className="text-2xl">↓</span>
+                                <span>Down strum</span>
                             </div>
                             <div className="flex items-center gap-2">
+                                <span className="text-2xl">↑</span>
+                                <span>Up strum</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className="text-2xl">·</span>
+                                <span>Skip (rest)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Controls - MINIMAL on mobile */}
+                    <div className="flex-shrink-0 flex flex-col sm:grid sm:grid-cols-2 gap-1 sm:gap-3">
+                        {/* Mobile: Just the essentials - stacked buttons */}
+                        <div className="bg-card border border-border rounded-lg p-2 sm:p-4 space-y-2 sm:space-y-4">
+                            {/* Level nav - inline on mobile */}
+                            <div className="flex items-center gap-1 sm:gap-2">
                                 <Button
                                     variant="outline"
                                     size="icon"
                                     onClick={handlePreviousLevel}
                                     disabled={level === 0}
-                                    className="h-8 w-8"
+                                    className="h-7 w-7 sm:h-8 sm:w-8"
                                 >
-                                    <ChevronLeft className="h-4 w-4" />
+                                    <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
                                 </Button>
-                                <Slider
-                                    min={0}
-                                    max={15}
-                                    step={1}
-                                    value={[level]}
-                                    onValueChange={([value]) => handleLevelChange(value)}
-                                    className="flex-1"
-                                />
+                                {/* Hide slider on mobile, show inline level */}
+                                <div className="flex-1 hidden sm:block">
+                                    <Slider
+                                        min={0}
+                                        max={15}
+                                        step={1}
+                                        value={[level]}
+                                        onValueChange={([value]) => handleLevelChange(value)}
+                                    />
+                                </div>
+                                <span className="flex-1 text-center text-xs sm:hidden">Level {level}/15</span>
                                 <Button
                                     variant="outline"
                                     size="icon"
                                     onClick={handleNextLevel}
                                     disabled={level >= 15}
-                                    className="h-8 w-8"
+                                    className="h-7 w-7 sm:h-8 sm:w-8"
                                 >
-                                    <ChevronRight className="h-4 w-4" />
+                                    <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
                                 </Button>
                             </div>
-                            <p className="text-xs text-muted-foreground mt-2">
-                                {level === 0 ? "Start here: all 16 strums" : `${pattern.deviationCount} skip${pattern.deviationCount > 1 ? 's' : ''} to master`}
-                            </p>
+
+                            {/* Confirmation Flow - compact on mobile */}
+                            {!hasConfirmed ? (
+                                <div className="flex gap-1 sm:flex-col sm:gap-2">
+                                    <Button
+                                        onClick={handleConfirm}
+                                        className="flex-1 bg-green-600 hover:bg-green-700 h-8 sm:h-10 text-xs sm:text-sm"
+                                    >
+                                        <Check className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                                        <span className="hidden sm:inline">I played it correctly!</span>
+                                        <span className="sm:hidden">✓ Correct</span>
+                                    </Button>
+                                    <Button
+                                        onClick={handleNext}
+                                        variant="outline"
+                                        className="flex-1 h-8 sm:h-10 text-xs sm:text-sm"
+                                    >
+                                        <SkipForward className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                                        <span className="hidden sm:inline">Generate New</span>
+                                        <span className="sm:hidden">New</span>
+                                    </Button>
+                                </div>
+                            ) : (
+                                <div className="space-y-1 sm:space-y-2">
+                                    <div className="hidden sm:block bg-green-500/20 border border-green-500/50 rounded-lg p-2 text-center">
+                                        <span className="text-sm font-semibold text-green-700 dark:text-green-400">
+                                            ✓ Great job! What's next?
+                                        </span>
+                                    </div>
+                                    <div className="flex gap-1 sm:grid sm:grid-cols-2 sm:gap-2">
+                                        <Button
+                                            onClick={handleRecord}
+                                            variant="outline"
+                                            className="flex-1 border-red-500/50 hover:bg-red-500/10 h-8 sm:h-10 text-xs sm:text-sm"
+                                            disabled={recording.isRecording}
+                                        >
+                                            <Mic className="w-3 h-3 sm:w-4 sm:h-4 mr-1 text-red-500" />
+                                            Rec
+                                        </Button>
+                                        <Button
+                                            onClick={handleNextRhythm}
+                                            className="flex-1 bg-blue-600 hover:bg-blue-700 h-8 sm:h-10 text-xs sm:text-sm"
+                                        >
+                                            <SkipForward className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+                                            Next
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Settings - HIDDEN on mobile */}
+                            <Collapsible open={settingsOpen} onOpenChange={setSettingsOpen} className="hidden sm:block">
+                                <CollapsibleTrigger asChild>
+                                    <Button variant="ghost" className="w-full flex items-center justify-between p-2 h-auto">
+                                        <div className="flex items-center gap-2">
+                                            <Settings className="w-4 h-4" />
+                                            <span className="text-sm">Settings</span>
+                                        </div>
+                                        <ChevronUp className={`w-4 h-4 transition-transform ${settingsOpen ? '' : 'rotate-180'}`} />
+                                    </Button>
+                                </CollapsibleTrigger>
+                                <CollapsibleContent className="space-y-3 pt-2">
+                                    <div className="flex items-center justify-between bg-muted/30 rounded-lg p-3">
+                                        <div>
+                                            <Label htmlFor="auto-switch">Auto-Switch</Label>
+                                            <p className="text-xs text-muted-foreground">Auto-advance to new pattern</p>
+                                        </div>
+                                        <Switch id="auto-switch" checked={autoSwitch} onCheckedChange={setAutoSwitch} />
+                                    </div>
+                                    {autoSwitch && (
+                                        <div className="bg-muted/30 rounded-lg p-3">
+                                            <div className="flex items-center justify-between mb-2">
+                                                <Label>Measures between switches</Label>
+                                                <span className="text-sm font-semibold">{switchMeasures}</span>
+                                            </div>
+                                            <Slider
+                                                min={1}
+                                                max={8}
+                                                step={1}
+                                                value={[switchMeasures]}
+                                                onValueChange={([value]) => setSwitchMeasures(value)}
+                                            />
+                                        </div>
+                                    )}
+                                </CollapsibleContent>
+                            </Collapsible>
                         </div>
 
-                        {/* Confirmation Flow */}
-                        {!hasConfirmed ? (
-                            <div className="space-y-2">
-                                <Button
-                                    onClick={handleConfirm}
-                                    className="w-full bg-green-600 hover:bg-green-700"
-                                >
-                                    <Check className="w-4 h-4 mr-2" />
-                                    I played it correctly!
-                                </Button>
-                                <Button
-                                    onClick={handleNext}
-                                    variant="outline"
-                                    className="w-full"
-                                >
-                                    <SkipForward className="w-4 h-4 mr-2" />
-                                    Generate New Pattern
-                                </Button>
-                            </div>
-                        ) : (
-                            <div className="space-y-2">
-                                <div className="bg-green-500/20 border border-green-500/50 rounded-lg p-2 text-center mb-2">
-                                    <span className="text-sm font-semibold text-green-700 dark:text-green-400">
-                                        ✓ Great job! What's next?
-                                    </span>
-                                </div>
-                                <div className="grid grid-cols-2 gap-2">
-                                    <Button
-                                        onClick={handleRecord}
-                                        variant="outline"
-                                        className="border-red-500/50 hover:bg-red-500/10"
-                                        disabled={recording.isRecording}
-                                    >
-                                        <Mic className="w-4 h-4 mr-2 text-red-500" />
-                                        Record
-                                    </Button>
-                                    <Button
-                                        onClick={handleNextRhythm}
-                                        className="bg-blue-600 hover:bg-blue-700"
-                                    >
-                                        <SkipForward className="w-4 h-4 mr-2" />
-                                        Next Rhythm
-                                    </Button>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Settings Collapsible */}
-                        <Collapsible open={settingsOpen} onOpenChange={setSettingsOpen}>
-                            <CollapsibleTrigger asChild>
-                                <Button variant="ghost" className="w-full flex items-center justify-between p-2 h-auto">
-                                    <div className="flex items-center gap-2">
-                                        <Settings className="w-4 h-4" />
-                                        <span className="text-sm">Settings</span>
-                                    </div>
-                                    <ChevronUp className={`w-4 h-4 transition-transform ${settingsOpen ? '' : 'rotate-180'}`} />
-                                </Button>
-                            </CollapsibleTrigger>
-                            <CollapsibleContent className="space-y-3 pt-2">
-                                {/* Auto-Switch Toggle */}
-                                <div className="flex items-center justify-between bg-muted/30 rounded-lg p-3">
-                                    <div>
-                                        <Label htmlFor="auto-switch">Auto-Switch</Label>
-                                        <p className="text-xs text-muted-foreground">
-                                            Auto-advance to new pattern
-                                        </p>
-                                    </div>
-                                    <Switch
-                                        id="auto-switch"
-                                        checked={autoSwitch}
-                                        onCheckedChange={setAutoSwitch}
-                                    />
-                                </div>
-
-                                {/* Measures between switches */}
-                                {autoSwitch && (
-                                    <div className="bg-muted/30 rounded-lg p-3">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <Label>Measures between switches</Label>
-                                            <span className="text-sm font-semibold">{switchMeasures}</span>
-                                        </div>
-                                        <Slider
-                                            min={1}
-                                            max={8}
-                                            step={1}
-                                            value={[switchMeasures]}
-                                            onValueChange={([value]) => setSwitchMeasures(value)}
-                                        />
-                                    </div>
-                                )}
-                            </CollapsibleContent>
-                        </Collapsible>
-                    </div>
-
-                    {/* Right: Metronome Controls */}
-                    <div>
-                        <MetronomeControls
-                            isPlaying={isPlaying}
-                            onPlayPause={handlePlayPause}
-                            onRestart={handleRestart}
-                            drumBeat={drumBeat}
-                            onStateChange={(newState) => {
-                                setMode(newState.mode);
-                                setBpm(newState.startBpm);
-                                setLoop(newState.loop);
-                                if (newState.drumBeat !== undefined) setDrumBeat(newState.drumBeat);
-                            }}
-                            initialState={{
-                                mode,
-                                startBpm: bpm,
-                                endBpm: bpm + 40, // Proper default for speed trainer/progressive modes
-                                increments: 8,
-                                measuresPerIncrement: 4,
-                                loop,
-                                progressiveStepBpm: 5,
-                            }}
-                            compact
-                        />
+                        {/* Metronome Controls */}
+                        <div>
+                            <MetronomeControls
+                                isPlaying={isPlaying}
+                                onPlayPause={handlePlayPause}
+                                onRestart={handleRestart}
+                                drumBeat={drumBeat}
+                                onStateChange={(newState) => {
+                                    setMode(newState.mode);
+                                    setBpm(newState.startBpm);
+                                    setLoop(newState.loop);
+                                    if (newState.drumBeat !== undefined) setDrumBeat(newState.drumBeat);
+                                }}
+                                initialState={{
+                                    mode,
+                                    startBpm: bpm,
+                                    endBpm: bpm + 40,
+                                    increments: 8,
+                                    measuresPerIncrement: 4,
+                                    loop,
+                                    progressiveStepBpm: 5,
+                                }}
+                                compact
+                            />
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
+        </ForceLandscapeWrapper>
     );
 }

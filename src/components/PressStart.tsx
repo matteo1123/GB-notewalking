@@ -7,10 +7,9 @@ import { Badge } from './ui/badge';
 import { Input } from './ui/input';
 import { Play, Clock, Target, Zap, History, Pencil } from 'lucide-react';
 import { useToast } from './ui/use-toast';
-import { generatePracticeSession, formatSessionSummary, type SessionBlock } from '@/lib/sessionGenerator';
+import { generatePracticeSession, type SessionBlock } from '@/lib/sessionGenerator';
 import type { UserPriority } from '@/types/priorities';
-import { SessionExecutor } from './SessionExecutor';
-import { SessionWrapUp } from './SessionWrapUp';
+import { useSession } from '@/contexts/SessionContext';
 
 // Interface for recordings fetched after session
 interface SessionRecording {
@@ -42,17 +41,19 @@ interface SavedSession {
 export function PressStart() {
     const { user } = useAuth();
     const { toast } = useToast();
+    const { startSession } = useSession(); // Use context
+
     const [priorities, setPriorities] = useState<UserPriority[]>([]);
     const [selectedDuration, setSelectedDuration] = useState(30);
     const [sessionPlan, setSessionPlan] = useState<SessionPlanData | null>(null);
     const [sessionName, setSessionName] = useState('');
     const [recentSessions, setRecentSessions] = useState<SavedSession[]>([]);
-    const [isExecuting, setIsExecuting] = useState(false);
-    const [sessionComplete, setSessionComplete] = useState(false);
+
+    // We strictly use context for execution state now. 
+    // If context.isActive is true, Premium.tsx handles the view switch.
+    // So PressStart only needs to worry about generating and calling startSession.
+
     const [loading, setLoading] = useState(true);
-    const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
-    const [sessionRecordings, setSessionRecordings] = useState<SessionRecording[]>([]);
-    const [completedBlocks, setCompletedBlocks] = useState<SessionBlock[]>([]);
 
     const [warmupCandidates, setWarmupCandidates] = useState<{ id: string; name: string; type: 'scale' | 'arpeggio' }[]>([]);
 
@@ -229,79 +230,18 @@ export function PressStart() {
         const planToUse = planData || sessionPlan;
         if (!planToUse || !user) return;
 
-        // Save session to database (store the full planData object including name)
-        const { data, error } = await supabase
-            .from('practice_sessions' as any)
-            .insert([
-                {
-                    user_id: user.id,
-                    session_plan: planToUse,
-                    total_duration_seconds: selectedDuration * 60,
-                    started_at: new Date().toISOString(),
-                },
-            ])
-            .select()
-            .single();
+        // Use global context to start session
+        // Pass the calculated duration and the generated blocks
+        await startSession(selectedDuration, undefined, planToUse.blocks);
 
-        if (error) {
-            toast({
-                title: 'Error starting session',
-                description: error.message,
-                variant: 'destructive',
-            });
-        } else {
-            // Store the session ID for linking practice logs
-            setCurrentSessionId((data as any)?.id || null);
-            setIsExecuting(true);
-            if (!planData) {
-                // Reload recent sessions
-                loadRecentSessions();
-            }
-        }
-    };
-
-    const handleSessionComplete = async () => {
-        setIsExecuting(false);
-
-        // Save the completed blocks for the wrap-up screen
-        if (sessionPlan) {
-            setCompletedBlocks(sessionPlan.blocks);
-        }
-
-        // Fetch recordings for this session
-        if (currentSessionId) {
-            const { data: recordings } = await supabase
-                .from('practice_log' as any)
-                .select('id, audio, module_type, duration, created_at')
-                .eq('session_id', currentSessionId)
-                .not('audio', 'is', null)
-                .order('created_at', { ascending: true });
-
-            if (recordings && Array.isArray(recordings)) {
-                setSessionRecordings(recordings as unknown as SessionRecording[]);
-            }
-        }
-
-        setSessionComplete(true);
-
-        // Reload recent sessions
-        await loadRecentSessions();
-    };
-
-    const handleRestart = () => {
-        setSessionPlan(null);
-        setSessionName('');
-        setIsExecuting(false);
-        setSessionComplete(false);
-        setCurrentSessionId(null);
-        setSessionRecordings([]);
-        setCompletedBlocks([]);
+        // Context update will trigger Premium.tsx to change view
     };
 
     const handleUseRecentSession = (session: SavedSession) => {
         // Inherit the full plan data (including name) from the old session
         setSessionPlan(session.planData);
         setSessionName(session.planData.name || '');
+        // Start immediately
         handleStartSession(session.planData);
     };
 
@@ -342,30 +282,6 @@ export function PressStart() {
             });
         }
     };
-
-    // Show session executor
-    if (isExecuting && sessionPlan) {
-        return (
-            <SessionExecutor
-                sessionPlan={sessionPlan.blocks}
-                sessionId={currentSessionId || undefined}
-                onComplete={handleSessionComplete}
-                onExit={() => setIsExecuting(false)}
-            />
-        );
-    }
-
-    // Show completion screen with wrap-up
-    if (sessionComplete) {
-        return (
-            <SessionWrapUp
-                sessionBlocks={completedBlocks}
-                recordings={sessionRecordings}
-                totalDurationMinutes={selectedDuration}
-                onRestart={handleRestart}
-            />
-        );
-    }
 
     if (loading) {
         return <div className="p-4">Loading...</div>;

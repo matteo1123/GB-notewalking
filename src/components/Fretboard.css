@@ -255,3 +255,40 @@
     height: 10px;
   }
 }
+
+/* Fullscreen Modal Fretboard - Override mobile styles for larger display */
+.fretboard-modal-view .fretboard-area {
+  margin-bottom: 0;
+}
+
+.fretboard-modal-view .open-notes-container {
+  grid-template-columns: 40px;
+  grid-template-rows: repeat(6, 35px);
+  margin-right: 8px;
+}
+
+.fretboard-modal-view .open-notes-container::before {
+  font-size: 14px;
+  top: -22px;
+}
+
+.fretboard-modal-view .fretboard {
+  grid-template-columns: repeat(24, 40px);
+  grid-template-rows: repeat(6, 35px);
+  max-width: none;
+  width: auto;
+}
+
+.fretboard-modal-view .dot {
+  width: 26px;
+  height: 26px;
+}
+
+.fretboard-modal-view .degree-number {
+  font-size: 14px;
+}
+
+.fretboard-modal-view .marker {
+  width: 18px;
+  height: 18px;
+}

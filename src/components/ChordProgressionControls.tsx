@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { ChordNumeral, ChordProgressionSettings } from "@/types/chords";
 import { getDiatonicChords } from "@/lib/chordProgression";
 import { Button } from "./ui/button";
@@ -11,7 +12,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "./ui/select";
-import { Play, Pause, Volume2, Headphones } from "lucide-react";
+import { Play, Pause, Volume2, Headphones, ArrowRightLeft } from "lucide-react";
 
 interface ChordProgressionControlsProps {
     settings: ChordProgressionSettings;
@@ -44,34 +45,32 @@ export function ChordProgressionControls({
     currentBpm,
 }: ChordProgressionControlsProps) {
     const diatonicChords = getDiatonicChords();
+    const [activeSlot, setActiveSlot] = useState<0 | 1>(0);
 
-    const handleChordToggle = (chord: ChordNumeral, checked: boolean) => {
-        let newChords: ChordNumeral[];
-
-        if (checked) {
-            // Add chord in diatonic order
-            newChords = [...settings.selectedChords, chord].sort(
-                (a, b) => diatonicChords.indexOf(a) - diatonicChords.indexOf(b)
-            );
-        } else {
-            newChords = settings.selectedChords.filter((c) => c !== chord);
+    const handleChordSelect = (chord: ChordNumeral) => {
+        // Ensure we always have 2 chords
+        const newChords = [...(settings.selectedChords || ["I", "IV"])];
+        if (newChords.length < 2) {
+            newChords.push("I"); // Fill if missing
+            if (newChords.length < 2) newChords.push("IV");
         }
 
-        // Ensure at least one chord is selected
-        if (newChords.length === 0) {
-            newChords = ["I"];
-        }
+        // Update the active slot
+        newChords[activeSlot] = chord;
 
         onSettingsChange({ selectedChords: newChords });
     };
+
+    const currentChordA = settings.selectedChords[0] || "I";
+    const currentChordB = settings.selectedChords[1] || "IV";
 
     return (
         <div className="bg-card border border-border rounded-lg p-3 space-y-3 shadow-lg">
             {/* Header */}
             <div>
-                <h2 className="text-lg font-bold mb-0.5">Chord Progression Practice</h2>
+                <h2 className="text-lg font-bold mb-0.5">Notewalking</h2>
                 <p className="text-xs text-muted-foreground">
-                    Practice scale degrees over different chord changes
+                    Master the relationship between two chords
                 </p>
             </div>
 
@@ -108,43 +107,65 @@ export function ChordProgressionControls({
                 </Select>
             </div>
 
-            {/* Chord Selection */}
+            {/* Two-Chord Slot Selection */}
             <div className="space-y-2">
-                <Label className="text-xs">Select Chords</Label>
+                <Label className="text-xs">Chord Relationship</Label>
+                <div className="flex items-center gap-2">
+                    {/* Slot A */}
+                    <div
+                        className={`flex-1 p-3 rounded-lg border-2 cursor-pointer transition-all text-center ${activeSlot === 0
+                                ? "border-primary bg-primary/10 ring-1 ring-primary/50"
+                                : "border-border hover:border-primary/50"
+                            }`}
+                        onClick={() => setActiveSlot(0)}
+                    >
+                        <span className="text-xs text-muted-foreground block mb-1">Chord A</span>
+                        <span className="text-2xl font-bold">{currentChordA}</span>
+                    </div>
+
+                    <ArrowRightLeft className="w-4 h-4 text-muted-foreground" />
+
+                    {/* Slot B */}
+                    <div
+                        className={`flex-1 p-3 rounded-lg border-2 cursor-pointer transition-all text-center ${activeSlot === 1
+                                ? "border-primary bg-primary/10 ring-1 ring-primary/50"
+                                : "border-border hover:border-primary/50"
+                            }`}
+                        onClick={() => setActiveSlot(1)}
+                    >
+                        <span className="text-xs text-muted-foreground block mb-1">Chord B</span>
+                        <span className="text-2xl font-bold">{currentChordB}</span>
+                    </div>
+                </div>
+            </div>
+
+            {/* Diatonic Chord Grid (Selector) */}
+            <div className="space-y-1.5 pt-2 border-t border-border">
+                <Label className="text-xs">
+                    Select Chord for <span className="text-primary font-bold">Slot {activeSlot === 0 ? "A" : "B"}</span>
+                </Label>
                 <div className="grid grid-cols-4 gap-1.5">
                     {diatonicChords.map((chord) => {
-                        const isChecked = settings.selectedChords.includes(chord);
+                        const isSelectedInCurrentSlot =
+                            (activeSlot === 0 && currentChordA === chord) ||
+                            (activeSlot === 1 && currentChordB === chord);
+
                         return (
-                            <div
+                            <Button
                                 key={chord}
-                                className="flex items-center space-x-1.5 bg-muted/50 rounded p-1.5 hover:bg-muted transition-colors"
+                                variant={isSelectedInCurrentSlot ? "default" : "outline"}
+                                className={`h-9 text-sm font-bold ${isSelectedInCurrentSlot ? "" : "hover:bg-primary/20 hover:text-primary"}`}
+                                onClick={() => handleChordSelect(chord)}
                             >
-                                <Checkbox
-                                    id={`chord-${chord}`}
-                                    checked={isChecked}
-                                    onCheckedChange={(checked) =>
-                                        handleChordToggle(chord, checked as boolean)
-                                    }
-                                />
-                                <Label
-                                    htmlFor={`chord-${chord}`}
-                                    className="text-xs font-medium cursor-pointer flex-1"
-                                >
-                                    {chord}
-                                </Label>
-                            </div>
+                                {chord}
+                            </Button>
                         );
                     })}
                 </div>
-                <p className="text-[10px] text-muted-foreground">
-                    {settings.selectedChords.length === 1
-                        ? "Single chord selected"
-                        : `${settings.selectedChords.length} chords - ${settings.measuresPerChord} measure(s) each`}
-                </p>
             </div>
 
             {/* Measures Per Chord */}
-            <div className="space-y-2">
+            <div className="space-y-2 pt-2 border-t border-border">
                 <div className="flex items-center justify-between">
                     <Label htmlFor="measures-slider" className="text-xs">Measures per chord</Label>
                     <span className="text-xs font-semibold text-foreground">

@@ -297,8 +297,8 @@ export function RhythmTraining({ autoStart = false, sessionId }: RhythmTrainingP
                         </div>
                     )}
 
-                    {/* RHYTHM NOTATION - THE MAIN CONTENT - 40%+ of screen on mobile */}
-                    <div className="flex-1 bg-card border border-border rounded-lg p-1 sm:p-6 mb-1 sm:mb-3 flex flex-col items-center justify-center min-h-[40vh] sm:min-h-0">
+                    {/* RHYTHM NOTATION - THE MAIN CONTENT - Flexible height instead of forced */}
+                    <div className="flex-1 bg-card border border-border rounded-lg p-1 sm:p-6 mb-1 flex flex-col items-center justify-center min-h-0">
                         {/* Pattern name - minimal on mobile */}
                         <div className="text-center mb-1 sm:mb-6">
                             <h2 className="text-xs sm:text-2xl font-semibold">{pattern.name}</h2>
@@ -311,7 +311,7 @@ export function RhythmTraining({ autoStart = false, sessionId }: RhythmTrainingP
                         </div>
 
                         {/* ========== RHYTHM NOTATION - MASSIVE ON MOBILE ========== */}
-                        <div className="text-4xl sm:text-5xl font-mono mb-1 sm:mb-6 tracking-tight sm:tracking-wider font-bold leading-tight">
+                        <div className="text-2xl sm:text-5xl font-mono mb-1 sm:mb-6 tracking-tight sm:tracking-wider font-bold leading-tight">
                             {patternToNotation(pattern)}
                         </div>
 
@@ -324,15 +324,15 @@ export function RhythmTraining({ autoStart = false, sessionId }: RhythmTrainingP
                         <div className="hidden sm:flex gap-6 text-sm text-muted-foreground mt-4">
                             <div className="flex items-center gap-2">
                                 <span className="text-2xl">↓</span>
-                                <span>Down strum</span>
+                                Down strum
                             </div>
                             <div className="flex items-center gap-2">
                                 <span className="text-2xl">↑</span>
-                                <span>Up strum</span>
+                                Up strum
                             </div>
                             <div className="flex items-center gap-2">
                                 <span className="text-2xl">·</span>
-                                <span>Skip (rest)</span>
+                                Skip (rest)
                             </div>
                         </div>
                     </div>

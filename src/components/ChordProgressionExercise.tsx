@@ -16,23 +16,48 @@ import { DegreeTuner } from "./DegreeTuner";
 import { Switch } from "./ui/switch";
 import { Label } from "./ui/label";
 import { Button } from "./ui/button";
-import { Check, Guitar } from "lucide-react"; // Import Guitar icon
-import Fretboard from "./Fretboard"; // Import Fretboard
+import { Check, Guitar, Play, Pause, Volume2, VolumeX } from "lucide-react";
+import Fretboard from "./Fretboard";
 import { createDegreeMap, findAllNoteOccurrences } from "@/lib/musicTheory";
 import { getChordTones, calculateDegreeFromRoot } from "@/lib/chordProgression";
 import { ChordNumeral } from "@/types/chords";
+import { ForceLandscapeWrapper } from "./ForceLandscapeWrapper";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "./ui/select";
 
 const DEFAULT_SETTINGS: ChordProgressionSettings = {
     key: "C",
-    selectedChords: ["I"],
+    selectedChords: ["I", "IV"],
     measuresPerChord: 4,
     droneEnabled: true,
     droneVolume: 0.5,
 };
 
+const KEYS = [
+    { value: "C", label: "C" },
+    { value: "C#", label: "C#" },
+    { value: "D", label: "D" },
+    { value: "D#", label: "D#" },
+    { value: "E", label: "E" },
+    { value: "F", label: "F" },
+    { value: "F#", label: "F#" },
+    { value: "G", label: "G" },
+    { value: "G#", label: "G#" },
+    { value: "A", label: "A" },
+    { value: "A#", label: "A#" },
+    { value: "B", label: "B" },
+];
+
+const DIATONIC_CHORDS: ChordNumeral[] = ["I", "ii", "iii", "IV", "V", "vi", "vii°"];
+
 interface ChordProgressionExerciseProps {
     autoStart?: boolean;
-    sessionId?: string; // Practice session ID for linking logs
+    sessionId?: string;
 }
 
 export function ChordProgressionExercise({ autoStart = false, sessionId }: ChordProgressionExerciseProps) {
@@ -46,76 +71,54 @@ export function ChordProgressionExercise({ autoStart = false, sessionId }: Chord
     const [pitchConfidence, setPitchConfidence] = useState(0);
     const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
     const [tickCount, setTickCount] = useState(0);
+    const [activeSlot, setActiveSlot] = useState<0 | 1>(0);
 
-    // Global auto-record setting from context
     const { autoRecordEnabled } = useAutoRecord();
 
-    // Initialize AudioContext on mount
     useEffect(() => {
         const ctx = new AudioContext();
         setAudioContext(ctx);
-        return () => {
-            ctx.close();
-        };
+        return () => { ctx.close(); };
     }, []);
-
-
 
     const { playNote } = useNotePlayer(audioContext);
 
-    // Chord Progression Logic
     const {
         currentChordIndex,
-        currentChord, // { rootNote, quality, intervals, degree }
+        currentChord,
         handleMetronomeTick: handleChordTick,
         setChord
     } = useChordProgression({
         settings,
-        onChordChange: (idx, rootNote) => {
-            // Optional: visual feedback trigger?
-        }
+        onChordChange: (idx, rootNote) => { }
     });
 
-    // Peek Fretboard State
     const [showFretboard, setShowFretboard] = useState(false);
     const [fretboardNotes, setFretboardNotes] = useState<any[]>([]);
     const [degreeMap, setDegreeMap] = useState<Map<string, number>>(new Map());
     const [scale, setScale] = useState(1);
 
-    // Calculate scale on resize
     useEffect(() => {
         const handleResize = () => {
-            const isMobile = window.innerWidth < 768;
-            if (isMobile) {
-                setScale(1);
-            } else {
-                const padding = 40; // 20px padding on each side
-                const contentWidth = 1250; // Approx fretboard width
-                const availableWidth = window.innerWidth - padding;
-                const newScale = Math.min(1, availableWidth / contentWidth);
-                setScale(newScale);
-            }
+            const padding = 40;
+            const contentWidth = 1250;
+            const availableWidth = window.innerWidth - padding;
+            const newScale = Math.min(1, availableWidth / contentWidth);
+            setScale(newScale);
         };
-
-        handleResize(); // Init
+        handleResize();
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    // Calculate Fretboard Notes
     useEffect(() => {
         const dMap = createDegreeMap(settings.key);
         setDegreeMap(dMap);
-
-        // 1. Base Notes (All notes in key)
         const notes: any[] = [];
         const noteNames = Array.from(dMap.keys());
-
-        // Map degrees to note names for lookup
         const degreeToNote = new Map<number, string>();
         dMap.forEach((degree, note) => degreeToNote.set(degree, note));
 
-        // 2. Identify Structure and Active Notes
         const structureNotes = new Set<string>();
         settings.selectedChords.forEach(numeral => {
             const tones = getChordTones(numeral as ChordNumeral);
@@ -134,27 +137,24 @@ export function ChordProgressionExercise({ autoStart = false, sessionId }: Chord
             });
         }
 
-        // 3. Build Note Objects
         noteNames.forEach(noteName => {
             const positions = findAllNoteOccurrences(noteName);
             positions.forEach(pos => {
+                // Check if this note matches the currently detected note
+                const isCurrentlyPlaying = detectedNote && noteName.toUpperCase() === detectedNote.toUpperCase();
                 notes.push({
                     string: pos.string,
                     fret: pos.fret,
                     isStructure: structureNotes.has(noteName),
-                    isActive: activeNotes.has(noteName)
+                    isActive: activeNotes.has(noteName),
+                    isPlaying: isCurrentlyPlaying
                 });
             });
         });
 
         setFretboardNotes(notes);
-    }, [settings.key, settings.selectedChords, currentChordIndex]);
+    }, [settings.key, settings.selectedChords, currentChordIndex, detectedNote]);
 
-
-
-
-
-    // Metronome setup
     const metronomeSettings: MetronomeSettings = {
         mode,
         startBpm: bpm,
@@ -163,13 +163,8 @@ export function ChordProgressionExercise({ autoStart = false, sessionId }: Chord
         muted: metronomeMuted,
         onTick: (state) => {
             setTickCount(prev => prev + 1);
-
-            // Delegate chord advancement logic
             handleChordTick(state);
-
             recording.handleTick(tickCount);
-
-            // Play drone on beat 1 of each measure
             if (settings.droneEnabled && state.currentBeat === 1) {
                 const droneNote = currentChord.rootNote.replace("#", "b") + "3";
                 playNote(droneNote);
@@ -179,7 +174,6 @@ export function ChordProgressionExercise({ autoStart = false, sessionId }: Chord
 
     const metronome = useMetronome(metronomeSettings);
 
-    // Handle auto-start
     useEffect(() => {
         if (autoStart && metronome) {
             const timer = setTimeout(() => {
@@ -197,7 +191,6 @@ export function ChordProgressionExercise({ autoStart = false, sessionId }: Chord
         }
     }, [autoStart, metronome]);
 
-    // BPM change handler for scroll/touch/drag controls
     const handleBpmChange = useCallback(
         (newBpm: number) => {
             const wasPlaying = metronome.state.isPlaying;
@@ -210,22 +203,14 @@ export function ChordProgressionExercise({ autoStart = false, sessionId }: Chord
         [metronome]
     );
 
-    // Global BPM adjustment controls
     useBpmControls({
         currentBpm: bpm,
         onBpmChange: handleBpmChange,
-        isEnabled: !showFretboard, // Disable when fretboard is shown to allow scrolling
+        isEnabled: !showFretboard,
     });
 
-    // Pitch detection
     const handlePitchDetected = useCallback(
-        (result: {
-            frequency: number;
-            note: string;
-            string: number;
-            fret: number;
-            confidence: number;
-        }) => {
+        (result: { frequency: number; note: string; string: number; fret: number; confidence: number; }) => {
             setDetectedNote(result.note.replace(/\d/g, ""));
             setPitchConfidence(result.confidence);
         },
@@ -238,7 +223,6 @@ export function ChordProgressionExercise({ autoStart = false, sessionId }: Chord
         sensitivity: 0.7,
     });
 
-    // Auto-recording
     const recording = useAutoRecording({
         enabled: autoRecordEnabled && isPlaying,
         moduleType: 'notewalking',
@@ -252,7 +236,6 @@ export function ChordProgressionExercise({ autoStart = false, sessionId }: Chord
         existingMicStream: pitchDetection.audioStream || undefined,
     });
 
-    // Handle settings changes
     const handleSettingsChange = useCallback(
         (newSettings: Partial<ChordProgressionSettings>) => {
             setSettings((prev) => ({ ...prev, ...newSettings }));
@@ -260,7 +243,6 @@ export function ChordProgressionExercise({ autoStart = false, sessionId }: Chord
         []
     );
 
-    // Play/Pause handler
     const handlePlayPause = useCallback(() => {
         if (isPlaying) {
             metronome.pause();
@@ -278,243 +260,264 @@ export function ChordProgressionExercise({ autoStart = false, sessionId }: Chord
         setTimeout(() => metronome.start(), 100);
     }, [metronome]);
 
-    // Cleanup on unmount
     useEffect(() => {
-        return () => {
-            metronome.stop();
-        };
+        return () => { metronome.stop(); };
     }, []);
 
+    const handleChordSelect = (chord: ChordNumeral) => {
+        const newChords = [...(settings.selectedChords || ["I", "IV"])];
+        if (newChords.length < 2) {
+            newChords.push("I");
+            if (newChords.length < 2) newChords.push("IV");
+        }
+        newChords[activeSlot] = chord;
+        handleSettingsChange({ selectedChords: newChords });
+    };
+
+    const currentChordA = settings.selectedChords[0] || "I";
+    const currentChordB = settings.selectedChords[1] || "IV";
+
+    // Get degree color for tuner
+    const DEGREE_COLORS: Record<number, string> = {
+        1: "#FF6B6B", 2: "#4ECDC4", 3: "#45B7D1", 4: "#96CEB4",
+        5: "#FFEAA7", 6: "#DDA0DD", 7: "#98D8C8"
+    };
+    const scaleDegree = detectedNote ? calculateDegreeFromRoot(detectedNote, settings.key) : null;
+    const degreeColor = scaleDegree ? DEGREE_COLORS[scaleDegree] || "#666" : "#666";
 
     return (
-        <div className="flex flex-col h-full bpm-control-area">
-            <div className="flex-1 flex flex-col p-2 min-h-0 overflow-hidden gap-2">
-                {/* Header - just title */}
-                <div className="flex-shrink-0 flex justify-between items-center">
-                    <h1 className="text-xl font-bold">Notewalking</h1>
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-blue-400 hover:text-blue-300 hover:bg-transparent px-2 h-8"
-                        onClick={() => setShowFretboard(true)}
-                    >
-                        <Guitar className="w-4 h-4 mr-2" />
-                        Fretboard
-                    </Button>
-                </div>
+        <>
+            <ForceLandscapeWrapper>
+                <div className="flex flex-col h-full w-full bpm-control-area overflow-hidden">
+                    {/* MOBILE LANDSCAPE LAYOUT - 3 Columns */}
+                    <div className="flex-1 flex flex-row gap-1 p-1 min-h-0 overflow-hidden">
 
-                {/* Fretboard Overlay */}
-                {showFretboard && (
-                    <div
-                        className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-sm animate-in fade-in duration-200 cursor-pointer overflow-hidden"
-                        onClick={() => setShowFretboard(false)}
-                    >
-                        {/* Desktop View */}
-                        <div
-                            className="hidden md:flex bg-background border border-border rounded-xl p-4 shadow-2xl origin-center cursor-default flex-col items-center justify-center"
-                            onClick={(e) => e.stopPropagation()}
-                            style={{
-                                transform: `scale(${scale})`,
-                            }}
-                        >
-                            <h3 className="text-center font-bold text-lg mb-2">Key of {settings.key} Reference</h3>
-                            <Fretboard
-                                selectedNotes={fretboardNotes}
-                                degreeMap={degreeMap}
-                                showDegreeNumbers
-                                isEditable={false}
-                                rootNote={fretboardNotes.find(n => n.fret === 0 && createDegreeMap(settings.key).get(getChordTones(settings.selectedChords[currentChordIndex] as ChordNumeral)[0] as any) === 1)}
-                            />
-                            <div className="mt-4 flex flex-wrap justify-center gap-4 text-sm scale-125 origin-top">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-3 h-3 rounded-full bg-gray-400"></div>
-                                    <span className="whitespace-nowrap">Scale Note</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <div className="w-3 h-3 rounded-full border-2 border-green-500 shadow-[0_0_5px_rgba(34,197,94,0.5)]"></div>
-                                    <span className="whitespace-nowrap">Progression Note</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <div className="w-3 h-3 rounded-full border-2 border-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.8)]"></div>
-                                    <span className="whitespace-nowrap">Current Chord Note</span>
-                                </div>
+                        {/* LEFT: Settings (15% width) */}
+                        <div className="w-[120px] flex-shrink-0 flex flex-col gap-1 overflow-hidden bg-card border rounded p-1">
+                            {/* Key + Chords in minimal space */}
+                            <div className="flex items-center gap-1">
+                                <span className="text-[10px] text-muted-foreground">Key</span>
+                                <Select value={settings.key} onValueChange={(v) => handleSettingsChange({ key: v })}>
+                                    <SelectTrigger className="h-6 text-xs px-1 flex-1">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {KEYS.map((k) => <SelectItem key={k.value} value={k.value}>{k.label}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
                             </div>
-                        </div>
 
-                        {/* Mobile View (Rotated) */}
-                        <div
-                            className="md:hidden w-full h-full overflow-y-auto overflow-x-hidden relative"
-                            onClick={(e) => {
-                                // Close if clicking strictly on the scrolling container (background)
-                                if (e.target === e.currentTarget) setShowFretboard(false);
-                            }}
-                        >
-                            <div
-                                className="absolute top-4 left-0 right-0 z-10 flex justify-center pointer-events-none"
+                            {/* Chord Slots - Compact */}
+                            <div className="flex gap-1">
+                                <button
+                                    className={`flex-1 py-1 rounded border text-sm font-bold ${activeSlot === 0 ? "bg-primary text-primary-foreground" : "bg-muted"}`}
+                                    onClick={() => setActiveSlot(0)}
+                                >
+                                    {currentChordA}
+                                </button>
+                                <button
+                                    className={`flex-1 py-1 rounded border text-sm font-bold ${activeSlot === 1 ? "bg-primary text-primary-foreground" : "bg-muted"}`}
+                                    onClick={() => setActiveSlot(1)}
+                                >
+                                    {currentChordB}
+                                </button>
+                            </div>
+
+                            {/* Chord Grid - 4 cols */}
+                            <div className="grid grid-cols-4 gap-0.5 flex-1 overflow-y-auto">
+                                {DIATONIC_CHORDS.map((chord) => {
+                                    const isSelected = (activeSlot === 0 && currentChordA === chord) || (activeSlot === 1 && currentChordB === chord);
+                                    return (
+                                        <button
+                                            key={chord}
+                                            className={`h-6 text-[10px] font-bold rounded ${isSelected ? "bg-primary text-white" : "bg-muted hover:bg-muted/80"}`}
+                                            onClick={() => handleChordSelect(chord)}
+                                        >
+                                            {chord}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Drone Toggle */}
+                            <button
+                                className={`h-6 text-[10px] rounded flex items-center justify-center gap-1 ${settings.droneEnabled ? "bg-green-600 text-white" : "bg-muted"}`}
+                                onClick={() => handleSettingsChange({ droneEnabled: !settings.droneEnabled })}
                             >
-                                <div className="bg-background/80 backdrop-blur p-2 rounded-lg border border-border text-xs font-bold pointer-events-auto">
-                                    Key: {settings.key}
-                                </div>
+                                {settings.droneEnabled ? <Volume2 className="w-3 h-3" /> : <VolumeX className="w-3 h-3" />}
+                                Drone
+                            </button>
+
+                            {/* Fretboard Button */}
+                            <Button variant="outline" size="sm" className="h-6 text-[10px]" onClick={() => setShowFretboard(true)}>
+                                <Guitar className="w-3 h-3 mr-1" /> Fretboard
+                            </Button>
+                        </div>
+
+                        {/* CENTER: Tuner (MOST IMPORTANT - ~55%) */}
+                        <div className="flex-1 flex flex-col gap-1 min-w-0 overflow-hidden">
+                            {/* Current Chord Display - Thin Bar */}
+                            <div className="flex-shrink-0 bg-card border rounded px-2 py-1 flex items-center justify-between">
+                                <span className="text-xs text-muted-foreground">Playing:</span>
+                                <span className="text-lg font-bold">{settings.selectedChords[currentChordIndex]} ({currentChord.rootNote})</span>
+                                <span className="text-xs text-muted-foreground">Key of {settings.key}</span>
                             </div>
 
-                            <div className="w-full flex justify-center" style={{ minHeight: '1350px' }}>
+                            {/* DEGREE TUNER - Main Visual */}
+                            <div className="flex-1 bg-card border rounded flex items-center justify-center gap-4 min-h-0">
+                                {/* Large Degree Circle */}
                                 <div
+                                    className="w-24 h-24 rounded-full flex items-center justify-center text-5xl font-black shadow-lg border-4"
                                     style={{
-                                        width: '240px', // Fretboard height (approx 180 + padding)
-                                        height: '1300px', // Fretboard width
-                                        position: 'relative',
-                                        marginTop: '60px'
+                                        backgroundColor: scaleDegree ? degreeColor : "#333",
+                                        borderColor: scaleDegree ? degreeColor : "#555",
+                                        color: scaleDegree ? "#fff" : "#888"
                                     }}
-                                    onClick={(e) => e.stopPropagation()}
                                 >
-                                    <div
-                                        style={{
-                                            position: 'absolute',
-                                            top: 0,
-                                            left: 0,
-                                            transformOrigin: 'top left',
-                                            transform: 'rotate(90deg) translateY(-100%)',
-                                            width: '1300px' // Ensure width for rotation
-                                        }}
-                                    >
-                                        <Fretboard
-                                            selectedNotes={fretboardNotes}
-                                            degreeMap={degreeMap}
-                                            showDegreeNumbers
-                                            isEditable={false}
-                                            rootNote={fretboardNotes.find(n => n.fret === 0 && createDegreeMap(settings.key).get(getChordTones(settings.selectedChords[currentChordIndex] as ChordNumeral)[0] as any) === 1)}
-                                        />
-                                    </div>
+                                    {scaleDegree || "?"}
+                                </div>
+
+                                {/* Note Info */}
+                                <div className="text-center">
+                                    <p className="text-2xl font-bold">{detectedNote || "---"}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                        {pitchConfidence > 0 ? `${Math.round(pitchConfidence * 100)}%` : "Play a note"}
+                                    </p>
                                 </div>
                             </div>
 
-                            <div className="fixed bottom-8 left-0 right-0 flex justify-center z-50 pointer-events-none">
-                                <Button
-                                    variant="destructive"
-                                    className="pointer-events-auto shadow-xl backdrop-blur bg-red-500/90 hover:bg-red-600 border-2 border-white/20 px-8 py-6 text-lg font-bold rounded-full animate-in slide-in-from-bottom-4"
-                                    onClick={() => setShowFretboard(false)}
-                                >
-                                    Close View
-                                </Button>
+                            {/* Chord Progression Visual - Compact */}
+                            <div className="flex-shrink-0 flex gap-1 justify-center">
+                                {settings.selectedChords.map((chord, idx) => (
+                                    <div
+                                        key={idx}
+                                        className={`px-3 py-1 rounded text-sm font-bold ${idx === currentChordIndex ? "bg-primary text-white scale-110" : "bg-muted"}`}
+                                    >
+                                        {chord}
+                                    </div>
+                                ))}
                             </div>
                         </div>
-                    </div>
-                )}
 
-                {/* Recording Countdown */}
-                {recording.countdown && (
-                    <div className="flex-shrink-0 mx-2 bg-yellow-500/20 border border-yellow-500/50 rounded-lg p-2 flex items-center justify-center">
-                        <span className="text-sm font-semibold text-yellow-700 dark:text-yellow-400 animate-pulse">
-                            Recording in {recording.countdown} clicks...
-                        </span>
-                    </div>
-                )}
-
-                {/* Recording Indicator */}
-                {recording.isRecording && (
-                    <div className="flex-shrink-0 mx-2 bg-red-500/20 border border-red-500/50 rounded-lg p-2 flex items-center justify-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
-                        <span className="text-sm font-semibold text-red-700 dark:text-red-400">
-                            RECORDING
-                        </span>
-                    </div>
-                )}
-
-                {/* Main Content */}
-                <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-2 min-h-0">
-                    {/* Left Column: Controls */}
-                    <div className="flex flex-col min-h-0 overflow-hidden">
-                        <div className="flex-1 overflow-hidden min-h-0">
-                            <ChordProgressionControls
-                                settings={settings}
-                                onSettingsChange={handleSettingsChange}
-                                isPlaying={isPlaying}
-                                onPlayPause={handlePlayPause}
-                                currentBpm={bpm}
-                            />
-                        </div>
-                    </div>
-
-                    {/* Right Column: Matrix Top, Tuner/Metronome Bottom */}
-                    <div className="lg:col-span-2 flex flex-col gap-2 min-h-0">
-                        {/* Top: Interval Matrix (Full Width) */}
-                        <div className="flex-shrink-0 bg-card border rounded-lg p-4">
-                            <IntervalMatrix
-                                selectedKey={settings.key}
-                                selectedChords={settings.selectedChords}
-                                currentChordIndex={currentChordIndex}
-                            />
-                        </div>
-
-                        {/* Bottom: Tuner and Metronome split */}
-                        <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-2 gap-2">
-                            {/* Degree Tuner */}
-                            <div className="bg-card border rounded-lg p-4 overflow-hidden flex flex-col">
-                                <DegreeTuner
-                                    currentChord={{
-                                        ...currentChord,
-                                        numeral: settings.selectedChords[currentChordIndex] as any
-                                    }}
-                                    detectedNote={detectedNote}
-                                    confidence={pitchConfidence}
-                                    keyRoot={settings.key}
+                        {/* RIGHT: Metronome (25% width) */}
+                        <div className="w-[140px] flex-shrink-0 flex flex-col gap-1 overflow-hidden bg-card border rounded p-1">
+                            {/* Beat Visualizer */}
+                            <div className="flex-shrink-0">
+                                <BeatVisualizer
+                                    currentBeat={metronome.state.currentBeat}
+                                    isPlaying={metronome.state.isPlaying}
+                                    currentBpm={metronome.state.isPlaying ? metronome.state.currentBpm : bpm}
                                 />
                             </div>
 
-                            {/* Metronome */}
-                            <div className="flex flex-col gap-2 bg-card border border-border rounded-lg p-3">
-                                {/* Beat Visualizer */}
-                                <div className="flex-shrink-0">
-                                    <BeatVisualizer
-                                        currentBeat={metronome.state.currentBeat}
-                                        isPlaying={metronome.state.isPlaying}
-                                        currentBpm={metronome.state.isPlaying ? metronome.state.currentBpm : bpm}
-                                    />
-                                </div>
+                            {/* Play/Pause - Big Button */}
+                            <Button
+                                onClick={handlePlayPause}
+                                className={`h-10 text-sm font-bold ${isPlaying ? "bg-red-500 hover:bg-red-600" : ""}`}
+                            >
+                                {isPlaying ? <><Pause className="w-4 h-4 mr-1" /> Stop</> : <><Play className="w-4 h-4 mr-1" /> Start</>}
+                            </Button>
 
-                                {/* Mute Toggle */}
-                                <div className="flex items-center justify-between bg-muted/30 rounded p-2">
-                                    <span className="text-xs font-medium">Mute Clicks</span>
-                                    <button
-                                        onClick={() => setMetronomeMuted(!metronomeMuted)}
-                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${metronomeMuted ? 'bg-primary' : 'bg-muted'
-                                            }`}
-                                    >
-                                        <span
-                                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${metronomeMuted ? 'translate-x-5' : 'translate-x-0.5'
-                                                }`}
-                                        />
-                                    </button>
-                                </div>
+                            {/* BPM Display */}
+                            <div className="text-center text-xl font-bold">{bpm} BPM</div>
 
-                                {/* Metronome Controls */}
-                                <div className="flex-shrink-0">
-                                    <MetronomeControls
-                                        isPlaying={isPlaying}
-                                        onPlayPause={handlePlayPause}
-                                        onRestart={handleRestart}
-                                        onStateChange={(newState) => {
-                                            setMode(newState.mode);
-                                            setBpm(newState.startBpm);
-                                            setLoop(newState.loop);
-                                        }}
-                                        initialState={{
-                                            mode,
-                                            startBpm: bpm,
-                                            endBpm: bpm + 40,
-                                            increments: 8,
-                                            measuresPerIncrement: 4,
-                                            loop,
-                                            progressiveStepBpm: 5,
-                                        }}
-                                        compact
-                                    />
-                                </div>
+                            {/* Mute Toggle */}
+                            <button
+                                className={`h-6 text-[10px] rounded ${metronomeMuted ? "bg-yellow-500 text-black" : "bg-muted"}`}
+                                onClick={() => setMetronomeMuted(!metronomeMuted)}
+                            >
+                                {metronomeMuted ? "Unmute" : "Mute Click"}
+                            </button>
+
+                            {/* Metronome Controls - Minimal */}
+                            <div className="flex-1 overflow-y-auto">
+                                <MetronomeControls
+                                    isPlaying={isPlaying}
+                                    onPlayPause={handlePlayPause}
+                                    onRestart={handleRestart}
+                                    onStateChange={(newState) => {
+                                        setMode(newState.mode);
+                                        setBpm(newState.startBpm);
+                                        setLoop(newState.loop);
+                                    }}
+                                    initialState={{
+                                        mode,
+                                        startBpm: bpm,
+                                        endBpm: bpm + 40,
+                                        increments: 8,
+                                        measuresPerIncrement: 4,
+                                        loop,
+                                        progressiveStepBpm: 5,
+                                    }}
+                                    compact
+                                />
                             </div>
                         </div>
                     </div>
+
+                    {/* Recording Indicators */}
+                    {recording.countdown && (
+                        <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-yellow-500/90 text-black px-3 py-1 rounded-full text-xs font-bold animate-pulse z-40">
+                            Recording in {recording.countdown}...
+                        </div>
+                    )}
+                    {recording.isRecording && (
+                        <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-red-500 text-white px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 z-40">
+                            <div className="w-2 h-2 rounded-full bg-white animate-pulse" /> REC
+                        </div>
+                    )}
+
                 </div>
-            </div>
-        </div>
+            </ForceLandscapeWrapper>
+
+            {/* Fretboard Overlay - OUTSIDE ForceLandscapeWrapper to avoid rotation issues */}
+            {
+                showFretboard && (
+                    <div className="fixed inset-0 z-[9999] bg-black flex flex-col">
+                        {/* Header */}
+                        <div className="flex-shrink-0 flex items-center justify-between p-3 bg-card border-b">
+                            <h3 className="font-bold text-lg">Key of {settings.key} - Fretboard Reference</h3>
+                            <Button variant="destructive" onClick={() => setShowFretboard(false)}>
+                                ✕ Close
+                            </Button>
+                        </div>
+
+                        {/* Fretboard - Rotated 90° and scrollable */}
+                        <div className="flex-1 overflow-auto bg-black flex items-center justify-center">
+                            <div
+                                className="fretboard-modal-view p-4"
+                                style={{
+                                    transform: 'rotate(90deg)',
+                                    transformOrigin: 'center center',
+                                }}
+                            >
+                                <Fretboard
+                                    selectedNotes={fretboardNotes}
+                                    degreeMap={degreeMap}
+                                    showDegreeNumbers
+                                    isEditable={false}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Legend */}
+                        <div className="flex-shrink-0 flex gap-4 justify-center p-3 bg-card border-t">
+                            <div className="flex items-center gap-2">
+                                <div className="w-4 h-4 rounded-full bg-gray-400"></div>
+                                <span className="text-sm">Scale</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <div className="w-4 h-4 rounded-full border-2 border-green-500 shadow-[0_0_5px_rgba(34,197,94,0.5)]"></div>
+                                <span className="text-sm">Progression</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <div className="w-4 h-4 rounded-full border-2 border-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.8)]"></div>
+                                <span className="text-sm">Current Chord</span>
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
+        </>
     );
 }

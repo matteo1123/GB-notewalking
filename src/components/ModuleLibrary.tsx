@@ -34,7 +34,7 @@ import { ExercisePracticeModule } from './ExercisePracticeModule';
 import { useModuleConfig } from '@/hooks/useModuleConfig';
 import { usePracticeSession } from '@/hooks/usePracticeSession';
 import { SessionBuilder } from '@/components/SessionBuilder';
-import { Save, Layers } from 'lucide-react';
+import { Save, Layers, Plus } from 'lucide-react';
 import {
     Dialog,
     DialogContent,
@@ -369,8 +369,8 @@ export function ModuleLibrary() {
                                 Build your skills with focused practice modules
                             </p>
                         </div>
-                        <Button size="lg" className="gap-2">
-                            <Search className="w-4 h-4" />
+                        <Button size="lg" className="gap-2" onClick={() => setShowSessionBuilder(true)}>
+                            <Plus className="w-4 h-4" />
                             Create Custom Routine
                         </Button>
                     </div>

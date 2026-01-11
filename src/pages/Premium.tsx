@@ -2,28 +2,34 @@ import { useEffect, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import RiffPractice from "@/components/RiffPractice";
-import ExerciseList from "@/components/ExerciseList";
 import { RepertoireItem } from "@/types/repertoire";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Tables } from "@/integrations/supabase/types";
 import Paywall from "@/components/Premium/Paywall";
-import { ChordProgressionExercise } from "@/components/ChordProgressionExercise";
-import { RhythmTraining } from "@/components/RhythmTraining";
 import { ModuleLibrary } from "@/components/ModuleLibrary";
 import { PriorityManager } from "@/components/PriorityManager";
 import { PressStart } from "@/components/PressStart";
 import { ProgressDashboard } from "@/components/ProgressDashboard";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
+import { SessionProvider, useSession } from "@/contexts/SessionContext";
+import { SessionExecutor } from "@/components/SessionExecutor";
+import { SessionWrapUp } from "@/components/SessionWrapUp";
 
 // Updated Stripe Price ID
 const STRIPE_PRICE_ID = "price_1SknWkEOnRZP4MxPtX889sCh";
 
-const Premium = () => {
+/**
+ * Inner component that consumes the SessionContext
+ */
+const PremiumContent = () => {
   const { user } = useAuth();
-  const navigate = useNavigate(); // Hook
+  const navigate = useNavigate();
+  // Lift session state check to here
+  const { activeSession, completeSession } = useSession();
+
   const [selectedRiff, setSelectedRiff] = useState<RepertoireItem | null>(null);
   const [exercises, setExercises] = useState<RepertoireItem[]>([]);
   const [sequences, setSequences] = useState<Tables<"sequences">[]>([]);
@@ -37,25 +43,29 @@ const Premium = () => {
   const exerciseId = searchParams.get("exerciseId");
   const [isPremium, setIsPremium] = useState(false);
   const [isSubscribing, setIsSubscribing] = useState(false);
-  const [checkingPremium, setCheckingPremium] = useState(true); // New loading state for premium check specifically
+  const [checkingPremium, setCheckingPremium] = useState(true);
   const [activeTab, setActiveTab] = useState("priorities");
 
+  // Handle Session Completion
+  const handleSessionComplete = async () => {
+    // This function can handle any post-session wrap up logic if needed
+    // But mostly it's handled by SessionWrapUp component which calls completeSession(false) eventually?
+    // Actually SessionExecutor calls nextBlock/complete. 
+    // If activeSession is done, we might want to show wrap up.
+    // The SessionContext handles 'activeSession' state. 
+    // If session is complete, it might be null or marked complete.
+    // Let's rely on the context to clear activeSession when done.
+    completeSession();
+  };
+
   useEffect(() => {
-    // Check for success/canceled params from Stripe
     if (searchParams.get("success")) {
       toast.success("Subscription successful! Welcome to Guitar Brain Premium.");
-      // optionally refresh profile here
     }
     if (searchParams.get("canceled")) {
       toast.error("Subscription canceled.");
     }
   }, [searchParams]);
-
-  useEffect(() => {
-    // If not logged in, Paywall component handles it (or we can redirect)
-    // User said: "send someone back to the homepage if they aren't premium and signed in"
-    // Paywall covers !user case generally, but let's see. logic below covers user && !premium.
-  }, []);
 
   useEffect(() => {
     if (exerciseId) {
@@ -80,31 +90,20 @@ const Premium = () => {
       setLoading(true);
       setCheckingPremium(true);
 
-      // Check premium status
       if (user) {
-        console.log('[Premium] Checking premium for user:', user.id);
-        const { data: profile, error: profileError } = await supabase
+        const { data: profile } = await supabase
           .from('profiles')
-          .select('premium_until') // Changed from is_premium
+          .select('premium_until')
           .eq('id', user.id)
           .single();
 
-        console.log('[Premium] Profile query result:', { profile, error: profileError });
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         if ((profile as any)?.premium_until) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const expiryDate = new Date((profile as any).premium_until);
-          console.log('[Premium] Expiry date:', expiryDate, 'Now:', new Date(), 'Is future?', expiryDate > new Date());
-          // Check if future
           if (expiryDate > new Date()) {
             setIsPremium(true);
           }
-        } else {
-          console.log('[Premium] No premium_until found or profile is null');
         }
 
-        // Check for recent sessions to determine initial tab
         const { data: sessionsData } = await supabase
           .from('practice_sessions' as any)
           .select('id')
@@ -112,19 +111,13 @@ const Premium = () => {
           .not('started_at', 'is', null)
           .limit(1);
 
-        // If user has sessions, show Start tab; otherwise show Priorities
         if (sessionsData && sessionsData.length > 0) {
           setActiveTab("start");
         } else {
           setActiveTab("priorities");
         }
-      } else {
-        console.log('[Premium] No user, skipping premium check');
       }
-      setCheckingPremium(false); // Done checking
-
-      // Note: We might not want to fetch if not premium to save bandwidth? 
-      // User said they should be redirected.
+      setCheckingPremium(false);
 
       const { data: scalesData, error: scalesError } = await supabase
         .from("scales")
@@ -189,14 +182,6 @@ const Premium = () => {
     };
   }, [user?.id]);
 
-  // Redirect effect - REMOVED so users can see the Paywall/Upgrade button
-  // useEffect(() => {
-  //   if (!checkingPremium && user && !isPremium) {
-  //     toast.error("Premium subscription expired or invalid.");
-  //     navigate("/");
-  //   }
-  // }, [checkingPremium, user, isPremium, navigate]);
-
   const handleSubscribe = async () => {
     try {
       setIsSubscribing(true);
@@ -235,7 +220,7 @@ const Premium = () => {
       .insert({
         user_id: user.id,
         scale_id: item.category === 'scale' || item.category === 'arpeggio' ? item.id : null,
-        duration: 0, // Default duration
+        duration: 0,
       });
 
     if (error) {
@@ -266,7 +251,6 @@ const Premium = () => {
     setSelectedLessonExercise(null);
   };
 
-  // Determine what to render based on premium status
   if (loading || checkingPremium) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -275,12 +259,20 @@ const Premium = () => {
     );
   }
 
-  // If not logged in, OR (logged in but Not Premium), show paywall
-  // We pass handleSubscribe ONLY if user is logged in
   if (!user || (!isPremium && user)) {
     return <Paywall onSubscribe={user ? handleSubscribe : undefined} isLoading={isSubscribing} />;
   }
 
+  // 1. Check for Active Session
+  if (activeSession) {
+    // If session is complete (but still in state?) - SessionWrapUp might be better handled by Executor return value or state
+    // But let's assume activeSession remains true until explicit close.
+    // If we need a WrapUp screen, the Executor probably handles it or we have a flag.
+    // For now, if active, show executor.
+    return <SessionExecutor />;
+  }
+
+  // 2. Check active Riff
   if (selectedRiff) {
     return (
       <div className="bg-background p-4 bpm-control-area">
@@ -291,7 +283,6 @@ const Premium = () => {
               dangerouslySetInnerHTML={{ __html: selectedLessonExercise.description }}
             />
           )}
-          {/* Riff Practice */}
           <RiffPractice
             repertoireItem={selectedRiff}
             sequences={sequences}
@@ -307,7 +298,6 @@ const Premium = () => {
 
   return (
     <div className="fixed inset-0 flex flex-col bg-background overflow-hidden">
-      {/* Fixed Header with Back Button - compact on mobile */}
       <div className="flex-shrink-0 border-b bg-card px-2 sm:px-4 py-1 sm:py-2 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <Button
@@ -348,7 +338,6 @@ const Premium = () => {
       </div>
 
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden p-2 sm:p-4">
-        {/* Content */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0 overflow-hidden">
           <div className="overflow-x-auto flex-shrink-0 mb-2 sm:mb-4 -mx-2 px-2">
             <TabsList className="inline-flex w-auto min-w-full sm:grid sm:grid-cols-5 gap-1">
@@ -435,5 +424,14 @@ const Premium = () => {
     </div>
   );
 };
+
+// Main Export
+const Premium = () => {
+  return (
+    <SessionProvider>
+      <PremiumContent />
+    </SessionProvider>
+  );
+}
 
 export default Premium;

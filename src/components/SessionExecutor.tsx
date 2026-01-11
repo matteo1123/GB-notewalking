@@ -4,7 +4,6 @@ import { Button } from './ui/button';
 import { Progress } from './ui/progress';
 import { Play, Pause, SkipForward, CheckCircle, Clock } from 'lucide-react';
 import type { SessionBlock } from '@/lib/sessionGenerator';
-
 // Import module components
 import { RhythmTraining } from './RhythmTraining';
 import { ChordProgressionExercise } from './ChordProgressionExercise';
@@ -12,69 +11,42 @@ import { ScalePracticeSession } from './ScalePracticeSession';
 import { PieceMastery } from './piece-mastery/PieceMastery';
 import { PieceList } from './piece-mastery/PieceList';
 import type { Piece } from './piece-mastery/types';
+import { useSession } from '@/contexts/SessionContext';
 
 /**
- * Session Executor - Takes user through a practice session
- * Shows progress bar and advances through blocks
+ * Session Executor - Actions governed by SessionContext
  */
+export function SessionExecutor() {
+    const {
+        activeSession,
+        timer,
+        pauseSession,
+        resumeSession,
+        nextBlock,
+        skipBlock,
+        endSession
+    } = useSession();
 
-interface SessionExecutorProps {
-    sessionPlan: SessionBlock[];
-    sessionId?: string; // Practice session ID for linking practice logs
-    onComplete: () => void;
-    onExit: () => void;
-}
-
-export function SessionExecutor({ sessionPlan, sessionId, onComplete, onExit }: SessionExecutorProps) {
-    const [currentBlockIndex, setCurrentBlockIndex] = useState(0);
-    const [elapsedTime, setElapsedTime] = useState(0); // seconds
-    const [isPaused, setIsPaused] = useState(false);
-    const [isRunning, setIsRunning] = useState(false);
     const [selectedPiece, setSelectedPiece] = useState<Piece | null>(null);
 
-    const currentBlock = sessionPlan[currentBlockIndex];
-    const totalBlocks = sessionPlan.length;
-    const totalDuration = sessionPlan.reduce((sum, b) => sum + b.duration_minutes, 0);
-    const progressPercent = ((currentBlockIndex + 1) / totalBlocks) * 100;
+    // If no active session, we shouldn't be here, but handle gracefully
+    if (!activeSession) {
+        return <div className="p-4">No active session</div>;
+    }
 
-    // Timer
-    useEffect(() => {
-        if (!isRunning || isPaused) return;
+    const { currentBlock, currentBlockIndex, session } = activeSession;
+    const blocks = session.session_plan;
+    const totalBlocks = blocks.length;
 
-        const interval = setInterval(() => {
-            setElapsedTime(prev => prev + 1);
+    // Calculate progress based on current index
+    const progressPercent = ((currentBlockIndex) / totalBlocks) * 100;
 
-            // Auto-advance when block time is up
-            const blockDurationSeconds = currentBlock.duration_minutes * 60;
-            if (elapsedTime >= blockDurationSeconds) {
-                handleNext();
-            }
-        }, 1000);
-
-        return () => clearInterval(interval);
-    }, [isRunning, isPaused, elapsedTime, currentBlock]);
-
-    const handleStart = () => {
-        setIsRunning(true);
-    };
-
-    const handlePause = () => {
-        setIsPaused(!isPaused);
-    };
-
-    const handleNext = () => {
-        if (currentBlockIndex < totalBlocks - 1) {
-            setCurrentBlockIndex(prev => prev + 1);
-            setElapsedTime(0);
+    const handleTogglePause = () => {
+        if (activeSession.isPaused) {
+            resumeSession();
         } else {
-            // Session complete!
-            setIsRunning(false);
-            onComplete();
+            pauseSession();
         }
-    };
-
-    const handleSkip = () => {
-        handleNext();
     };
 
     const formatTime = (seconds: number) => {
@@ -85,7 +57,7 @@ export function SessionExecutor({ sessionPlan, sessionId, onComplete, onExit }: 
 
     return (
         <div className="h-full flex flex-col overflow-hidden">
-            {/* Compact Progress Header - Single Line */}
+            {/* Compact Progress Header */}
             <div className="flex-shrink-0 border-b bg-card p-3">
                 <div className="flex items-center justify-between gap-4 mb-2">
                     {/* Left: Title & Block Info */}
@@ -102,40 +74,31 @@ export function SessionExecutor({ sessionPlan, sessionId, onComplete, onExit }: 
                         </div>
                     </div>
 
-                    {/* Center: Timer */}
+                    {/* Center: Timer (from Context) */}
                     <div className="flex items-center gap-2 text-sm font-medium">
                         <Clock className="w-4 h-4" />
-                        {formatTime(elapsedTime)} / {currentBlock.duration_minutes}:00
+                        {formatTime(timer.timeRemaining)} / {currentBlock.duration_minutes}:00
                     </div>
 
                     {/* Right: Controls */}
                     <div className="flex items-center gap-2">
-                        {!isRunning ? (
-                            <Button onClick={handleStart} size="sm">
-                                <Play className="w-4 h-4 mr-1" />
-                                Start
-                            </Button>
-                        ) : (
-                            <>
-                                <Button
-                                    onClick={handlePause}
-                                    variant={isPaused ? 'default' : 'outline'}
-                                    size="sm"
-                                >
-                                    <Pause className="w-4 h-4" />
-                                </Button>
-                                <Button onClick={handleSkip} variant="outline" size="sm">
-                                    <SkipForward className="w-4 h-4" />
-                                </Button>
-                            </>
-                        )}
-                        <Button onClick={onExit} variant="ghost" size="sm">
+                        <Button
+                            onClick={handleTogglePause}
+                            variant={activeSession.isPaused ? 'default' : 'outline'}
+                            size="sm"
+                        >
+                            {activeSession.isPaused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
+                        </Button>
+                        <Button onClick={() => skipBlock()} variant="outline" size="sm">
+                            <SkipForward className="w-4 h-4" />
+                        </Button>
+                        <Button onClick={() => endSession(false)} variant="ghost" size="sm">
                             Exit
                         </Button>
                     </div>
                 </div>
 
-                {/* Progress Bar - Thin */}
+                {/* Progress Bar */}
                 <div className="flex items-center gap-3">
                     <span className="text-xs text-muted-foreground whitespace-nowrap">
                         {currentBlockIndex + 1}/{totalBlocks}
@@ -147,18 +110,15 @@ export function SessionExecutor({ sessionPlan, sessionId, onComplete, onExit }: 
                 </div>
             </div>
 
-            {/* Module Content - Takes remaining space, no overflow */}
+            {/* Module Content */}
             <div className="flex-1 min-h-0 overflow-hidden">
-                {renderModuleContent(currentBlock, sessionId, selectedPiece, setSelectedPiece)}
+                {renderModuleContent(currentBlock, session.id, selectedPiece, setSelectedPiece)}
             </div>
         </div>
     );
 }
 
-/**
- * Render the appropriate module based on block type
- * Pure flexbox layout - NO OVERFLOW EVER
- */
+// ... renderModuleContent remains mostly the same, just exported or kept local
 function renderModuleContent(
     block: SessionBlock,
     sessionId?: string,
@@ -195,7 +155,6 @@ function renderModuleContent(
             );
 
         case 'piece_mastery':
-            // Show PieceList for selection, or PieceMastery once a piece is chosen
             if (!selectedPiece) {
                 return (
                     <div className="h-full overflow-auto">
@@ -225,9 +184,6 @@ function renderModuleContent(
     }
 }
 
-/**
- * Completion Screen
- */
 export function SessionComplete({ onRestart }: { onRestart: () => void }) {
     return (
         <Card className="max-w-2xl mx-auto mt-12">

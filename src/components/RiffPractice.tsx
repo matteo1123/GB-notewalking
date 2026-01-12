@@ -679,6 +679,8 @@ const RiffPractice = ({
 
             {/* Right side: Metronome */}
             <div className="flex items-start space-x-4">
+
+
               <RecordingControls
                 onSave={async (audioBlob, duration, maxBpm, perfectBpm) => {
                   if (!user || !repertoireItem || !activeSequence) return;
@@ -741,6 +743,8 @@ const RiffPractice = ({
             </div>
           </div>
         </div>
+        {/* Ear Training Layout Slot - Full Width Bar (Responsive) */}
+        <div id="ear-training-ui-slot" className="w-full flex justify-start md:justify-center border-b border-border bg-card/30 empty:hidden min-h-0 overflow-x-auto" />
         <main className="flex-1 min-h-0 overflow-hidden">
           <NoteDisplay
             notes={displayNotes}

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useNotePlayer } from "@/hooks/useNotePlayer";
 import { useEarTraining } from "@/hooks/useEarTraining";
 import { usePitchDetection } from "@/hooks/usePitchDetection";
@@ -49,6 +50,14 @@ export function EarTrainingWrapper({
     // Track the last tick we played on to avoid duplicate triggers
     const lastPlayedTickRef = useRef<number>(-1);
 
+    const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
+
+    useEffect(() => {
+        // Try to find the portal slot in the parent component (RiffPractice)
+        const el = document.getElementById('ear-training-ui-slot');
+        if (el) setPortalTarget(el);
+    }, []);
+
     useEffect(() => {
         if (earTrainingEnabled && !audioContext) {
             const ctx = new AudioContext();
@@ -61,11 +70,11 @@ export function EarTrainingWrapper({
         }
 
         return () => {
-            if (audioContext) {
+            if (audioContext && audioContext.state !== 'closed') {
                 audioContext.close();
             }
         };
-    }, [earTrainingEnabled, onEnsurePlaying]);
+    }, [earTrainingEnabled, onEnsurePlaying, audioContext]);
 
     const simpleNotes = useMemo(() => {
         return notes.map((n) => ({ string: n.string, fret: n.fret }));
@@ -230,107 +239,109 @@ export function EarTrainingWrapper({
         return simpleNotes;
     }, [simpleNotes]);
 
-    return (
-        <div className="space-y-1 sm:space-y-4">
-            {/* Ear Training Toggle & Mode Indicator */}
-            <div className="flex justify-between items-center">
-                {/* Badge removed as requested since Identify is the only mode */}
-                <div className="flex-1" />
-                <Button
-                    variant={earTrainingEnabled ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => {
-                        const newEnabled = !earTrainingEnabled;
-                        setEarTrainingEnabled(newEnabled);
-                        if (!newEnabled) {
-                            earTraining.reset();
-                            stopPlayback();
-                        }
-                    }}
-                    className="gap-2 ml-auto"
-                >
-                    <Ear className="w-4 h-4" />
-                    {earTrainingEnabled ? "Exit Ear Training" : "Ear Training Mode"}
-                </Button>
-            </div>
-
-            {/* Ear Training Controls */}
-            {earTrainingEnabled && (
-                <EarTrainingControls
-                    settings={earTrainingSettings}
-                    progress={earTraining.progress}
-                    isPlaying={earTraining.isPlaying}
-                    isListening={earTraining.isListening}
-                    waitingForClick={earTraining.waitingForClick}
-                    maxLevel={earTrainingNotes.length}
-                    onSettingsChange={(newSettings) =>
-                        setEarTrainingSettings((prev) => ({ ...prev, ...newSettings }))
+    const uiContent = (
+        <div className="flex items-center gap-2 pointer-events-auto">
+            <Button
+                variant={earTrainingEnabled ? "default" : "outline"}
+                size="sm"
+                onClick={() => {
+                    const newEnabled = !earTrainingEnabled;
+                    setEarTrainingEnabled(newEnabled);
+                    if (!newEnabled) {
+                        earTraining.reset();
+                        stopPlayback();
                     }
-                    onPlay={earTraining.playCurrentPhrase}
-                    onNext={earTraining.goToNextPhrase}
-                    onPrevious={earTraining.goToPreviousPhrase}
-                    onReset={earTraining.reset}
-                    compact
-                />
-            )}
+                }}
+                className="gap-1 h-7 sm:h-9 text-xs sm:text-sm px-2 sm:px-4 shadow-md"
+            >
+                <Ear className="w-3 h-3 sm:w-4 sm:h-4" />
+                <span className="hidden sm:inline">{earTrainingEnabled ? "Exit Ear Training" : "Ear Training"}</span>
+                <span className="sm:hidden">{earTrainingEnabled ? "Exit" : "Ear"}</span>
+            </Button>
 
-            {/* Instructions */}
             {earTrainingEnabled && (
-                <div className="mb-1 sm:mb-4 p-2 sm:p-4 bg-muted/50 rounded-lg border border-border">
-                    {earTraining.isPlaying && (
-                        <p className="text-center text-sm sm:text-lg font-medium">
-                            🎵 Listen to the note...
-                        </p>
+                <div className={portalTarget
+                    ? "flex bg-background/95 backdrop-blur-sm rounded-lg border border-border shadow-sm"
+                    : "absolute top-12 left-0 mt-2 bg-background/95 backdrop-blur-sm p-2 rounded-lg border border-border shadow-lg flex flex-col items-center gap-2 w-max max-w-[90vw]"
+                }>
+                    {/* Instructions - only show in fallback or if space allows? Keep it simple. */}
+                    {!portalTarget && (
+                        <div className="flex items-center justify-center gap-2 text-xs whitespace-nowrap mb-2">
+                            {earTraining.isPlaying && <span>🎵 Listen...</span>}
+                            <span className="text-blue-600 font-medium">Click note!</span>
+                        </div>
                     )}
-                    <p className="text-center text-sm sm:text-lg font-medium text-blue-600">
-                        👆 Click the note you heard!
-                    </p>
 
-                    {feedbackMessage && (
-                        <p className={`text-center text-xl font-bold mt-2 ${feedbackMessage.includes("Correct") ? "text-green-600" : "text-amber-500"}`}>
-                            {feedbackMessage}
-                        </p>
-                    )}
+                    <EarTrainingControls
+                        settings={earTrainingSettings}
+                        progress={earTraining.progress}
+                        isPlaying={earTraining.isPlaying}
+                        isListening={earTraining.isListening}
+                        waitingForClick={earTraining.waitingForClick}
+                        maxLevel={earTrainingNotes.length}
+                        onSettingsChange={(newSettings) =>
+                            setEarTrainingSettings((prev) => ({ ...prev, ...newSettings }))
+                        }
+                        onPlay={earTraining.playCurrentPhrase}
+                        onNext={earTraining.goToNextPhrase}
+                        onPrevious={earTraining.goToPreviousPhrase}
+                        onReset={earTraining.reset}
+                        compact
+                    />
+                </div>
+            )}
+        </div>
+    );
+
+    return (
+        <div className="relative h-full w-full flex flex-col overflow-hidden pb-4">
+            {/* Render UI via Portal if target exists, otherwise Absolute Fallback */}
+            {portalTarget ? (
+                createPortal(uiContent, portalTarget)
+            ) : (
+                <div className="absolute top-2 left-2 z-20">
+                    {uiContent}
                 </div>
             )}
 
-            {/* Fretboard with ear training visual feedback */}
+            {/* Fretboard - Fill remaining space */}
             {displayMode === "fretboard" && (
-                <Fretboard
-                    selectedNotes={displayNotes.map((n, idx) => {
-                        // In Identify mode, we DO NOT want to highlight the note being played (that's the answer!)
-                        // So isPlayingNote is always false.
-                        const isPlayingNote = false;
+                <div className="flex-1 w-full h-full min-h-0 overflow-hidden flex items-center justify-center p-2 lg:p-4">
+                    <div className="w-full h-full relative rounded-xl overflow-x-auto overflow-y-hidden">
+                        <Fretboard
+                            selectedNotes={displayNotes.filter(n => {
+                                // If ear training is enabled, only show notes available at current level
+                                if (earTrainingEnabled && earTrainingNotes.length > 0) {
+                                    const allowedNotes = earTrainingNotes.slice(0, earTrainingSettings.level + 1);
+                                    return allowedNotes.some(allowed => allowed.string === n.string && allowed.fret === n.fret);
+                                }
+                                return true;
+                            }).map((n) => {
+                                const isPlayingNote = false;
+                                const isExpectedNote = false;
+                                const sungResult = null;
+                                const isCurrent = !earTrainingEnabled && Math.abs((n as any).time - currentPosition) < 0.1;
 
-                        // We also likely don't want to show 'isExpected' as that might give it away too?
-                        // Unless isExpected is used for something else. checks... 
-                        // It was "Highlight the note user should sing". In identify mode, we don't want to show the target.
-                        const isExpectedNote = false;
-
-                        const sungResult = null; // No singing
-
-                        // Standard practice mode highlighting
-                        const isCurrent = !earTrainingEnabled && Math.abs((n as any).time - currentPosition) < 0.1;
-
-                        return {
-                            ...n,
-                            // Add visual feedback classes via custom rendering
-                            isPlaying: isPlayingNote,
-                            isExpected: isExpectedNote,
-                            sungCorrect: false,
-                            sungIncorrect: false,
-                            isActive: isCurrent, // Use standard active highlighting when not in ear training
-                        };
-                    })}
-                    degreeMap={degreeMap}
-                    showDegreeNumbers={true}
-                    highlightedNote={detectedPitch} // NEW: Show detected pitch
-                    isEditable={true} // Always editable for click-to-play
-                    rootNote={simpleNotes.find(
-                        (n) => getNoteFromFret(n.string, n.fret) === major_key
-                    )}
-                    onNoteClick={handleGeneralFretboardClick}
-                />
+                                return {
+                                    ...n,
+                                    isPlaying: isPlayingNote,
+                                    isExpected: isExpectedNote,
+                                    sungCorrect: false,
+                                    sungIncorrect: false,
+                                    isActive: isCurrent,
+                                };
+                            })}
+                            degreeMap={degreeMap}
+                            showDegreeNumbers={true}
+                            highlightedNote={detectedPitch}
+                            isEditable={true}
+                            rootNote={simpleNotes.find(
+                                (n) => getNoteFromFret(n.string, n.fret) === major_key
+                            )}
+                            onNoteClick={handleGeneralFretboardClick}
+                        />
+                    </div>
+                </div>
             )}
         </div>
     );

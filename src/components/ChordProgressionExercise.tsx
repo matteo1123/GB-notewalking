@@ -16,7 +16,7 @@ import { DegreeTuner } from "./DegreeTuner";
 import { Switch } from "./ui/switch";
 import { Label } from "./ui/label";
 import { Button } from "./ui/button";
-import { Check, Guitar, Play, Pause, Volume2, VolumeX } from "lucide-react";
+import { Check, Guitar, Play, Pause, Volume2, VolumeX, Clock, SkipForward, X } from "lucide-react";
 import Fretboard from "./Fretboard";
 import { createDegreeMap, findAllNoteOccurrences } from "@/lib/musicTheory";
 import { getChordTones, calculateDegreeFromRoot } from "@/lib/chordProgression";
@@ -58,9 +58,23 @@ const DIATONIC_CHORDS: ChordNumeral[] = ["I", "ii", "iii", "IV", "V", "vi", "vii
 interface ChordProgressionExerciseProps {
     autoStart?: boolean;
     sessionId?: string;
+    // Exit callback for standalone/freeplay mode
+    onExit?: () => void;
+    // Session control props (optional - for when used in a lesson)
+    sessionControls?: {
+        timeRemaining: number;
+        totalDuration: number; // in minutes
+        isPaused: boolean;
+        currentBlockIndex: number;
+        totalBlocks: number;
+        onPause: () => void;
+        onResume: () => void;
+        onSkip: () => void;
+        onExit: () => void;
+    };
 }
 
-export function ChordProgressionExercise({ autoStart = false, sessionId }: ChordProgressionExerciseProps) {
+export function ChordProgressionExercise({ autoStart = false, sessionId, onExit, sessionControls }: ChordProgressionExerciseProps) {
     const [settings, setSettings] = useState<ChordProgressionSettings>(DEFAULT_SETTINGS);
     const [isPlaying, setIsPlaying] = useState(autoStart);
     const [bpm, setBpm] = useState(80);
@@ -356,11 +370,59 @@ export function ChordProgressionExercise({ autoStart = false, sessionId }: Chord
 
                         {/* CENTER: Tuner (MOST IMPORTANT - ~55%) */}
                         <div className="flex-1 flex flex-col gap-1 min-w-0 overflow-hidden">
-                            {/* Current Chord Display - Thin Bar */}
-                            <div className="flex-shrink-0 bg-card border rounded px-2 py-1 flex items-center justify-between">
-                                <span className="text-xs text-muted-foreground">Playing:</span>
-                                <span className="text-lg font-bold">{settings.selectedChords[currentChordIndex]} ({currentChord.rootNote})</span>
-                                <span className="text-xs text-muted-foreground">Key of {settings.key}</span>
+                            {/* Top Bar - Split: Chord Info | Session Controls */}
+                            <div className="flex-shrink-0 flex gap-1">
+                                {/* Left Half: Current Chord Display */}
+                                <div className="flex-1 bg-card border rounded px-2 py-1 flex items-center justify-between">
+                                    <span className="text-xs text-muted-foreground">Playing:</span>
+                                    <span className="text-lg font-bold">{settings.selectedChords[currentChordIndex]} ({currentChord.rootNote})</span>
+                                    <span className="text-xs text-muted-foreground">Key of {settings.key}</span>
+                                </div>
+
+                                {/* Right Half: Session Controls (only if in a lesson) */}
+                                {sessionControls && (
+                                    <div className="flex-1 bg-card border rounded px-2 py-1 flex items-center justify-between gap-2">
+                                        {/* Timer */}
+                                        <div className="flex items-center gap-1 text-sm">
+                                            <Clock className="w-3 h-3" />
+                                            <span className="font-mono font-bold">
+                                                {Math.floor(sessionControls.timeRemaining / 60)}:{(sessionControls.timeRemaining % 60).toString().padStart(2, '0')}
+                                            </span>
+                                        </div>
+
+                                        {/* Progress */}
+                                        <span className="text-xs text-muted-foreground">
+                                            {sessionControls.currentBlockIndex + 1}/{sessionControls.totalBlocks}
+                                        </span>
+
+                                        {/* Controls */}
+                                        <div className="flex items-center gap-1">
+                                            <Button
+                                                size="sm"
+                                                variant={sessionControls.isPaused ? "default" : "outline"}
+                                                className="h-6 w-6 p-0"
+                                                onClick={sessionControls.isPaused ? sessionControls.onResume : sessionControls.onPause}
+                                            >
+                                                {sessionControls.isPaused ? <Play className="w-3 h-3" /> : <Pause className="w-3 h-3" />}
+                                            </Button>
+                                            <Button size="sm" variant="outline" className="h-6 w-6 p-0" onClick={sessionControls.onSkip}>
+                                                <SkipForward className="w-3 h-3" />
+                                            </Button>
+                                            <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={sessionControls.onExit}>
+                                                Exit
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Freeplay Exit (when not in session but onExit provided) */}
+                                {!sessionControls && onExit && (
+                                    <div className="bg-card border rounded px-2 py-1 flex items-center">
+                                        <Button size="sm" variant="ghost" className="h-6 px-2 text-xs gap-1" onClick={onExit}>
+                                            <X className="w-3 h-3" /> Exit
+                                        </Button>
+                                    </div>
+                                )}
                             </div>
 
                             {/* DEGREE TUNER - Main Visual */}

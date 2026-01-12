@@ -4,7 +4,7 @@ import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { Play, Pause, ChevronLeft, ChevronRight, RotateCcw, ArrowLeft, Mic, Volume2, Music, Settings2, PlusCircle, Save } from "lucide-react";
+import { Play, Pause, ChevronLeft, ChevronRight, RotateCcw, ArrowLeft, Mic, Volume2, Music, Settings2, PlusCircle, Save, X } from "lucide-react";
 import { usePieceMastery, PracticePhase } from "@/hooks/usePieceMastery";
 import { Piece } from "./types";
 import { cn } from "@/lib/utils";
@@ -13,9 +13,11 @@ import { useToast } from "@/hooks/use-toast";
 interface PieceMasteryProps {
     piece: Piece;
     onBack: () => void;
+    // Exit callback for standalone/freeplay mode
+    onExit?: () => void;
 }
 
-export function PieceMastery({ piece, onBack }: PieceMasteryProps) {
+export function PieceMastery({ piece, onBack, onExit }: PieceMasteryProps) {
     const [autoAdvance, setAutoAdvance] = useState(false);
     const [notes, setNotes] = useState(piece.notes || "");
     const { toast } = useToast();
@@ -93,7 +95,7 @@ export function PieceMastery({ piece, onBack }: PieceMasteryProps) {
                 <Button variant="ghost" size="icon" onClick={onBack}>
                     <ArrowLeft className="h-5 w-5" />
                 </Button>
-                <div>
+                <div className="flex-1">
                     <h2 className="text-xl font-bold">{piece.name}</h2>
                     <p className="text-sm text-muted-foreground flex items-center gap-2">
                         Block {currentBlockIndex + 1} • {loopRange.label}
@@ -105,6 +107,11 @@ export function PieceMastery({ piece, onBack }: PieceMasteryProps) {
                         <RotateCcw className="w-4 h-4" />
                         Auto-Advance: {autoAdvance ? 'ON' : 'OFF'}
                     </Button>
+                    {onExit && (
+                        <Button size="sm" variant="ghost" className="gap-1" onClick={onExit}>
+                            <X className="w-4 h-4" /> Exit
+                        </Button>
+                    )}
                 </div>
             </div>
 

@@ -1,22 +1,26 @@
 .fretboard-area {
   display: flex;
   align-items: center;
-  margin-bottom: 0.5rem;
+  justify-content: center;
   max-width: 100%;
-  overflow-x: hidden;
+  overflow: hidden;
+  height: fit-content;
+  flex: 0 0 auto;
 }
 
 .open-notes-container {
   display: grid;
-  grid-template-columns: minmax(30px, 50px);
-  grid-template-rows: repeat(6, minmax(18px, 30px));
-  margin-right: 5px;
+  grid-template-columns: minmax(35px, 50px);
+  grid-template-rows: repeat(6, 1fr);
+  margin-right: 0;
   background-color: #1a1a1a;
-  border: 2px solid #666;
+  border: none;
   border-right: 4px solid #fff;
-  border-radius: 4px 0 0 4px;
+  border-radius: 0;
   position: relative;
   flex-shrink: 0;
+  height: auto;
+  box-sizing: border-box;
 }
 
 .open-notes-container::before {
@@ -33,18 +37,27 @@
 .fretboard-container {
   overflow-x: hidden;
   max-width: 100%;
+  flex: 1;
+  display: flex;
+  align-items: stretch;
+  height: 100%;
 }
 
 .fretboard {
   display: grid;
   grid-template-columns: repeat(24, minmax(20px, 1fr));
-  grid-template-rows: repeat(6, minmax(18px, 30px));
+  grid-template-rows: repeat(6, 1fr);
   position: relative;
   background-color: #000;
   width: 100%;
+  height: 100%;
   max-width: 1200px;
-  border: 2px solid #fff;
-  border-left-width: 5px;
+  border: none;
+  border-left: 5px solid #fff;
+  border-top: none;
+  border-right: none;
+  border-bottom: none;
+  box-sizing: border-box;
 }
 
 .fret {
@@ -81,8 +94,9 @@
 }
 
 .dot {
-  width: clamp(14px, 3vw, 22px);
-  height: clamp(14px, 3vw, 22px);
+  /* Default Desktop Size */
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   background-color: #ccc;
   position: absolute;
@@ -92,6 +106,69 @@
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* ====== MOBILE STYLES (Default - Mobile First) ====== */
+/* Mobile Landscape Optimization */
+@media (max-width: 1023px) {
+  .dot {
+    width: clamp(18px, 5vw, 32px);
+    height: clamp(18px, 5vw, 32px);
+  }
+
+  .fretboard {
+    /* Mobile: WIDE and THIN - like a real guitar neck */
+    min-width: 600px;
+    max-height: 195px;
+    height: 195px;
+    padding: 12px 0;
+  }
+
+  .open-notes-container {
+    height: 195px;
+    padding: 12px 0;
+  }
+
+  .fretboard-area {
+    padding: 4px;
+    max-height: 210px;
+  }
+}
+
+/* ====== DESKTOP STYLES ====== */
+@media (min-height: 700px) {
+  .fretboard {
+    /* Desktop: WIDE and THIN - like a real guitar neck */
+    /* Frets (width) >> String spacing (height) */
+    min-width: 900px;
+    max-width: 1200px;
+    height: 180px;
+    max-height: 200px;
+    grid-template-columns: repeat(24, minmax(35px, 50px));
+    grid-template-rows: repeat(6, minmax(25px, 35px));
+    margin: 0 auto;
+  }
+
+  .open-notes-container {
+    height: 180px;
+    padding: 0;
+  }
+
+  .fretboard-area {
+    justify-content: center;
+    padding: 8px;
+  }
+
+  .fretboard-container {
+    min-width: 900px;
+    max-width: 1200px;
+    justify-content: center;
+  }
+
+  .dot {
+    width: 22px;
+    height: 22px;
+  }
 }
 
 .dot.out-of-scale {
@@ -198,61 +275,50 @@
   /* Ensure visibility over others */
 }
 
-/* Mobile landscape optimization */
+/* Mobile landscape optimization - LARGER SIZES for visibility */
 @media (max-width: 900px) and (orientation: landscape) {
-  .fretboard-area {
-    margin-bottom: 0.25rem;
-  }
-
   .open-notes-container {
-    grid-template-columns: 25px;
-    grid-template-rows: repeat(6, 16px);
-    margin-right: 3px;
+    grid-template-columns: 30px;
+    margin-right: 4px;
   }
 
   .open-notes-container::before {
-    font-size: 10px;
-    top: -16px;
+    font-size: 11px;
+    top: -18px;
   }
 
   .fretboard {
-    grid-template-rows: repeat(6, 16px);
+    grid-template-columns: repeat(24, minmax(24px, 1fr));
   }
 
   .dot {
-    width: 12px;
-    height: 12px;
+    width: 22px;
+    height: 22px;
   }
 
   .degree-number {
-    font-size: 8px;
+    font-size: 11px;
   }
 
   .marker {
-    width: 10px;
-    height: 10px;
+    width: 14px;
+    height: 14px;
   }
 }
 
 /* Compact mobile portrait */
 @media (max-width: 500px) {
-  .fretboard-area {
-    margin-bottom: 0.25rem;
-  }
-
   .open-notes-container {
     grid-template-columns: 20px;
-    grid-template-rows: repeat(6, 14px);
   }
 
   .fretboard {
-    grid-template-columns: repeat(24, minmax(12px, 1fr));
-    grid-template-rows: repeat(6, 14px);
+    grid-template-columns: repeat(24, minmax(14px, 1fr));
   }
 
   .dot {
-    width: 10px;
-    height: 10px;
+    width: 14px;
+    height: 14px;
   }
 }
 

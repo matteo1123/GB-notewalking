@@ -1,6 +1,6 @@
 import { useMemo, useCallback } from 'react';
 import { Button } from './ui/button';
-import { Settings, Star, StarOff, Save, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Settings, Star, StarOff, Save, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import type { ScaleModuleConfig, ArpeggioModuleConfig } from '@/types/practice';
 import type { RepertoireItem } from '@/types/repertoire';
 import RiffPractice from './RiffPractice';
@@ -34,6 +34,8 @@ export interface ExercisePracticeModuleProps {
     onSaveConfig?: () => void;
     savedInstances?: { id: string; name: string }[];
     onLoadInstance?: (id: string) => void;
+    // Exit callback for standalone/freeplay mode
+    onExit?: () => void;
 }
 
 /**
@@ -58,6 +60,7 @@ export function ExercisePracticeModule({
     onSaveConfig,
     savedInstances = [],
     onLoadInstance,
+    onExit,
 }: ExercisePracticeModuleProps) {
     // Process exercises with config (filter, dedupe, order)
     const processedExercises = useMemo(() => {
@@ -345,6 +348,13 @@ export function ExercisePracticeModule({
                             <span className="hidden sm:inline">Next</span>
                             <ChevronRight className="w-4 h-4 sm:ml-1" />
                         </Button>
+
+                        {/* Exit button */}
+                        {onExit && (
+                            <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1 ml-1" onClick={onExit}>
+                                <X className="w-3 h-3" /> Exit
+                            </Button>
+                        )}
                     </div>
 
                     {/* Exercise content */}
@@ -387,6 +397,11 @@ export function ExercisePracticeModule({
                     <span className="text-sm text-muted-foreground whitespace-nowrap">
                         {processedExercises.length} exercises
                     </span>
+                    {onExit && (
+                        <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1" onClick={onExit}>
+                            <X className="w-3 h-3" /> Exit
+                        </Button>
+                    )}
                 </div>
             </div>
             <ExerciseList

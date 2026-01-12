@@ -21,16 +21,18 @@ import { Slider } from "./ui/slider";
 import { Label } from "./ui/label";
 import { Switch } from "./ui/switch";
 import { Checkbox } from "./ui/checkbox";
-import { SkipForward, ChevronLeft, ChevronRight, Check, Mic, Settings, ChevronUp, Shuffle, ListOrdered } from "lucide-react";
+import { SkipForward, ChevronLeft, ChevronRight, Check, Mic, Settings, ChevronUp, Shuffle, ListOrdered, X } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui/collapsible";
 import { ForceLandscapeWrapper } from "./ForceLandscapeWrapper";
 
 interface RhythmTrainingProps {
     autoStart?: boolean;
     sessionId?: string;
+    // Exit callback for standalone/freeplay mode
+    onExit?: () => void;
 }
 
-export function RhythmTraining({ autoStart = false, sessionId }: RhythmTrainingProps) {
+export function RhythmTraining({ autoStart = false, sessionId, onExit }: RhythmTrainingProps) {
     // Rhythm mode and deviation types
     const [rhythmMode, setRhythmMode] = useState<RhythmMode>('random');
     const [deviationTypes, setDeviationTypes] = useState<DeviationOptions>({ skip: true, triplet: false });
@@ -81,7 +83,7 @@ export function RhythmTraining({ autoStart = false, sessionId }: RhythmTrainingP
     useEffect(() => {
         if (autoStart) {
             const timer = setTimeout(() => {
-                if (metronome.audioContext.state === 'suspended') {
+                if (metronome.audioContext && metronome.audioContext.state === 'suspended') {
                     metronome.audioContext.resume();
                 }
                 if (!metronome.state.isPlaying) {
@@ -272,6 +274,16 @@ export function RhythmTraining({ autoStart = false, sessionId }: RhythmTrainingP
                             <h1 className="text-sm sm:text-2xl font-bold">Rhythm</h1>
                             <span className="text-xs bg-muted px-1.5 py-0.5 rounded">L{level}</span>
                         </div>
+
+                        {/* Center: Session controls or Exit button */}
+                        <div className="flex items-center gap-2">
+                            {onExit && (
+                                <Button size="sm" variant="ghost" className="h-6 px-2 text-xs gap-1" onClick={onExit}>
+                                    <X className="w-3 h-3" /> Exit
+                                </Button>
+                            )}
+                        </div>
+
                         <BeatVisualizer
                             currentBeat={metronome.state.currentBeat}
                             isPlaying={metronome.state.isPlaying}

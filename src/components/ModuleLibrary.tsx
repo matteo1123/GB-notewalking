@@ -300,8 +300,8 @@ export function ModuleLibrary() {
 
                 {/* Module Content */}
                 <div className="flex-1 min-h-0">
-                    {activeModule === 'rhythm' && <RhythmTraining />}
-                    {activeModule === 'notewalking' && <ChordProgressionExercise />}
+                    {activeModule === 'rhythm' && <RhythmTraining onExit={handleCloseModule} />}
+                    {activeModule === 'notewalking' && <ChordProgressionExercise onExit={handleCloseModule} />}
                     {(activeModule === 'scale' || activeModule === 'arpeggio') && (
                         <ExercisePracticeModule
                             moduleType={activeModule}
@@ -330,6 +330,7 @@ export function ModuleLibrary() {
                                     }
                                 }
                             }}
+                            onExit={handleCloseModule}
                         />
                     )}
                     {activeModule === 'chord_progressions' && (
@@ -344,11 +345,11 @@ export function ModuleLibrary() {
                     {activeModule === 'piece_mastery' && (
                         selectedPiece ? (
                             <div className="h-full bg-background">
-                                <PieceMastery piece={selectedPiece} onBack={() => setSelectedPiece(null)} />
+                                <PieceMastery piece={selectedPiece} onBack={() => setSelectedPiece(null)} onExit={handleCloseModule} />
                             </div>
                         ) : (
                             <div className="h-full overflow-y-auto">
-                                <PieceList onSelectPiece={setSelectedPiece} />
+                                <PieceList onSelectPiece={setSelectedPiece} onExit={handleCloseModule} />
                             </div>
                         )
                     )}

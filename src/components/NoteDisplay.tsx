@@ -126,10 +126,31 @@ const NoteDisplay = ({
   const minFret = notes.length > 0 ? Math.min(...notes.map(n => n.fret)) : 0;
 
   return (
-    <div className={`bg-card rounded-lg border border-border ${displayMode === 'fretboard' ? 'p-0' : 'p-4'} ${className}`}>
-      <div className="flex justify-between items-center mb-1 sm:mb-4 px-1 sm:px-0">
-        <h3 className="text-sm sm:text-lg font-semibold capitalize">{displayMode}</h3>
-        <div className="flex items-center gap-2 sm:gap-4">
+    <div className={`bg-card rounded-lg ${displayMode === 'fretboard' ? '' : 'border border-border'} h-full flex flex-col ${displayMode === 'fretboard' ? 'p-0' : 'p-4'} ${className}`}>
+      <div className="flex-shrink-0 flex justify-between items-center mb-1 px-1 gap-1">
+        <div className="flex items-center gap-1 sm:gap-2">
+          <h3 className="text-xs sm:text-lg font-semibold capitalize hidden sm:block">{displayMode}</h3>
+          {/* Learn button - compact on mobile */}
+          {displayMode === 'fretboard' && setIsLearning && (
+            <Button
+              size="sm"
+              variant={isLearning ? "destructive" : "default"}
+              className="text-xs px-2 py-1 h-7 sm:h-8"
+              onClick={() => {
+                const newIsLearning = !isLearning;
+                setIsLearning(newIsLearning);
+                if (newIsLearning) {
+                  setShowSingleNote(true);
+                  if (setMetronomeBpm) setMetronomeBpm(60);
+                  if (handlePlay) handlePlay();
+                }
+              }}
+            >
+              {isLearning ? "Stop" : "Learn"}
+            </Button>
+          )}
+        </div>
+        <div className="flex items-center gap-1 sm:gap-4">
           {displayMode === 'fretboard' && (
             <div className="hidden sm:flex items-center space-x-2">
               <Switch
@@ -141,17 +162,17 @@ const NoteDisplay = ({
             </div>
           )}
           <Tabs value={displayMode} onValueChange={(value) => setDisplayMode(value as 'tablature' | 'grid' | 'fretboard')} className="w-auto">
-            <TabsList className="h-8 sm:h-10">
-              <TabsTrigger value="tablature" className="text-xs sm:text-sm px-2 sm:px-3">Tab</TabsTrigger>
-              <TabsTrigger value="grid" className="text-xs sm:text-sm px-2 sm:px-3">Grid</TabsTrigger>
-              <TabsTrigger value="fretboard" className="text-xs sm:text-sm px-2 sm:px-3">Frets</TabsTrigger>
+            <TabsList className="h-7 sm:h-10">
+              <TabsTrigger value="tablature" className="text-xs px-1.5 sm:px-3">Tab</TabsTrigger>
+              <TabsTrigger value="grid" className="text-xs px-1.5 sm:px-3">Grid</TabsTrigger>
+              <TabsTrigger value="fretboard" className="text-xs px-1.5 sm:px-3">Frets</TabsTrigger>
             </TabsList>
           </Tabs>
         </div>
       </div>
       <div
         ref={containerRef}
-        className="overflow-x-auto overflow-y-hidden animated-scrollbar h-full"
+        className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden animated-scrollbar"
       >
         {displayMode === 'tablature' ? (
           <div
@@ -275,71 +296,54 @@ const NoteDisplay = ({
           </div>
         ) : (
           <>
-            <div className="flex items-center gap-2 sm:gap-4 mb-2 sm:mb-4 flex-wrap">
-              <Button
-                size="sm"
-                onClick={() => {
-                  if (setIsLearning) {
-                    const newIsLearning = !isLearning;
-                    setIsLearning(newIsLearning);
-                    if (newIsLearning) {
-                      setShowSingleNote(true);
-                      if (setMetronomeBpm) setMetronomeBpm(60);
-                      if (handlePlay) handlePlay();
-                    }
-                  }
-                }}
-              >
-                {isLearning ? "Stop" : "Learn"}
-              </Button>
-              {isLearning && (
-                <>
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="repetitions">Repetitions</Label>
-                    <Input
-                      id="repetitions"
-                      type="number"
-                      value={learnRepetitions}
-                      onChange={(e) => setLearnRepetitions && setLearnRepetitions(parseInt(e.target.value, 10))}
-                      className="w-20"
-                    />
-                  </div>
-                  <div className="flex space-x-2">
-                    {learnTimeline?.map((item, index) => (
-                      <div
-                        key={index}
-                        className={`p-2 rounded cursor-pointer ${index === currentLearnIndex ? "bg-blue-500" : "bg-gray-700"
-                          }`}
-                        onClick={() => {
-                          if (setNoteIndex) setNoteIndex(item.startIndex);
-                          if (setCurrentLearnIndex) setCurrentLearnIndex(index);
-                        }}
-                        onMouseEnter={() => {
-                          if (hoverIntervalRef.current) {
-                            clearInterval(hoverIntervalRef.current);
-                          }
-                          const sectionNotes = notes.slice(item.startIndex, item.endIndex + 1);
-                          setHoveredNotes(sectionNotes);
-                          setHoveredNoteIndex(0);
-                          hoverIntervalRef.current = setInterval(() => {
-                            setHoveredNoteIndex(prevIndex => (prevIndex + 1) % sectionNotes.length);
-                          }, 200);
-                        }}
-                        onMouseLeave={() => {
-                          if (hoverIntervalRef.current) {
-                            clearInterval(hoverIntervalRef.current);
-                          }
-                          setHoveredNotes([]);
-                          setHoveredNoteIndex(0);
-                        }}
-                      >
-                        {item.label}
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
+            {/* Learning controls - shown when isLearning is true */}
+            {isLearning && (
+              <div className="flex items-center gap-2 sm:gap-4 mb-2 sm:mb-4 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="repetitions">Repetitions</Label>
+                  <Input
+                    id="repetitions"
+                    type="number"
+                    value={learnRepetitions}
+                    onChange={(e) => setLearnRepetitions && setLearnRepetitions(parseInt(e.target.value, 10))}
+                    className="w-20"
+                  />
+                </div>
+                <div className="flex space-x-2">
+                  {learnTimeline?.map((item, index) => (
+                    <div
+                      key={index}
+                      className={`p-2 rounded cursor-pointer ${index === currentLearnIndex ? "bg-blue-500" : "bg-gray-700"
+                        }`}
+                      onClick={() => {
+                        if (setNoteIndex) setNoteIndex(item.startIndex);
+                        if (setCurrentLearnIndex) setCurrentLearnIndex(index);
+                      }}
+                      onMouseEnter={() => {
+                        if (hoverIntervalRef.current) {
+                          clearInterval(hoverIntervalRef.current);
+                        }
+                        const sectionNotes = notes.slice(item.startIndex, item.endIndex + 1);
+                        setHoveredNotes(sectionNotes);
+                        setHoveredNoteIndex(0);
+                        hoverIntervalRef.current = setInterval(() => {
+                          setHoveredNoteIndex(prevIndex => (prevIndex + 1) % sectionNotes.length);
+                        }, 200);
+                      }}
+                      onMouseLeave={() => {
+                        if (hoverIntervalRef.current) {
+                          clearInterval(hoverIntervalRef.current);
+                        }
+                        setHoveredNotes([]);
+                        setHoveredNoteIndex(0);
+                      }}
+                    >
+                      {item.label}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             {/* Ear Training always gets all notes, not affected by Single Note Mode or Help Me Learn */
               /* UPDATE: For Help Me Learn, we ONLY want to show the notes in the current section */
             }
@@ -367,25 +371,20 @@ const NoteDisplay = ({
           </>
         )}
       </div>
-      <div className="mt-4 text-xs text-muted-foreground text-center">
+      {/* Legend - hide on mobile to save space */}
+      <div className="hidden sm:block flex-shrink-0 mt-2 text-xs text-muted-foreground text-center">
         {displayMode === 'tablature' ? (
-          <>
-            String numbers (1 = High E, 6 = Low E) • Numbers on strings = Fret positions
-          </>
+          <>String numbers (1 = High E, 6 = Low E) • Numbers on strings = Fret positions</>
         ) : (
-          <>
-            String numbers (1 = High E, 6 = Low E) • Note names on grid = Note positions
-          </>
+          <>String numbers (1 = High E, 6 = Low E) • Note names on grid = Note positions</>
         )}
         <br />
-        <span className="inline-block w-3 h-3 bg-green-500 rounded mr-1"></span>
+        <span className="inline-block w-2 h-2 bg-green-500 rounded mr-1"></span>
         Detected •
-        <span className="inline-block w-3 h-3 bg-blue-500 rounded mr-1 ml-2"></span>
+        <span className="inline-block w-2 h-2 bg-blue-500 rounded mr-1 ml-2"></span>
         Current •
-        <span className="inline-block w-3 h-3 bg-accent border border-accent-foreground/20 rounded mr-1 ml-2"></span>
-        Highlighted •
-        <span className="inline-block w-3 h-3 bg-muted rounded ml-2"></span>
-        Regular
+        <span className="inline-block w-2 h-2 bg-accent border border-accent-foreground/20 rounded mr-1 ml-2"></span>
+        Highlighted
         {isListening && (
           <span className="ml-2 inline-flex items-center">
             <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse mr-1"></span>
@@ -393,19 +392,18 @@ const NoteDisplay = ({
           </span>
         )}
       </div>
-      {displayMode !== 'fretboard' && (
-        <div className="mt-4 flex justify-center space-x-4 text-xs absolute bottom-4 left-1/2 -translate-x-1/2">
-          {Object.entries(DEGREE_COLORS).map(([degree, color]) => (
-            <div key={degree} className="flex items-center">
-              <span
-                className="inline-block w-3 h-3 rounded mr-1"
-                style={{ backgroundColor: color }}
-              ></span>
-              <span>{degree}</span>
-            </div>
-          ))}
-        </div>
-      )}
+      {/* Degree colors legend - shown for all modes */}
+      <div className="flex-shrink-0 flex justify-center flex-wrap gap-2 text-xs mt-1 px-1">
+        {Object.entries(DEGREE_COLORS).map(([degree, color]) => (
+          <div key={degree} className="flex items-center">
+            <span
+              className="inline-block w-3 h-3 rounded mr-0.5"
+              style={{ backgroundColor: color }}
+            ></span>
+            <span>{degree}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 };

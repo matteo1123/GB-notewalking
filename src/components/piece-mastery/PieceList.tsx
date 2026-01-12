@@ -4,16 +4,18 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Play, Edit, Trash2, Music } from "lucide-react";
+import { Plus, Play, Edit, Trash2, Music, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Piece } from "./types";
 import { PieceEditor } from "./PieceEditor";
 
 interface PieceListProps {
     onSelectPiece: (piece: Piece) => void;
+    // Exit callback for standalone/freeplay mode
+    onExit?: () => void;
 }
 
-export function PieceList({ onSelectPiece }: PieceListProps) {
+export function PieceList({ onSelectPiece, onExit }: PieceListProps) {
     const { user } = useAuth();
     const { toast } = useToast();
     const [pieces, setPieces] = useState<Piece[]>([]);
@@ -86,9 +88,16 @@ export function PieceList({ onSelectPiece }: PieceListProps) {
                         Master your favorite songs chunk by chunk.
                     </p>
                 </div>
-                <Button onClick={handleCreate}>
-                    <Plus className="mr-2 h-4 w-4" /> New Piece
-                </Button>
+                <div className="flex items-center gap-2">
+                    <Button onClick={handleCreate}>
+                        <Plus className="mr-2 h-4 w-4" /> New Piece
+                    </Button>
+                    {onExit && (
+                        <Button size="sm" variant="ghost" className="gap-1" onClick={onExit}>
+                            <X className="w-4 h-4" /> Exit
+                        </Button>
+                    )}
+                </div>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">

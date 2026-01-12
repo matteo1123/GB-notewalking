@@ -5,12 +5,13 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
     EarTrainingSettings,
     EarTrainingProgress,
     EarTrainingMode,
 } from "@/types/practice";
-import { Play, Pause, SkipForward, SkipBack, RotateCcw, Ear, MousePointer, Mic } from "lucide-react";
+import { Play, Pause, SkipForward, SkipBack, RotateCcw, Ear, MousePointer, Mic, Settings, Search } from "lucide-react";
 
 interface EarTrainingControlsProps {
     settings: EarTrainingSettings;
@@ -54,188 +55,164 @@ export function EarTrainingControls({
         return "text-red-500";
     };
 
+    // Compact Toolbar Mode (for Header/Sidebar)
     if (compact) {
         return (
-            <Card className="bg-card/50">
-                <CardContent className="p-4">
-                    <div className="flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-2">
-                            <Ear className="w-5 h-5 text-primary" />
-                            <div className="text-sm">
-                                <div className="font-semibold">Ear Training Mode</div>
-                                <div className="text-xs text-muted-foreground">
-                                    Phrase {progress.currentPhraseIndex + 1} of {progress.totalPhrases}
-                                </div>
-                            </div>
-                        </div>
+            <div className="flex items-center gap-2 p-1 text-sm bg-background/50 rounded-lg">
+                {/* Playback Controls */}
+                <div className="flex items-center bg-muted/50 rounded-md p-0.5">
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onPrevious} disabled={progress.currentPhraseIndex === 0 || isPlaying || isListening} title="Previous">
+                        <SkipBack className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button variant={isPlaying ? "destructive" : "default"} size="icon" className="h-7 w-7 shadow-sm" onClick={onPlay} disabled={isListening} title={isPlaying ? "Stop" : "Play"}>
+                        {isPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onNext} disabled={progress.currentPhraseIndex >= progress.totalPhrases - 1 || isPlaying || isListening} title="Next">
+                        <SkipForward className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onReset} disabled={isPlaying || isListening} title="Reset">
+                        <RotateCcw className="w-3.5 h-3.5" />
+                    </Button>
+                </div>
 
-                        <div className="flex items-center gap-3">
-                            <div className="text-sm text-center">
-                                <div className="text-xs text-muted-foreground">Accuracy</div>
-                                <div className={`font-bold ${accuracyColor(progress.overallAccuracy)}`}>
-                                    {progress.overallAccuracy.toFixed(0)}%
-                                </div>
-                            </div>
+                {/* Separator */}
+                <div className="w-px h-6 bg-border mx-1" />
 
-                            <div className="flex gap-1">
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={onPrevious}
-                                    disabled={progress.currentPhraseIndex === 0 || isPlaying || isListening}
-                                    title="Previous phrase"
-                                >
-                                    <SkipBack className="w-4 h-4" />
-                                </Button>
-                                <Button
-                                    variant={isPlaying || isListening ? "destructive" : "default"}
-                                    size="icon"
-                                    onClick={onPlay}
-                                    disabled={isPlaying || isListening}
-                                    title="Play current phrase"
-                                >
-                                    {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-                                </Button>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={onNext}
-                                    disabled={progress.currentPhraseIndex >= progress.totalPhrases - 1 || isPlaying || isListening}
-                                    title="Next phrase"
-                                >
-                                    <SkipForward className="w-4 h-4" />
-                                </Button>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={onReset}
-                                    disabled={isPlaying || isListening}
-                                    title="Reset to first phrase"
-                                >
-                                    <RotateCcw className="w-4 h-4" />
-                                </Button>
-                            </div>
-                        </div>
+                {/* Mode Toggle */}
+                <div className="flex bg-muted/50 rounded-md p-0.5">
+                    <Button
+                        variant={settings.mode === 'sing-back' ? 'secondary' : 'ghost'}
+                        size="sm"
+                        className="h-7 px-2 text-xs gap-1.5"
+                        onClick={() => onSettingsChange({ mode: 'sing-back' })}
+                        title="Sing-Back Mode"
+                    >
+                        <Mic className="w-3.5 h-3.5" />
+                        <span className="hidden xl:inline">Sing</span>
+                    </Button>
+                    <Button
+                        variant={settings.mode === 'identify' ? 'secondary' : 'ghost'}
+                        size="sm"
+                        className="h-7 px-2 text-xs gap-1.5"
+                        onClick={() => onSettingsChange({ mode: 'identify' })}
+                        title="Identify Mode"
+                    >
+                        <Search className="w-3.5 h-3.5" />
+                        <span className="hidden xl:inline">Ident</span>
+                    </Button>
+                </div>
 
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setShowSettings(!showSettings)}
-                        >
-                            Settings
+                {/* Level Slider */}
+                <div className="hidden lg:flex items-center gap-2 w-32 px-2">
+                    <span className="text-xs font-medium whitespace-nowrap text-muted-foreground w-8">Lvl {settings.level}</span>
+                    <Slider
+                        value={[settings.level]}
+                        min={1}
+                        max={maxLevel - 1}
+                        step={1}
+                        className="flex-1"
+                        onValueChange={([value]) => onSettingsChange({ level: value })}
+                        disabled={isPlaying || isListening}
+                    />
+                </div>
+
+                {/* Speed Slider */}
+                <div className="hidden xl:flex items-center gap-2 w-28 px-2">
+                    <span className="text-xs font-medium whitespace-nowrap text-muted-foreground w-8">{settings.playbackSpeed.toFixed(1)}x</span>
+                    <Slider
+                        value={[settings.playbackSpeed]}
+                        min={0.5}
+                        max={2}
+                        step={0.1}
+                        className="flex-1"
+                        onValueChange={([value]) => onSettingsChange({ playbackSpeed: value })}
+                        disabled={isPlaying || isListening}
+                    />
+                </div>
+
+                {/* Advanced Settings Popover */}
+                <Popover>
+                    <PopoverTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground">
+                            <Settings className="w-4 h-4" />
                         </Button>
-                    </div>
-
-                    {isListening && (
-                        <div className="mt-3 flex items-center justify-center gap-2 text-sm text-green-500">
-                            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                            Listening... Sing the notes back!
+                    </PopoverTrigger>
+                    <PopoverContent className="w-64 p-4 space-y-4" side="bottom" align="end">
+                        <div className="space-y-2">
+                            <h4 className="font-medium leading-none">Settings</h4>
+                            <p className="text-sm text-muted-foreground">Adjust ear training detection.</p>
                         </div>
-                    )}
 
-                    {waitingForClick && (
-                        <div className="mt-3 flex items-center justify-center gap-2 text-sm text-blue-500">
-                            <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></span>
-                            Click the note on the fretboard!
-                        </div>
-                    )}
-
-                    {showSettings && (
-                        <div className="mt-4 pt-4 border-t border-border space-y-4">
-                            <div className="space-y-2">
-                                <Label>Mode</Label>
-                                <Tabs value={settings.mode} onValueChange={(value) => onSettingsChange({ mode: value as EarTrainingMode })}>
-                                    <TabsList className="grid w-full grid-cols-2">
-                                        <TabsTrigger value="sing-back" className="gap-2">
-                                            <Mic className="w-4 h-4" />
-                                            Sing-Back
-                                        </TabsTrigger>
-                                        <TabsTrigger value="identify" className="gap-2">
-                                            <MousePointer className="w-4 h-4" />
-                                            Identify
-                                        </TabsTrigger>
-                                    </TabsList>
-                                </Tabs>
-                            </div>
-
-                            {settings.mode === 'sing-back' && (
-                                <div className="space-y-2">
-                                    <Label>Notes per phrase: {settings.notesPerPhrase}</Label>
-                                    <Slider
-                                        value={[settings.notesPerPhrase]}
-                                        min={1}
-                                        max={8}
-                                        step={1}
-                                        onValueChange={([value]) =>
-                                            onSettingsChange({ notesPerPhrase: value })
-                                        }
-                                        disabled={isPlaying || isListening}
-                                    />
-                                </div>
-                            )}
-
-                            <div className="space-y-2">
-                                <Label>Level: {settings.level} ({settings.level + 1} notes)</Label>
+                        {/* Sliders for Mobile/Tablet where they are hidden in toolbar */}
+                        <div className="space-y-3 lg:hidden">
+                            <div className="space-y-1">
+                                <Label className="text-xs">Level: {settings.level}</Label>
                                 <Slider
                                     value={[settings.level]}
                                     min={1}
                                     max={maxLevel - 1}
                                     step={1}
-                                    onValueChange={([value]) =>
-                                        onSettingsChange({ level: value })
-                                    }
-                                    disabled={isPlaying || isListening}
+                                    onValueChange={([value]) => onSettingsChange({ level: value })}
                                 />
-                                <p className="text-xs text-muted-foreground">
-                                    Uses root + {settings.level} notes from this exercise only (max {maxLevel} notes available)
-                                </p>
                             </div>
-
-                            <div className="space-y-2">
-                                <Label>Playback speed: {settings.playbackSpeed.toFixed(1)}x</Label>
+                            <div className="space-y-1">
+                                <Label className="text-xs">Speed: {settings.playbackSpeed.toFixed(1)}x</Label>
                                 <Slider
                                     value={[settings.playbackSpeed]}
                                     min={0.5}
                                     max={2}
                                     step={0.1}
-                                    onValueChange={([value]) =>
-                                        onSettingsChange({ playbackSpeed: value })
-                                    }
-                                    disabled={isPlaying || isListening}
+                                    onValueChange={([value]) => onSettingsChange({ playbackSpeed: value })}
                                 />
                             </div>
+                        </div>
 
-                            <div className="space-y-2">
-                                <Label>Sensitivity: {(settings.sensitivity * 100).toFixed(0)}%</Label>
+                        <div className="space-y-3">
+                            <div className="space-y-1">
+                                <Label className="text-xs">Sensitivity: {(settings.sensitivity * 100).toFixed(0)}%</Label>
                                 <Slider
                                     value={[settings.sensitivity]}
                                     min={0.3}
                                     max={1}
                                     step={0.1}
-                                    onValueChange={([value]) =>
-                                        onSettingsChange({ sensitivity: value })
-                                    }
-                                    disabled={isPlaying || isListening}
+                                    onValueChange={([value]) => onSettingsChange({ sensitivity: value })}
                                 />
                             </div>
-
                             {settings.mode === 'sing-back' && (
-                                <div className="flex items-center space-x-2">
-                                    <Switch
-                                        id="show-feedback"
-                                        checked={settings.showFeedback}
-                                        onCheckedChange={(checked) =>
-                                            onSettingsChange({ showFeedback: checked })
-                                        }
-                                        disabled={isPlaying || isListening}
+                                <div className="space-y-1">
+                                    <Label className="text-xs">Notes per phrase: {settings.notesPerPhrase}</Label>
+                                    <Slider
+                                        value={[settings.notesPerPhrase]}
+                                        min={1}
+                                        max={8}
+                                        step={1}
+                                        onValueChange={([value]) => onSettingsChange({ notesPerPhrase: value })}
                                     />
-                                    <Label htmlFor="show-feedback">Show visual feedback</Label>
                                 </div>
                             )}
+                            <div className="flex items-center justify-between">
+                                <Label htmlFor="show-feedback" className="text-xs">Visual Feedback</Label>
+                                <Switch
+                                    id="show-feedback"
+                                    checked={settings.showFeedback}
+                                    onCheckedChange={(checked) => onSettingsChange({ showFeedback: checked })}
+                                    className="scale-75 origin-right"
+                                />
+                            </div>
                         </div>
-                    )}
-                </CardContent>
-            </Card>
+                    </PopoverContent>
+                </Popover>
+
+                {/* Status Indicator */}
+                {(isListening || waitingForClick) && (
+                    <div className="ml-2 flex items-center gap-1.5 text-xs font-medium animate-pulse text-primary">
+                        <div className="w-2 h-2 rounded-full bg-primary" />
+                        <span className="hidden lg:inline">
+                            {isListening ? "Sing!" : "Click Note!"}
+                        </span>
+                    </div>
+                )}
+            </div>
         );
     }
 

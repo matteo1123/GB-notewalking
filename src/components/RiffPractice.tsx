@@ -28,7 +28,7 @@ import { usePracticeSettings } from "@/contexts/PracticeSettingsContext";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Checkbox } from "./ui/checkbox";
-import { RecordingControls } from "./RecordingControls";
+// RecordingControls removed - using only auto-record toggle
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
 import { useToast } from "./ui/use-toast";
 // Defaults to quarter notes (1 step per beat) when subdivision is missing
@@ -84,6 +84,7 @@ interface RiffPracticeProps {
   timeLimit?: number; // Time in seconds
   isControlledSession?: boolean; // If true, parent controls the session
   lessonExercise?: Tables<"lesson_exercises"> | null; // For lesson-specific settings
+  sessionId?: string; // Optional session ID for grouping logs
 }
 
 const RiffPractice = ({
@@ -96,6 +97,7 @@ const RiffPractice = ({
   timeLimit,
   isControlledSession = false,
   lessonExercise,
+  sessionId,
 }: RiffPracticeProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -135,6 +137,8 @@ const RiffPractice = ({
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [autoRecordCountdown, setAutoRecordCountdown] = useState<number | null>(null);
   const [hasRecorded, setHasRecorded] = useState(false);
+  const [hasReachedTargetBpm, setHasReachedTargetBpm] = useState(false);
+  const [trackedMaxBpm, setTrackedMaxBpm] = useState(0);
 
   useEffect(() => {
     setHarmonicContext(repertoireItem.major_key);
@@ -160,7 +164,19 @@ const RiffPractice = ({
 
   const availableSequences = useMemo(() => {
     const itemType = repertoireItem.Type?.toLowerCase();
-    return sequences.filter((s) => s.Type?.toLowerCase() === itemType);
+
+    // Debug logging for sequences drop down
+    console.log('Filtering sequences:', {
+      itemType,
+      totalSequences: sequences.length,
+      sampleSequenceType: sequences[0]?.Type,
+      sampleSequenceTypeLower: sequences[0]?.Type?.toLowerCase()
+    });
+
+    const filtered = sequences.filter((s) => s.Type?.toLowerCase() === itemType);
+    console.log('Filtered sequences count:', filtered.length);
+
+    return filtered;
   }, [sequences, repertoireItem]);
 
   useEffect(() => {
@@ -256,6 +272,7 @@ const RiffPractice = ({
       audio: audioUrl,
       exercise_category: `${repertoireItem.name} - ${activeSequence.name}`,
       duration: Math.round(duration),
+      session_id: sessionId,
     });
 
     if (error) {
@@ -305,37 +322,58 @@ const RiffPractice = ({
         setTickCountState(tickCountRef.current); // Trigger re-render for ear training
         setNoteIndex((prevIndex) => prevIndex + 1);
 
-        if (isRecordingArmed) {
-          if (tickCountRef.current >= 4) {
-            recorder.startRecording();
-            setIsRecording(true);
-            setIsRecordingArmed(false);
-            tickCountRef.current = 0; // Reset for recording duration
+        // Track max BPM during practice
+        const currentBpm = metronome.state.currentBpm;
+        if (currentBpm > trackedMaxBpm) {
+          setTrackedMaxBpm(currentBpm);
+        }
+
+        // Auto-recording logic - depends on mode
+        if (autoRecord && !hasRecorded && !isRecording) {
+          if (mode === 'regular') {
+            // Regular mode: Wait 4 beats, then record for 16 beats
+            if (tickCountRef.current <= 4) {
+              setAutoRecordCountdown(4 - tickCountRef.current);
+            } else if (tickCountRef.current === 5) {
+              // Start recording after 4 beats
+              recorder.startRecording();
+              setIsRecording(true);
+              setAutoRecordCountdown(16);
+            }
+          } else {
+            // Progressive/Speed-trainer: Wait for target BPM to be reached
+            const targetBpm = metronomeSettings.endBpm;
+            if (!hasReachedTargetBpm && currentBpm >= targetBpm) {
+              // Just reached target BPM - mark it and reset counter for recording
+              setHasReachedTargetBpm(true);
+              tickCountRef.current = 0;
+              setAutoRecordCountdown(16);
+            } else if (hasReachedTargetBpm && tickCountRef.current === 1) {
+              // First beat at target BPM - start recording
+              recorder.startRecording();
+              setIsRecording(true);
+            }
           }
-        } else if (isRecording) {
-          const recordDuration = activeSequence?.num_clicks || 16;
-          setAutoRecordCountdown(recordDuration - tickCountRef.current);
-          if (tickCountRef.current >= recordDuration) {
+        }
+
+        // Handle active recording - count down and stop after 16 beats
+        if (isRecording) {
+          const beatsRemaining = 16 - tickCountRef.current;
+          setAutoRecordCountdown(beatsRemaining > 0 ? beatsRemaining : 0);
+
+          if (tickCountRef.current >= 16) {
             recorder.stopRecording();
             setIsRecording(false);
             setAutoRecordCountdown(null);
             setHasRecorded(true);
+            // Auto-disable auto-record after successful recording
+            setAutoRecord(false);
             toast({
               title: "Recording complete!",
+              description: "Auto-record has been disabled.",
             });
           }
-        } else if (autoRecord && !hasRecorded && autoRecordStartClickRef.current) {
-          const countdown = autoRecordStartClickRef.current - tickCountRef.current;
-          setAutoRecordCountdown(countdown);
-          if (countdown <= 0) {
-            recorder.startRecording();
-            setIsRecording(true);
-            setAutoRecordCountdown(null);
-            tickCountRef.current = 0;
-          }
         }
-
-
 
         if (playContextNote) {
           if (tickCountRef.current % 4 === 0) {
@@ -400,9 +438,9 @@ const RiffPractice = ({
 
   const handlePlay = useCallback(() => {
     if (!metronome.state.isPlaying) {
-      if (autoRecord && !hasRecorded) {
-        autoRecordStartClickRef.current = Math.floor(Math.random() * (90 - 30 + 1)) + 30;
-      }
+      // Reset tracking for new practice session
+      setHasReachedTargetBpm(false);
+      tickCountRef.current = 0;
       metronome.start();
     } else {
       metronome.pause();
@@ -410,16 +448,19 @@ const RiffPractice = ({
         recorder.stopRecording();
         setIsRecording(false);
         setHasRecorded(true);
+        setAutoRecord(false); // Auto-disable after recording
         toast({
           title: "Recording complete!",
         });
       }
+      // Auto-fill max BPM from tracked value and show save dialog after meaningful practice
       if (tickCountRef.current > 40) {
+        setMaxBpm(trackedMaxBpm || metronomeBpm);
         setShowSaveDialog(true);
       }
     }
     setIsPlaying(!metronome.state.isPlaying);
-  }, [metronome, autoRecord, isRecording, recorder, hasRecorded, toast]);
+  }, [metronome, isRecording, recorder, toast, trackedMaxBpm, metronomeBpm]);
 
   const baseExerciseNotes = useMemo(() => {
     if (!activeSequence) {
@@ -679,33 +720,6 @@ const RiffPractice = ({
 
             {/* Right side: Metronome */}
             <div className="flex items-start space-x-4">
-
-
-              <RecordingControls
-                onSave={async (audioBlob, duration, maxBpm, perfectBpm) => {
-                  if (!user || !repertoireItem || !activeSequence) return;
-                  const { data, error } = await supabase.storage
-                    .from('practice')
-                    .upload(`${user.id}/${new Date().toISOString()}.webm`, audioBlob);
-
-                  if (error) {
-                    console.error('Error uploading recording:', error);
-                    return;
-                  }
-
-                  await supabase.from('practice_log').insert({
-                    user_id: user.id,
-                    exercise_id: activeSequence.id,
-                    scale_id: repertoireItem.id,
-                    scale_shape_id: 'scale_shape' in repertoireItem ? repertoireItem.scale_shape as string : null,
-                    max_bpm: maxBpm,
-                    perfect_bpm: perfectBpm,
-                    audio: data.path,
-                    exercise_category: `${repertoireItem.name} - ${activeSequence.name}`,
-                    duration: Math.round(duration),
-                  });
-                }}
-              />
               <div className="flex flex-col items-center space-y-2">
                 <BeatVisualizer
                   currentBeat={metronome.state.currentBeat}

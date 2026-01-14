@@ -38,6 +38,10 @@ export function ScalePracticeSession({
     const [sequences, setSequences] = useState<Tables<"sequences">[]>([]);
     const [sequencesLoading, setSequencesLoading] = useState(true);
 
+    // Generate a stable session ID if one isn't provided
+    const [generatedSessionId] = useState(() => crypto.randomUUID());
+    const effectiveSessionId = sessionId || generatedSessionId;
+
     // Derive queue options from moduleConfig
     const queueOptions: UseExerciseQueueOptions = {
         moduleType,
@@ -181,6 +185,7 @@ export function ScalePracticeSession({
                     sequences={sequences}
                     autoStart={autoStart}
                     isControlledSession={true}
+                    sessionId={effectiveSessionId}
                     onComplete={handleNext}
                 />
             </div>

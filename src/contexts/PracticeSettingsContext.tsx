@@ -1,12 +1,15 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { MetronomeConfig, DEFAULT_METRONOME_CONFIG } from '@/types/practice';
 
 export interface PracticeSettings {
     practiceMode: 'static' | 'progressive';
     autoAdvance: boolean;
     exerciseDurationMinutes: number;
     bpmIncrement: number;
+    // User's global metronome defaults
+    defaultMetronome: MetronomeConfig;
 }
 
 const DEFAULT_SETTINGS: PracticeSettings = {
@@ -14,6 +17,7 @@ const DEFAULT_SETTINGS: PracticeSettings = {
     autoAdvance: true,
     exerciseDurationMinutes: 2,
     bpmIncrement: 5,
+    defaultMetronome: DEFAULT_METRONOME_CONFIG,
 };
 
 interface PracticeSettingsContextValue {
@@ -57,6 +61,7 @@ export function PracticeSettingsProvider({ children }: PracticeSettingsProviderP
                         autoAdvance: profileSettings.autoAdvance ?? DEFAULT_SETTINGS.autoAdvance,
                         exerciseDurationMinutes: profileSettings.exerciseDurationMinutes || DEFAULT_SETTINGS.exerciseDurationMinutes,
                         bpmIncrement: profileSettings.bpmIncrement || DEFAULT_SETTINGS.bpmIncrement,
+                        defaultMetronome: profileSettings.defaultMetronome || DEFAULT_SETTINGS.defaultMetronome,
                     });
                 }
             } catch (err) {
@@ -90,11 +95,12 @@ export function PracticeSettingsProvider({ children }: PracticeSettingsProviderP
                 autoAdvance: merged.autoAdvance,
                 exerciseDurationMinutes: merged.exerciseDurationMinutes,
                 bpmIncrement: merged.bpmIncrement,
+                defaultMetronome: merged.defaultMetronome,
             };
 
             const { error } = await supabase
                 .from('profiles')
-                .update({ settings: updatedSettings })
+                .update({ settings: updatedSettings as any })
                 .eq('id', user.id);
 
             if (error) {

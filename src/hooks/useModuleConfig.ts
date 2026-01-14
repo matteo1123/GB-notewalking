@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import type { ModuleConfig, ScaleModuleConfig, ArpeggioModuleConfig } from '@/types/practice';
+import type { ModuleConfig, ModuleType } from '@/types/practice';
 
 export interface SavedModuleInstance {
     id: string;
@@ -23,8 +23,9 @@ export interface UseModuleConfigReturn {
 /**
  * Hook to manage module configurations persisted in practice_log.
  * Each saved config becomes a "module instance" that can be added to sessions.
+ * Supports ALL module types: scale, arpeggio, rhythm, notewalking, etc.
  */
-export function useModuleConfig(moduleType: 'scale' | 'arpeggio'): UseModuleConfigReturn {
+export function useModuleConfig(moduleType: ModuleType): UseModuleConfigReturn {
     const { toast } = useToast();
     const [savedInstances, setSavedInstances] = useState<SavedModuleInstance[]>([]);
     const [loading, setLoading] = useState(true);
@@ -41,10 +42,9 @@ export function useModuleConfig(moduleType: 'scale' | 'arpeggio'): UseModuleConf
 
             // Query practice_log for entries with module_config that are "template" entries
             // We'll identify saved configs by having a specific marker in module_config
-            // Note: Cast to any since types may not be regenerated yet
             const { data, error } = await supabase
                 .from('practice_log')
-                .select('id, module_type, module_config, created_at, notes')
+                .select('id, module_type, module_config, created_at')
                 .eq('user_id', user.id)
                 .eq('module_type', moduleType)
                 .not('module_config', 'is', null)
@@ -100,7 +100,14 @@ export function useModuleConfig(moduleType: 'scale' | 'arpeggio'): UseModuleConf
                 _instance_name: name,
             };
 
-            // Cast to any since types may not be regenerated yet
+            // Debug logging to help diagnose save failures
+            console.log('Saving module config:', {
+                moduleType,
+                name,
+                configKeys: Object.keys(configWithMeta),
+                configPreview: JSON.stringify(configWithMeta).substring(0, 200),
+            });
+
             const { data, error } = await supabase
                 .from('practice_log')
                 .insert({
@@ -108,12 +115,19 @@ export function useModuleConfig(moduleType: 'scale' | 'arpeggio'): UseModuleConf
                     module_type: moduleType,
                     module_config: configWithMeta as any,
                     duration: 0, // Template entry, no duration
-                    notes: `Saved module instance: ${name}`,
                 } as any)
                 .select()
-                .single() as { data: any, error: any };
+                .single();
 
-            if (error) throw error;
+            if (error) {
+                console.error('Supabase save error details:', {
+                    code: error.code,
+                    message: error.message,
+                    details: error.details,
+                    hint: error.hint,
+                });
+                throw error;
+            }
 
             toast({
                 title: 'Configuration saved!',
@@ -123,11 +137,11 @@ export function useModuleConfig(moduleType: 'scale' | 'arpeggio'): UseModuleConf
             await refreshInstances();
             return data.id;
 
-        } catch (error) {
+        } catch (error: any) {
             console.error('Failed to save config:', error);
             toast({
                 title: 'Failed to save',
-                description: 'Please try again',
+                description: error?.message || 'Please try again',
                 variant: 'destructive',
             });
             return null;

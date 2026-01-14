@@ -77,6 +77,12 @@ export function RhythmTraining({ autoStart = false, sessionId, onExit }: RhythmT
             rhythm_level: level,
             duration_minutes: 5,
         },
+        metronomeConfig: {
+            mode: metronomeMode,
+            bpm,
+            drum_beat: drumBeat,
+            auto_record: autoRecordEnabled,
+        },
     });
 
     // Handle auto-start

@@ -14,7 +14,7 @@ import ShapeLibrary from "./pages/Admin/ShapeLibrary";
 import ProgressionEditor from "./pages/Admin/ProgressionEditor";
 import ScaleSequenceEditor from "./pages/Admin/ScaleSequenceEditor";
 import AudioSandbox from "./pages/Admin/AudioSandbox";
-import LessonBuilder from "./pages/Admin/LessonBuilder";
+// LessonBuilder import removed - deprecated lessons system
 import { ChordProgressionTrainer } from "./components/ChordProgressionTrainer";
 import NotFound from "./pages/NotFound";
 import AdminRoute from "./components/AdminRoute";
@@ -42,7 +42,7 @@ const App = () => (
                   <Route path="/admin/progression-editor" element={<AdminRoute><ProgressionEditor /></AdminRoute>} />
                   <Route path="/admin/scale-sequence-editor" element={<AdminRoute><ScaleSequenceEditor /></AdminRoute>} />
                   <Route path="/admin/audio-sandbox" element={<AdminRoute><AudioSandbox /></AdminRoute>} />
-                  <Route path="/admin/lesson-builder" element={<AdminRoute><LessonBuilder /></AdminRoute>} />
+                  {/* LessonBuilder route removed - deprecated lessons system */}
                   <Route path="/admin/chord-trainer" element={<AdminRoute><div className="h-screen p-4"><ChordProgressionTrainer /></div></AdminRoute>} />
                 </Route>
                 <Route path="/auth" element={<Auth />} />

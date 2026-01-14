@@ -1,12 +1,13 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import type { ModuleType, ModuleConfig } from '@/types/practice';
+import type { ModuleType, ModuleConfig, MetronomeConfig } from '@/types/practice';
 
 export interface AutoRecordingOptions {
     enabled: boolean;
     moduleType: ModuleType;
     moduleConfig?: ModuleConfig;
+    metronomeConfig?: MetronomeConfig; // Current metronome state for encoding in practice log
     sessionId?: string; // Practice session ID to link recordings
     minClicksBeforeRecord?: number; // Min clicks before scheduling (default: 30)
     maxClicksBeforeRecord?: number; // Max clicks before scheduling (default: 90)
@@ -48,6 +49,7 @@ export function useAutoRecording(options: AutoRecordingOptions) {
         enabled,
         moduleType,
         moduleConfig,
+        metronomeConfig,
         sessionId,
         minClicksBeforeRecord = 30,
         maxClicksBeforeRecord = 90,
@@ -173,7 +175,12 @@ export function useAutoRecording(options: AutoRecordingOptions) {
                 .from('practice')
                 .getPublicUrl(fileName);
 
-            // Log to practice_log
+            // Log to practice_log with merged metronome config
+            const configWithMetronome = moduleConfig ? {
+                ...moduleConfig,
+                metronome: metronomeConfig,
+            } : metronomeConfig ? { metronome: metronomeConfig } : undefined;
+
             const { error: logError } = await supabase
                 .from('practice_log')
                 .insert({
@@ -181,7 +188,7 @@ export function useAutoRecording(options: AutoRecordingOptions) {
                     duration: recordingDurationSeconds,
                     audio: publicUrl,
                     module_type: moduleType,
-                    module_config: moduleConfig,
+                    module_config: configWithMetronome,
                     session_id: sessionId || null,
                     created_at: new Date().toISOString(),
                 });

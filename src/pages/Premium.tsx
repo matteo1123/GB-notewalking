@@ -33,10 +33,7 @@ const PremiumContent = () => {
   const [selectedRiff, setSelectedRiff] = useState<RepertoireItem | null>(null);
   const [exercises, setExercises] = useState<RepertoireItem[]>([]);
   const [sequences, setSequences] = useState<Tables<"sequences">[]>([]);
-  const [lessons, setLessons] = useState<Tables<"lessons">[]>([]);
-  const [selectedLesson, setSelectedLesson] = useState<Tables<"lessons"> | null>(null);
-  const [lessonExercises, setLessonExercises] = useState<Tables<"lesson_exercises">[]>([]);
-  const [selectedLessonExercise, setSelectedLessonExercise] = useState<Tables<"lesson_exercises"> | null>(null);
+  // Note: Lessons system removed - now using SessionBuilder for custom routines
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -162,16 +159,7 @@ const PremiumContent = () => {
         setSequences(sequencesData as Tables<"sequences">[]);
       }
 
-      const { data: lessonsData, error: lessonsError } = await supabase
-        .from("lessons")
-        .select("*");
-
-      if (lessonsError) {
-        setError(lessonsError.message);
-        setLessons([]);
-      } else {
-        setLessons(lessonsData as Tables<"lessons">[]);
-      }
+      // Lessons fetch removed - using SessionBuilder for custom routines now
 
       setError(null);
       setLoading(false);
@@ -230,26 +218,7 @@ const PremiumContent = () => {
     setSearchParams({ exerciseId: item.id });
   };
 
-  const handleLessonSelect = async (lesson: Tables<"lessons">) => {
-    const { data, error } = await supabase
-      .from('lesson_exercises')
-      .select('*')
-      .eq('lesson_id', lesson.id);
-
-    if (error) {
-      console.error("Error fetching lesson exercises:", error);
-      return;
-    }
-
-    setSelectedLesson(lesson);
-    setLessonExercises(data as Tables<"lesson_exercises">[]);
-  };
-
-  const handleBackToLessons = () => {
-    setSelectedLesson(null);
-    setLessonExercises([]);
-    setSelectedLessonExercise(null);
-  };
+  // Lesson handlers removed - using SessionBuilder for custom routines
 
   if (loading || checkingPremium) {
     return (
@@ -277,19 +246,11 @@ const PremiumContent = () => {
     return (
       <div className="bg-background p-4 bpm-control-area">
         <div className="space-y-6">
-          {selectedLessonExercise?.description && (
-            <div
-              className="prose dark:prose-invert"
-              dangerouslySetInnerHTML={{ __html: selectedLessonExercise.description }}
-            />
-          )}
           <RiffPractice
             repertoireItem={selectedRiff}
             sequences={sequences}
             onComplete={() => setSearchParams({})}
             onExerciseSelect={(exercise) => setSearchParams({ exerciseId: exercise.id })}
-            lessonExercise={selectedLessonExercise}
-            timeLimit={selectedLessonExercise?.time}
           />
         </div>
       </div>
@@ -340,12 +301,11 @@ const PremiumContent = () => {
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden p-2 sm:p-4">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0 overflow-hidden">
           <div className="overflow-x-auto flex-shrink-0 mb-2 sm:mb-4 -mx-2 px-2">
-            <TabsList className="inline-flex w-auto min-w-full sm:grid sm:grid-cols-5 gap-1">
+            <TabsList className="inline-flex w-auto min-w-full sm:grid sm:grid-cols-4 gap-1">
               <TabsTrigger value="start" className="text-xs sm:text-sm px-2 sm:px-4 whitespace-nowrap">🚀 Start</TabsTrigger>
               <TabsTrigger value="priorities" className="text-xs sm:text-sm px-2 sm:px-4 whitespace-nowrap">⚙️ Priorities</TabsTrigger>
               <TabsTrigger value="progress" className="text-xs sm:text-sm px-2 sm:px-4 whitespace-nowrap">📊 Progress</TabsTrigger>
               <TabsTrigger value="modules" className="text-xs sm:text-sm px-2 sm:px-4 whitespace-nowrap">🎯 Modules</TabsTrigger>
-              <TabsTrigger value="sessions" className="text-xs sm:text-sm px-2 sm:px-4 whitespace-nowrap">📚 Lessons</TabsTrigger>
             </TabsList>
           </div>
 
@@ -365,60 +325,7 @@ const PremiumContent = () => {
             <ModuleLibrary />
           </TabsContent>
 
-          <TabsContent value="sessions" className="flex-1 min-h-0 overflow-y-auto data-[state=active]:block">
-            {selectedLesson ? (
-              <div className="space-y-4">
-                <div className="flex items-center gap-4">
-                  <Button variant="outline" onClick={handleBackToLessons}>
-                    Back to Lessons
-                  </Button>
-                  <h3 className="text-xl font-semibold">{selectedLesson.name}</h3>
-                </div>
-                <div className="grid gap-4">
-                  {lessonExercises.map((le) => {
-                    const exercise = exercises.find((e) => e.id === le.scale_id);
-                    if (!exercise) return null;
-                    return (
-                      <Button
-                        key={le.id}
-                        variant="outline"
-                        className="justify-start"
-                        onClick={() => {
-                          setSelectedLessonExercise(le);
-                          handleExerciseSelect(exercise);
-                        }}
-                      >
-                        {exercise.name} - {exercise.category}
-                      </Button>
-                    );
-                  })}
-                </div>
-              </div>
-            ) : (
-              <div className="grid gap-4">
-                {lessons.map((lesson) => (
-                  <Button
-                    key={lesson.id}
-                    variant="outline"
-                    className="justify-start"
-                    onClick={() => handleLessonSelect(lesson)}
-                  >
-                    {lesson.name}
-                  </Button>
-                ))}
-                {lessons.length === 0 && (
-                  <div className="text-center py-12">
-                    <h3 className="text-xl font-semibold mb-4">
-                      No Lessons Yet
-                    </h3>
-                    <p className="text-muted-foreground">
-                      Create lessons in the Admin section to get started.
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-          </TabsContent>
+          {/* Lessons tab removed - using SessionBuilder in Modules tab for custom routines */}
         </Tabs>
       </div>
     </div>

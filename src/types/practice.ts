@@ -77,17 +77,42 @@ export interface SungNoteResult {
 // Practice System Types (New - for intelligent sessions and progress tracking)
 // ============================================================================
 
+// Metronome Configuration - The universal backbone for all modules
+export interface MetronomeConfig {
+  mode: 'regular' | 'speed-trainer' | 'progressive';
+  bpm: number;               // Starting BPM (always present)
+  drum_beat: boolean;
+  auto_record: boolean;
+  // Speed trainer / progressive fields (conditional on mode)
+  end_bpm?: number;
+  increments?: number;       // # of BPM steps
+  measures_per_increment?: number;
+  step_bpm?: number;         // Progressive mode only
+  loop?: boolean;
+}
+
+// Default metronome configuration
+export const DEFAULT_METRONOME_CONFIG: MetronomeConfig = {
+  mode: 'regular',
+  bpm: 60,
+  drum_beat: false,
+  auto_record: false,
+};
+
 export type ModuleType =
   | 'scale'
   | 'rhythm'
   | 'notewalking'
   | 'arpeggio'
   | 'piece_mastery'
-  | 'chord_progressions';
+  | 'chord_progressions'
+  | 'riff';
 
 // Module Configurations
+// Each module config includes an optional metronome config for encoding full practice state
 export interface ScaleModuleConfig {
   module_type: 'scale';
+  metronome?: MetronomeConfig;
   current_scale_id?: string;        // Currently active scale (for navigation state)
   priority_scale_ids?: string[];    // User-defined order (UUIDs to practice first)
   type_filter?: string;             // Filter by Type field (e.g., "3 Notes Per String")
@@ -98,12 +123,14 @@ export interface ScaleModuleConfig {
 
 export interface RhythmModuleConfig {
   module_type: 'rhythm';
+  metronome?: MetronomeConfig;
   rhythm_level: number;
   duration_minutes?: number;
 }
 
 export interface NotewalkingModuleConfig {
   module_type: 'notewalking';
+  metronome?: MetronomeConfig;
   key: string;
   chords: string[];
   measures_per_chord: number;
@@ -111,6 +138,7 @@ export interface NotewalkingModuleConfig {
 
 export interface ChordProgressionsModuleConfig {
   module_type: 'chord_progressions';
+  metronome?: MetronomeConfig;
   progression_id: string;
   key: string;
   target_bpm?: number;
@@ -118,6 +146,7 @@ export interface ChordProgressionsModuleConfig {
 
 export interface ArpeggioModuleConfig {
   module_type: 'arpeggio';
+  metronome?: MetronomeConfig;
   current_arpeggio_id?: string;      // Currently active arpeggio (for navigation state)
   priority_arpeggio_ids?: string[];  // User-defined order (UUIDs to practice first)
   type_filter?: string;              // Filter by Type field
@@ -128,8 +157,16 @@ export interface ArpeggioModuleConfig {
 
 export interface PieceMasteryModuleConfig {
   module_type: 'piece_mastery';
+  metronome?: MetronomeConfig;
   piece_id: string;
   segment_seconds: number;
+}
+
+export interface RiffModuleConfig {
+  module_type: 'riff';
+  metronome?: MetronomeConfig;
+  riff_id?: string;
+  riff_name?: string;
 }
 
 export type ModuleConfig =
@@ -138,7 +175,8 @@ export type ModuleConfig =
   | NotewalkingModuleConfig
   | ChordProgressionsModuleConfig
   | ArpeggioModuleConfig
-  | PieceMasteryModuleConfig;
+  | PieceMasteryModuleConfig
+  | RiffModuleConfig;
 
 // Practice Sessions
 export interface SessionBlock {

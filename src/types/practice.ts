@@ -108,11 +108,20 @@ export type ModuleType =
   | 'chord_progressions'
   | 'riff';
 
+// Ear Training Options for module configs
+export interface EarTrainingModuleOptions {
+  enabled: boolean;
+  mode: 'sing-back' | 'identify';
+  level?: number;           // 1-12: difficulty level
+  notes_per_phrase?: number; // For sing-back mode
+}
+
 // Module Configurations
 // Each module config includes an optional metronome config for encoding full practice state
 export interface ScaleModuleConfig {
   module_type: 'scale';
   metronome?: MetronomeConfig;
+  ear_training?: EarTrainingModuleOptions;  // Opens module directly in ear training mode
   current_scale_id?: string;        // Currently active scale (for navigation state)
   priority_scale_ids?: string[];    // User-defined order (UUIDs to practice first)
   type_filter?: string;             // Filter by Type field (e.g., "3 Notes Per String")
@@ -147,6 +156,7 @@ export interface ChordProgressionsModuleConfig {
 export interface ArpeggioModuleConfig {
   module_type: 'arpeggio';
   metronome?: MetronomeConfig;
+  ear_training?: EarTrainingModuleOptions;  // Opens module directly in ear training mode
   current_arpeggio_id?: string;      // Currently active arpeggio (for navigation state)
   priority_arpeggio_ids?: string[];  // User-defined order (UUIDs to practice first)
   type_filter?: string;              // Filter by Type field

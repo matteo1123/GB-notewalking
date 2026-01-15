@@ -36,6 +36,8 @@ export interface ExercisePracticeModuleProps {
     onLoadInstance?: (id: string) => void;
     // Exit callback for standalone/freeplay mode
     onExit?: () => void;
+    // Config mode: hides metronome, no playback - for session builder configuration
+    isConfigMode?: boolean;
 }
 
 /**
@@ -61,6 +63,7 @@ export function ExercisePracticeModule({
     savedInstances = [],
     onLoadInstance,
     onExit,
+    isConfigMode = false,
 }: ExercisePracticeModuleProps) {
     // Process exercises with config (filter, dedupe, order)
     const processedExercises = useMemo(() => {
@@ -363,6 +366,7 @@ export function ExercisePracticeModule({
                             repertoireItem={selectedExercise}
                             sequences={sequences}
                             onExerciseSelect={() => { }}
+                            isConfigMode={isConfigMode}
                         />
                     </div>
                 </div>

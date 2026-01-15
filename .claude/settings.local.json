@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(where.exe:*)",
+      "Bash(where /r \"C:\\\\Users\\\\matth\" auth.json)",
+      "Bash(findstr:*)",
+      "Bash(powershell:*)",
+      "Bash(test:*)",
+      "Bash(ls:*)",
+      "Bash(env)",
+      "Bash(find:*)",
+      "Bash(echo:*)"
+    ]
+  }
+}

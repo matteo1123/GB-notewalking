@@ -7,11 +7,13 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import ProgressGraphs from '@/components/ProgressGraphs';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Slider } from '@/components/ui/slider';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Link } from 'react-router-dom';
+import { usePracticeSettings } from '@/contexts/PracticeSettingsContext';
 
 type PracticeLogWithExercise = Tables<'practice_log'> & {
   exercises: { name: string } | null;
@@ -34,6 +36,7 @@ const Profile = () => {
   const [practiceLog, setPracticeLog] = useState<PracticeLogWithExercise[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSubscribing, setIsSubscribing] = useState(false); // State for sub button
+  const { settings: practiceSettings, updateSettings: updatePracticeSettings, isLoading: practiceLoading } = usePracticeSettings();
 
   // Helper to check if premium based on date
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -141,7 +144,7 @@ const Profile = () => {
     }
   }
 
-  if (loading) {
+  if (loading || practiceLoading) {
     return <div>Loading...</div>;
   }
 
@@ -246,13 +249,13 @@ const Profile = () => {
         </TabsContent>
 
         <TabsContent value="settings">
-          <Card>
-            <CardHeader>
-              <CardTitle>Settings</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Auto-Record Setting */}
-              <div className="space-y-3">
+          <div className="space-y-6">
+            {/* Auto-Record Setting */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Recording Settings</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
                 <div className="flex items-center justify-between">
                   <div>
                     <Label htmlFor="auto-record" className="text-base font-medium">Auto-Record Practice</Label>
@@ -281,13 +284,116 @@ const Profile = () => {
                   <p className="text-sm text-blue-800 dark:text-blue-200">
                     <span className="font-medium">🎤 Tip:</span> For auto-recording to work seamlessly,
                     set your browser's microphone permission for this site to "Always Allow".
-                    This prevents the permission prompt from interrupting your practice.
                   </p>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Button onClick={handleUpdate} className="mt-4">Save Settings</Button>
+              </CardContent>
+            </Card>
+
+            {/* Default Metronome Settings */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Default Metronome Settings</CardTitle>
+                <CardDescription>Your preferred starting settings when opening any practice module</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Default BPM */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label>Default BPM</Label>
+                    <span className="text-sm font-medium">{practiceSettings.defaultMetronome?.bpm ?? 60} BPM</span>
+                  </div>
+                  <Slider
+                    value={[practiceSettings.defaultMetronome?.bpm ?? 60]}
+                    min={40}
+                    max={180}
+                    step={5}
+                    onValueChange={([value]) => updatePracticeSettings({
+                      defaultMetronome: { ...practiceSettings.defaultMetronome, bpm: value }
+                    })}
+                  />
+                </div>
+
+                {/* Default Mode */}
+                <div className="space-y-2">
+                  <div>
+                    <Label>Default Mode</Label>
+                    <p className="text-sm text-muted-foreground">
+                      {practiceSettings.defaultMetronome?.mode === 'speed-trainer'
+                        ? 'Speed Trainer: Gradually increases BPM'
+                        : practiceSettings.defaultMetronome?.mode === 'progressive'
+                          ? 'Progressive: Step up BPM at set intervals'
+                          : 'Regular: Constant BPM'}
+                    </p>
+                  </div>
+                  <div className="flex gap-1 bg-muted rounded-lg p-1">
+                    <Button
+                      size="sm"
+                      variant={practiceSettings.defaultMetronome?.mode === 'regular' ? 'default' : 'ghost'}
+                      onClick={() => updatePracticeSettings({
+                        defaultMetronome: { ...practiceSettings.defaultMetronome, mode: 'regular' }
+                      })}
+                    >
+                      Regular
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={practiceSettings.defaultMetronome?.mode === 'speed-trainer' ? 'default' : 'ghost'}
+                      onClick={() => updatePracticeSettings({
+                        defaultMetronome: { ...practiceSettings.defaultMetronome, mode: 'speed-trainer' }
+                      })}
+                    >
+                      Speed
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={practiceSettings.defaultMetronome?.mode === 'progressive' ? 'default' : 'ghost'}
+                      onClick={() => updatePracticeSettings({
+                        defaultMetronome: { ...practiceSettings.defaultMetronome, mode: 'progressive' }
+                      })}
+                    >
+                      Progressive
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Drum Beat */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label htmlFor="drum-beat">Drum Beat</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Play kick on 1, snare on 3 instead of clicks
+                    </p>
+                  </div>
+                  <Switch
+                    id="drum-beat"
+                    checked={practiceSettings.defaultMetronome?.drum_beat ?? false}
+                    onCheckedChange={(value) => updatePracticeSettings({
+                      defaultMetronome: { ...practiceSettings.defaultMetronome, drum_beat: value }
+                    })}
+                  />
+                </div>
+
+                {/* Auto-Record Default */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label htmlFor="metronome-auto-record">Auto-Record by Default</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Automatically enable recording when starting practice
+                    </p>
+                  </div>
+                  <Switch
+                    id="metronome-auto-record"
+                    checked={practiceSettings.defaultMetronome?.auto_record ?? false}
+                    onCheckedChange={(value) => updatePracticeSettings({
+                      defaultMetronome: { ...practiceSettings.defaultMetronome, auto_record: value }
+                    })}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Button onClick={handleUpdate}>Save Settings</Button>
+          </div>
         </TabsContent>
         <TabsContent value="history">
           <div className="space-y-8">

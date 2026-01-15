@@ -163,6 +163,111 @@ const Settings = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Default Metronome Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Default Metronome Settings</CardTitle>
+          <CardDescription>Your preferred starting settings when opening any practice module</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Default BPM */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label>Default BPM</Label>
+              <span className="text-sm font-medium">{practiceSettings.defaultMetronome?.bpm ?? 60} BPM</span>
+            </div>
+            <Slider
+              value={[practiceSettings.defaultMetronome?.bpm ?? 60]}
+              min={40}
+              max={180}
+              step={5}
+              onValueChange={([value]) => updatePracticeSettings({
+                defaultMetronome: { ...practiceSettings.defaultMetronome, bpm: value }
+              })}
+            />
+          </div>
+
+          {/* Default Mode */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>Default Mode</Label>
+                <p className="text-sm text-muted-foreground">
+                  {practiceSettings.defaultMetronome?.mode === 'speed-trainer'
+                    ? 'Speed Trainer: Gradually increases BPM'
+                    : practiceSettings.defaultMetronome?.mode === 'progressive'
+                      ? 'Progressive: Step up BPM at set intervals'
+                      : 'Regular: Constant BPM'}
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-1 bg-muted rounded-lg p-1">
+              <Button
+                size="sm"
+                variant={practiceSettings.defaultMetronome?.mode === 'regular' ? 'default' : 'ghost'}
+                onClick={() => updatePracticeSettings({
+                  defaultMetronome: { ...practiceSettings.defaultMetronome, mode: 'regular' }
+                })}
+              >
+                Regular
+              </Button>
+              <Button
+                size="sm"
+                variant={practiceSettings.defaultMetronome?.mode === 'speed-trainer' ? 'default' : 'ghost'}
+                onClick={() => updatePracticeSettings({
+                  defaultMetronome: { ...practiceSettings.defaultMetronome, mode: 'speed-trainer' }
+                })}
+              >
+                Speed
+              </Button>
+              <Button
+                size="sm"
+                variant={practiceSettings.defaultMetronome?.mode === 'progressive' ? 'default' : 'ghost'}
+                onClick={() => updatePracticeSettings({
+                  defaultMetronome: { ...practiceSettings.defaultMetronome, mode: 'progressive' }
+                })}
+              >
+                Progressive
+              </Button>
+            </div>
+          </div>
+
+          {/* Drum Beat */}
+          <div className="flex items-center justify-between">
+            <div>
+              <Label htmlFor="drum-beat">Drum Beat</Label>
+              <p className="text-sm text-muted-foreground">
+                Play kick on 1, snare on 3 instead of clicks
+              </p>
+            </div>
+            <Switch
+              id="drum-beat"
+              checked={practiceSettings.defaultMetronome?.drum_beat ?? false}
+              onCheckedChange={(value) => updatePracticeSettings({
+                defaultMetronome: { ...practiceSettings.defaultMetronome, drum_beat: value }
+              })}
+            />
+          </div>
+
+          {/* Auto-Record Default */}
+          <div className="flex items-center justify-between">
+            <div>
+              <Label htmlFor="metronome-auto-record">Auto-Record by Default</Label>
+              <p className="text-sm text-muted-foreground">
+                Automatically enable recording when starting practice
+              </p>
+            </div>
+            <Switch
+              id="metronome-auto-record"
+              checked={practiceSettings.defaultMetronome?.auto_record ?? false}
+              onCheckedChange={(value) => updatePracticeSettings({
+                defaultMetronome: { ...practiceSettings.defaultMetronome, auto_record: value }
+              })}
+            />
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };

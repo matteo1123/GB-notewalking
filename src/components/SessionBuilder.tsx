@@ -1,11 +1,16 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, Trash2, GripVertical, Play, Clock } from 'lucide-react';
+import { Plus, Trash2, GripVertical, Play, Clock, Settings, Ear, X, Check } from 'lucide-react';
 import { useModuleConfig, SavedModuleInstance } from '@/hooks/useModuleConfig';
 import { MODULE_REGISTRY } from '@/types/modules';
-import type { SessionBlock, ModuleType, ModuleConfig, ScaleModuleConfig, ArpeggioModuleConfig } from '@/types/practice';
+import type { SessionBlock, ModuleType, ModuleConfig, ScaleModuleConfig, ArpeggioModuleConfig, EarTrainingModuleOptions } from '@/types/practice';
+import type { RepertoireItem } from '@/types/repertoire';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { supabase } from '@/integrations/supabase/client';
+import { ExercisePracticeModule } from './ExercisePracticeModule';
 import {
     Dialog,
     DialogContent,
@@ -41,8 +46,68 @@ export function SessionBuilder({ onStartSession, onCancel }: SessionBuilderProps
     const [selectedModuleType, setSelectedModuleType] = useState<ModuleType | null>(null);
     const [selectedDuration, setSelectedDuration] = useState(5);
 
+    // Edit block state
+    const [editDialogOpen, setEditDialogOpen] = useState(false);
+    const [editingBlockIndex, setEditingBlockIndex] = useState<number | null>(null);
+
+    // Fullscreen config mode state
+    const [configMode, setConfigMode] = useState(false);
+    const [configExercise, setConfigExercise] = useState<RepertoireItem | null>(null);
+
+    // Data for ExercisePracticeModule
+    const [exercises, setExercises] = useState<RepertoireItem[]>([]);
+    const [sequences, setSequences] = useState<any[]>([]);
+
     const scaleConfigs = useModuleConfig('scale');
     const arpeggioConfigs = useModuleConfig('arpeggio');
+
+    // Load exercises and sequences for config mode
+    useEffect(() => {
+        async function loadData() {
+            const { data: scalesData } = await supabase
+                .from('scales')
+                .select('*')
+                .order('Position');
+
+            if (scalesData) {
+                const mapped = scalesData.map((row: any) => ({
+                    id: row.id,
+                    name: row.name,
+                    category: row.Type?.toLowerCase().includes('arpeggio') ? 'arpeggio' : 'scale',
+                    difficulty: row.difficulty,
+                    notes: row.notes_json ?? [],
+                    tonic: row.root_note,
+                    tonality: row.tonality,
+                    position: row.Position,
+                    major_key: row.major_key,
+                    Type: row.Type,
+                    scale_shape: row.scale_shape,
+                    created_at: row.created_at,
+                }));
+                setExercises(mapped as any);
+            }
+
+            const { data: sequencesData } = await supabase
+                .from('sequences')
+                .select('*');
+
+            if (sequencesData) {
+                setSequences(sequencesData);
+            }
+        }
+        loadData();
+    }, []);
+
+    // Get unique Type values for filter dropdown
+    const availableTypes = useMemo(() => {
+        const types = new Set<string>();
+        exercises.forEach(e => {
+            if (e.Type && (e.category === 'scale' || e.category === 'arpeggio')) {
+                types.add(e.Type);
+            }
+        });
+        return Array.from(types).sort();
+    }, [exercises]);
 
     // Get total duration
     const totalMinutes = blocks.reduce((sum, b) => sum + b.duration_minutes, 0);
@@ -115,6 +180,39 @@ export function SessionBuilder({ onStartSession, onCancel }: SessionBuilderProps
         ));
     }, []);
 
+    // Update block config (for edit dialog)
+    const updateBlockConfig = useCallback((index: number, newConfig: Partial<ModuleConfig>) => {
+        setBlocks(prev => prev.map((b, i) =>
+            i === index ? { ...b, config: { ...b.config, ...newConfig } as ModuleConfig } : b
+        ));
+    }, []);
+
+    // Open edit dialog for a block - fullscreen for scale/arpeggio, simple dialog for others
+    const openEditDialog = useCallback((index: number) => {
+        const block = blocks[index];
+        setEditingBlockIndex(index);
+
+        // For scale/arpeggio modules, use fullscreen config mode
+        if (block.module_type === 'scale' || block.module_type === 'arpeggio') {
+            // Find the currently selected exercise from config
+            const config = block.config as ScaleModuleConfig | ArpeggioModuleConfig;
+            const exerciseId = config.module_type === 'scale'
+                ? (config as ScaleModuleConfig).current_scale_id
+                : (config as ArpeggioModuleConfig).current_arpeggio_id;
+
+            if (exerciseId) {
+                const found = exercises.find(e => e.id === exerciseId);
+                setConfigExercise(found || null);
+            } else {
+                setConfigExercise(null);
+            }
+            setConfigMode(true);
+        } else {
+            // For other module types, use simple dialog
+            setEditDialogOpen(true);
+        }
+    }, [blocks, exercises]);
+
     // Move block up/down
     const moveBlock = useCallback((index: number, direction: 'up' | 'down') => {
         setBlocks(prev => {
@@ -127,12 +225,36 @@ export function SessionBuilder({ onStartSession, onCancel }: SessionBuilderProps
         });
     }, []);
 
-    // Get config display name
+    // Get config display name - shows what's actually configured
     const getConfigName = (block: SessionBlock): string => {
         const config = block.config as any;
-        if (config._instance_name) return config._instance_name;
-        if (config.type_filter) return config.type_filter;
-        return 'Default';
+        const parts: string[] = [];
+
+        // Check for saved instance name
+        if (config._instance_name) {
+            return config._instance_name;
+        }
+
+        // Check for selected exercise ID and look up name
+        const exerciseId = config.current_scale_id || config.current_arpeggio_id;
+        if (exerciseId) {
+            const exercise = exercises.find(e => e.id === exerciseId);
+            if (exercise) {
+                parts.push(exercise.name);
+            }
+        }
+
+        // Add type filter if present
+        if (config.type_filter) {
+            parts.push(config.type_filter);
+        }
+
+        // Add ear training indicator if enabled
+        if (config.ear_training?.enabled) {
+            parts.push(`🎧 ${config.ear_training.mode}`);
+        }
+
+        return parts.length > 0 ? parts.join(' • ') : 'Default';
     };
 
     // Get saved configs for selected module type
@@ -141,6 +263,85 @@ export function SessionBuilder({ onStartSession, onCancel }: SessionBuilderProps
         if (selectedModuleType === 'arpeggio') return arpeggioConfigs.savedInstances;
         return [];
     };
+
+    // Handle saving config in fullscreen mode
+    const handleSaveConfig = useCallback(() => {
+        if (editingBlockIndex === null) return;
+
+        const block = blocks[editingBlockIndex];
+        const moduleType = block.module_type as 'scale' | 'arpeggio';
+        const config = block.config as ScaleModuleConfig | ArpeggioModuleConfig;
+
+        // Update the config with the selected exercise ID
+        if (configExercise) {
+            if (moduleType === 'scale') {
+                updateBlockConfig(editingBlockIndex, {
+                    current_scale_id: configExercise.id,
+                });
+            } else {
+                updateBlockConfig(editingBlockIndex, {
+                    current_arpeggio_id: configExercise.id,
+                });
+            }
+        }
+
+        setConfigMode(false);
+        setConfigExercise(null);
+        setEditingBlockIndex(null);
+    }, [editingBlockIndex, blocks, configExercise, updateBlockConfig]);
+
+    // Render fullscreen config mode for scale/arpeggio modules
+    if (configMode && editingBlockIndex !== null && blocks[editingBlockIndex]) {
+        const block = blocks[editingBlockIndex];
+        const moduleType = block.module_type as 'scale' | 'arpeggio';
+        const config = block.config as ScaleModuleConfig | ArpeggioModuleConfig;
+
+        return (
+            <div className="fixed inset-0 bg-background z-50 flex flex-col">
+                {/* Header */}
+                <div className="flex-shrink-0 p-4 border-b flex items-center justify-between bg-card">
+                    <div className="flex items-center gap-3">
+                        <span className="text-2xl">{MODULE_REGISTRY[moduleType]?.icon || '📦'}</span>
+                        <div>
+                            <h2 className="text-xl font-bold">Configure {MODULE_REGISTRY[moduleType]?.name}</h2>
+                            <p className="text-sm text-muted-foreground">
+                                {configExercise ? configExercise.name : 'Select an exercise'}
+                            </p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Button variant="outline" onClick={() => {
+                            setConfigMode(false);
+                            setConfigExercise(null);
+                            setEditingBlockIndex(null);
+                        }}>
+                            <X className="w-4 h-4 mr-2" />
+                            Cancel
+                        </Button>
+                        <Button onClick={handleSaveConfig}>
+                            <Check className="w-4 h-4 mr-2" />
+                            Save Configuration
+                        </Button>
+                    </div>
+                </div>
+
+                {/* Exercise Practice Module in config mode */}
+                <div className="flex-1 min-h-0">
+                    <ExercisePracticeModule
+                        moduleType={moduleType}
+                        exercises={exercises}
+                        sequences={sequences}
+                        selectedExercise={configExercise}
+                        onSelectExercise={setConfigExercise}
+                        config={config}
+                        onConfigChange={(newConfig) => updateBlockConfig(editingBlockIndex, newConfig)}
+                        availableTypes={availableTypes}
+                        isConfigMode={true}
+                    />
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="flex flex-col h-full">
@@ -186,8 +387,8 @@ export function SessionBuilder({ onStartSession, onCancel }: SessionBuilderProps
                 ) : (
                     <>
                         {blocks.map((block, index) => (
-                            <Card key={index} className="relative">
-                                <CardContent className="p-4 flex items-center gap-4">
+                            <Card key={index} className="relative cursor-pointer hover:border-primary/50 transition-colors">
+                                <CardContent className="p-4 flex items-center gap-4" onClick={() => openEditDialog(index)}>
                                     {/* Drag handle / order controls */}
                                     <div className="flex flex-col gap-1">
                                         <Button
@@ -342,6 +543,104 @@ export function SessionBuilder({ onStartSession, onCancel }: SessionBuilderProps
                             </Button>
                         )}
                     </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Edit Block Dialog */}
+            <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Settings className="w-5 h-5" />
+                            Edit {editingBlockIndex !== null ? MODULE_REGISTRY[blocks[editingBlockIndex]?.module_type]?.name : 'Block'}
+                        </DialogTitle>
+                        <DialogDescription>
+                            Configure this module for your practice session
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    {editingBlockIndex !== null && blocks[editingBlockIndex] && (
+                        <div className="space-y-4 py-4">
+                            {/* Module Info */}
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <span className="text-2xl">{MODULE_REGISTRY[blocks[editingBlockIndex].module_type]?.icon || '📦'}</span>
+                                <span>{getConfigName(blocks[editingBlockIndex])}</span>
+                            </div>
+
+                            {/* Ear Training Toggle (for scale and arpeggio) */}
+                            {['scale', 'arpeggio'].includes(blocks[editingBlockIndex].module_type) && (
+                                <div className="space-y-4 border rounded-lg p-4 bg-muted/30">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <Ear className="w-4 h-4" />
+                                            <Label htmlFor="ear-training-toggle">Ear Training Mode</Label>
+                                        </div>
+                                        <Switch
+                                            id="ear-training-toggle"
+                                            checked={(blocks[editingBlockIndex].config as ScaleModuleConfig | ArpeggioModuleConfig).ear_training?.enabled ?? false}
+                                            onCheckedChange={(checked) => {
+                                                const currentConfig = blocks[editingBlockIndex].config as ScaleModuleConfig | ArpeggioModuleConfig;
+                                                updateBlockConfig(editingBlockIndex, {
+                                                    ear_training: {
+                                                        enabled: checked,
+                                                        mode: currentConfig.ear_training?.mode ?? 'identify',
+                                                        level: currentConfig.ear_training?.level ?? 12,
+                                                    } as EarTrainingModuleOptions,
+                                                });
+                                            }}
+                                        />
+                                    </div>
+
+                                    {/* Mode selection when enabled */}
+                                    {(blocks[editingBlockIndex].config as ScaleModuleConfig | ArpeggioModuleConfig).ear_training?.enabled && (
+                                        <div className="flex gap-2">
+                                            <Button
+                                                variant={(blocks[editingBlockIndex].config as ScaleModuleConfig | ArpeggioModuleConfig).ear_training?.mode === 'identify' ? "default" : "outline"}
+                                                size="sm"
+                                                className="flex-1"
+                                                onClick={() => {
+                                                    const currentConfig = blocks[editingBlockIndex].config as ScaleModuleConfig | ArpeggioModuleConfig;
+                                                    updateBlockConfig(editingBlockIndex, {
+                                                        ear_training: {
+                                                            ...currentConfig.ear_training,
+                                                            enabled: true,
+                                                            mode: 'identify',
+                                                        } as EarTrainingModuleOptions,
+                                                    });
+                                                }}
+                                            >
+                                                🎯 Identify
+                                            </Button>
+                                            <Button
+                                                variant={(blocks[editingBlockIndex].config as ScaleModuleConfig | ArpeggioModuleConfig).ear_training?.mode === 'sing-back' ? "default" : "outline"}
+                                                size="sm"
+                                                className="flex-1"
+                                                onClick={() => {
+                                                    const currentConfig = blocks[editingBlockIndex].config as ScaleModuleConfig | ArpeggioModuleConfig;
+                                                    updateBlockConfig(editingBlockIndex, {
+                                                        ear_training: {
+                                                            ...currentConfig.ear_training,
+                                                            enabled: true,
+                                                            mode: 'sing-back',
+                                                        } as EarTrainingModuleOptions,
+                                                    });
+                                                }}
+                                            >
+                                                🎤 Sing-back
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            <Button
+                                className="w-full"
+                                onClick={() => setEditDialogOpen(false)}
+                            >
+                                Done
+                            </Button>
+                        </div>
+                    )}
                 </DialogContent>
             </Dialog>
         </div>

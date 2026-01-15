@@ -58,23 +58,30 @@ export function EarTrainingWrapper({
         if (el) setPortalTarget(el);
     }, []);
 
+    // AudioContext creation - only create when ear training is enabled
     useEffect(() => {
         if (earTrainingEnabled && !audioContext) {
             const ctx = new AudioContext();
             setAudioContext(ctx);
         }
+    }, [earTrainingEnabled, audioContext]);
 
-        // Auto-start the metronome when enabled if provided
-        if (earTrainingEnabled && onEnsurePlaying) {
-            onEnsurePlaying();
-        }
-
+    // Cleanup AudioContext ONLY on component unmount (not on state changes)
+    useEffect(() => {
         return () => {
             if (audioContext && audioContext.state !== 'closed') {
                 audioContext.close();
             }
         };
-    }, [earTrainingEnabled, onEnsurePlaying, audioContext]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []); // Empty deps = unmount only
+
+    // Auto-start metronome when enabled
+    useEffect(() => {
+        if (earTrainingEnabled && onEnsurePlaying) {
+            onEnsurePlaying();
+        }
+    }, [earTrainingEnabled, onEnsurePlaying]);
 
     const simpleNotes = useMemo(() => {
         return notes.map((n) => ({ string: n.string, fret: n.fret }));
@@ -158,8 +165,30 @@ export function EarTrainingWrapper({
         }
     }, [earTrainingEnabled, tickCount, onEnsurePlaying, earTrainingSettings.mode, earTraining.isPlaying, earTraining.waitingForClick, earTraining.currentPhrase, handlePlayNote, earTraining]);
 
-    // Pitch detection removed for simplified Identify-only mode
+    // Pitch detection for sing-back mode
     const [detectedPitch, setDetectedPitch] = useState<{ string: number; fret: number } | null>(null);
+
+    const handlePitchDetected = useCallback((result: {
+        frequency: number;
+        note: string;
+        string: number;
+        fret: number;
+        confidence: number;
+    }) => {
+        setDetectedPitch({ string: result.string, fret: result.fret });
+
+        // Only forward to ear training if in sing-back mode and listening
+        if (earTrainingEnabled && earTrainingSettings.mode === 'sing-back' && earTraining.isListening) {
+            earTraining.handleDetectedNote(result);
+        }
+    }, [earTrainingEnabled, earTrainingSettings.mode, earTraining.isListening, earTraining]);
+
+    // Enable pitch detection only for sing-back mode when listening
+    usePitchDetection({
+        isEnabled: earTrainingEnabled && earTrainingSettings.mode === 'sing-back' && earTraining.isListening,
+        onNoteDetected: handlePitchDetected,
+        sensitivity: earTrainingSettings.sensitivity,
+    });
 
     const degreeMap = useMemo(
         () => (major_key ? createDegreeMap(major_key, tonalContext) : null),

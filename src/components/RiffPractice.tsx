@@ -85,6 +85,7 @@ interface RiffPracticeProps {
   isControlledSession?: boolean; // If true, parent controls the session
   lessonExercise?: Tables<"lesson_exercises"> | null; // For lesson-specific settings
   sessionId?: string; // Optional session ID for grouping logs
+  isConfigMode?: boolean; // Config mode: hide metronome, no playback - for session builder
 }
 
 const RiffPractice = ({
@@ -98,12 +99,13 @@ const RiffPractice = ({
   isControlledSession = false,
   lessonExercise,
   sessionId,
+  isConfigMode = false,
 }: RiffPracticeProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const { settings: practiceSettings } = usePracticeSettings();
   const [noteIndex, setNoteIndex] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(autoStart);
+  const [isPlaying, setIsPlaying] = useState(!isConfigMode && autoStart);
 
   // Determine mode: Use progressive when in controlled session + settings say so
   const effectiveMode: MetronomeMode = isControlledSession && practiceSettings.practiceMode === 'progressive'
@@ -144,9 +146,9 @@ const RiffPractice = ({
     setHarmonicContext(repertoireItem.major_key);
   }, [repertoireItem.major_key]);
 
-  // Handle auto-start
+  // Handle auto-start (skip in config mode)
   useEffect(() => {
-    if (autoStart) {
+    if (autoStart && !isConfigMode) {
       // Small delay to ensure audio context is ready/user interaction context is satisfied
       // Note: Modern browsers block audio without user interaction.
       // Since the user CLICKED "Start Practice Session" to get here,
@@ -160,7 +162,7 @@ const RiffPractice = ({
       }, 500);
       return () => clearTimeout(timer);
     }
-  }, [autoStart]);
+  }, [autoStart, isConfigMode]);
 
   const availableSequences = useMemo(() => {
     const itemType = repertoireItem.Type?.toLowerCase();
@@ -173,8 +175,16 @@ const RiffPractice = ({
       sampleSequenceTypeLower: sequences[0]?.Type?.toLowerCase()
     });
 
+    // Filter by matching Type
     const filtered = sequences.filter((s) => s.Type?.toLowerCase() === itemType);
     console.log('Filtered sequences count:', filtered.length);
+
+    // FALLBACK: If no sequences match the type, show all sequences
+    // This ensures the module is always usable even if sequences data is incomplete
+    if (filtered.length === 0 && sequences.length > 0) {
+      console.log('No type-specific sequences found, using all sequences as fallback');
+      return sequences;
+    }
 
     return filtered;
   }, [sequences, repertoireItem]);
@@ -718,43 +728,45 @@ const RiffPractice = ({
               </div>
             </div>
 
-            {/* Right side: Metronome */}
-            <div className="flex items-start space-x-4">
-              <div className="flex flex-col items-center space-y-2">
-                <BeatVisualizer
-                  currentBeat={metronome.state.currentBeat}
-                  isPlaying={metronome.state.isPlaying}
-                  currentBpm={
-                    metronome.state.isPlaying
-                      ? metronome.state.currentBpm
-                      : metronomeBpm
-                  }
-                />
-                <MetronomeControls
-                  isPlaying={isPlaying}
-                  onPlayPause={handlePlay}
-                  onRestart={handleRestart}
-                  onStateChange={(newState) => {
-                    setMode(newState.mode);
-                    setMetronomeBpm(newState.startBpm);
-                    setLoop(newState.loop);
-                    setDrumBeat(!!newState.drumBeat);
-                  }}
-                  initialState={{
-                    mode,
-                    startBpm: metronomeBpm,
-                    endBpm: lessonExercise?.target_bpm || (metronomeBpm + 40),
-                    increments: lessonExercise?.increments || 8,
-                    measuresPerIncrement: lessonExercise?.measures_per_bpm || 4,
-                    loop,
-                    drumBeat,
-                    progressiveStepBpm:
-                      lessonExercise?.progressive_step_bpm || 5,
-                  }}
-                  compact
-                />
+            {/* Right side: Metronome - hidden in config mode */}
+            {!isConfigMode && (
+              <div className="flex items-start space-x-4">
+                <div className="flex flex-col items-center space-y-2">
+                  <BeatVisualizer
+                    currentBeat={metronome.state.currentBeat}
+                    isPlaying={metronome.state.isPlaying}
+                    currentBpm={
+                      metronome.state.isPlaying
+                        ? metronome.state.currentBpm
+                        : metronomeBpm
+                    }
+                  />
+                  <MetronomeControls
+                    isPlaying={isPlaying}
+                    onPlayPause={handlePlay}
+                    onRestart={handleRestart}
+                    onStateChange={(newState) => {
+                      setMode(newState.mode);
+                      setMetronomeBpm(newState.startBpm);
+                      setLoop(newState.loop);
+                      setDrumBeat(!!newState.drumBeat);
+                    }}
+                    initialState={{
+                      mode,
+                      startBpm: metronomeBpm,
+                      endBpm: lessonExercise?.target_bpm || (metronomeBpm + 40),
+                      increments: lessonExercise?.increments || 8,
+                      measuresPerIncrement: lessonExercise?.measures_per_bpm || 4,
+                      loop,
+                      drumBeat,
+                      progressiveStepBpm:
+                        lessonExercise?.progressive_step_bpm || 5,
+                    }}
+                    compact
+                  />
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
         {/* Ear Training Layout Slot - Full Width Bar (Responsive) */}

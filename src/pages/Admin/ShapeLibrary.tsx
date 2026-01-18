@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useToast } from "@/components/ui/use-toast"
 import { supabase } from '@/integrations/supabase/client';
-import { FRET_COUNT, findAllNoteOccurrences, notes as allNotes, getNote, getNoteWithEnharmonicPreference, determineEnharmonicNotes } from '@/lib/musicTheory';
+import { FRET_COUNT, findAllNoteOccurrences, notes as allNotes, getNote, getNoteWithEnharmonicPreference, determineEnharmonicNotes, normalizeNotesToFretboard } from '@/lib/musicTheory';
 import { useAuth } from '@/contexts/AuthContext';
 import { Tables } from '@/integrations/supabase/types';
 import Fretboard from '@/components/Fretboard';
@@ -20,7 +20,7 @@ const ShapeLibrary = () => {
   const [position, setPosition] = useState(1);
   const [mode, setMode] = useState('Ionian');
   const [tonality, setTonality] = useState('Major');
-  const [savedShapes, setSavedShapes] = useState<(Tables<'scale_shapes'> & { Type: string, Mode: string, Position: number, tonality: string, root_fret: number, notes: string[], shape_json: { string: number, fret_offset: number }[] })[]>([]);
+  const [savedShapes, setSavedShapes] = useState<(Tables<'scale_shapes'> & { Type: string, Mode: string, Position: number, tonality: string, root_fret: number, root_string: number, notes: string[], shape_json: { string: number, fret_offset: number }[] })[]>([]);
   const [shapeToGeneralize, setShapeToGeneralize] = useState('');
   const [selectedShapeId, setSelectedShapeId] = useState<string | null>(null);
   const [previewNotes, setPreviewNotes] = useState([]);
@@ -42,7 +42,7 @@ const ShapeLibrary = () => {
     if (error) {
       toast({ title: "Error fetching shapes", description: error.message });
     } else if (data) {
-      setSavedShapes(data as (Tables<'scale_shapes'> & { Type: string, Mode: string, Position: number, tonality: string, root_fret: number, notes: string[], shape_json: { string: number, fret_offset: number }[] })[]);
+      setSavedShapes(data as (Tables<'scale_shapes'> & { Type: string, Mode: string, Position: number, tonality: string, root_fret: number, root_string: number, notes: string[], shape_json: { string: number, fret_offset: number }[] })[]);
     }
   };
 
@@ -151,6 +151,7 @@ const ShapeLibrary = () => {
       });
 
     const root_fret = 0;
+    const root_string = rootNote.string;
 
     const rootNoteName = getNote(rootNote.string, rootNote.fret);
     const rootNoteIndex = allNotes.indexOf(rootNoteName);
@@ -171,6 +172,7 @@ const ShapeLibrary = () => {
         name: scaleName,
         chord_quality: chordQuality,
         root_fret,
+        root_string,
         shape_json,
         intervals: calculatedIntervals,
         notes: calculatedNotes,
@@ -199,6 +201,7 @@ const ShapeLibrary = () => {
         name: scaleName,
         shape_json,
         root_fret,
+        root_string,
         intervals: calculatedIntervals,
         notes: calculatedNotes,
         Type: scaleType,
@@ -437,6 +440,33 @@ const ShapeLibrary = () => {
     }
   };
 
+  // Regenerate: Delete existing scales from this shape and re-generalize
+  const handleRegenerate = async () => {
+    if (!shapeToGeneralize) {
+      toast({ title: "Error", description: "Please select a shape to regenerate." });
+      return;
+    }
+
+    const table = isChordMode ? 'chords' : 'scales';
+    const fkColumn = isChordMode ? 'chord_shape_id' : 'scale_shape';
+
+    // Delete existing items from this shape
+    const { error: deleteError, count } = await supabase
+      .from(table as any)
+      .delete()
+      .eq(fkColumn, shapeToGeneralize);
+
+    if (deleteError) {
+      toast({ title: "Error deleting old items", description: deleteError.message, variant: 'destructive' });
+      return;
+    }
+
+    toast({ title: "Deleted", description: `Removed existing items. Regenerating...` });
+
+    // Re-run generalize
+    await handleGeneralize();
+  };
+
   const handleShapeSelect = (e) => {
     const shapeId = e.target.value;
     if (!shapeId) {
@@ -474,7 +504,10 @@ const ShapeLibrary = () => {
       }
 
       const baseFret = 5; // Arbitrary fret to display the shape
-      const rootNoteInShape = selectedShape.shape_json.find(n => n.fret_offset === selectedShape.root_fret);
+      // Find root by fret_offset AND string (if available) to handle shapes with multiple notes at same fret
+      const rootNoteInShape = selectedShape.root_string != null
+        ? selectedShape.shape_json.find(n => n.fret_offset === selectedShape.root_fret && n.string === selectedShape.root_string)
+        : selectedShape.shape_json.find(n => n.fret_offset === selectedShape.root_fret);
 
       if (!rootNoteInShape) {
         toast({ title: "Error", description: "Could not find root note in shape." });
@@ -485,10 +518,12 @@ const ShapeLibrary = () => {
       const newRootNote = { string: rootString, fret: baseFret };
       setRootNote(newRootNote);
 
-      const newSelectedNotes = selectedShape.shape_json.map(note => ({
+      const rawNotes = selectedShape.shape_json.map(note => ({
         string: note.string,
         fret: baseFret + note.fret_offset - selectedShape.root_fret
       }));
+      // Normalize to keep within fretboard bounds (shift octave if any fret < 0 or > 22)
+      const newSelectedNotes = normalizeNotesToFretboard(rawNotes);
       setSelectedNotes(newSelectedNotes);
 
       const rootNoteName = getNote(newRootNote.string, newRootNote.fret);
@@ -536,6 +571,7 @@ const ShapeLibrary = () => {
               shapeToGeneralize={shapeToGeneralize}
               setShapeToGeneralize={setShapeToGeneralize}
               handleGeneralize={handleGeneralize}
+              handleRegenerate={handleRegenerate}
               scaleType={scaleType}
               setScaleType={setScaleType}
               SCALE_TYPES={SCALE_TYPES}

@@ -7,6 +7,7 @@ import { useBpmControls } from "@/hooks/useBpmControls";
 import NoteDisplay from "./NoteDisplay";
 import { BeatVisualizer } from "./BeatVisualizer";
 import { MetronomeControls, MetronomeMode } from "./MetronomeControls";
+import { normalizeNotesToFretboard } from "@/lib/musicTheory";
 
 
 import ExerciseHierarchy from "./ExerciseHierarchy";
@@ -474,11 +475,13 @@ const RiffPractice = ({
 
   const baseExerciseNotes = useMemo(() => {
     if (!activeSequence) {
-      return repertoireItem.notes.map((note, index) => ({
+      const rawNotes = repertoireItem.notes.map((note, index) => ({
         ...note,
         time: index,
         duration: 1,
       }));
+      // Normalize to keep within fretboard bounds
+      return normalizeNotesToFretboard(rawNotes);
     }
 
     const scale: Scale = {
@@ -488,19 +491,23 @@ const RiffPractice = ({
       Type: repertoireItem.Type || '',
     };
 
-    return applySequenceToScale(
+    const rawNotes = applySequenceToScale(
       scale,
       activeSequence.pattern_string,
       activeSequence.note_value,
       activeSequence.is_triplet
     );
+    // Normalize to keep within fretboard bounds (shift octave if any fret < 0 or > 22)
+    return normalizeNotesToFretboard(rawNotes);
   }, [activeSequence, repertoireItem]);
 
   // Ear training should use the original scale shape (repertoireItem.notes)
   // NOT the sequence-applied notes which have duplicates
   // This is more efficient and architecturally cleaner
   const scaleShapeNotes = useMemo(() => {
-    return repertoireItem.notes.map(n => ({ string: n.string, fret: n.fret }));
+    const rawNotes = repertoireItem.notes.map(n => ({ string: n.string, fret: n.fret }));
+    // Normalize to keep within fretboard bounds
+    return normalizeNotesToFretboard(rawNotes);
   }, [repertoireItem.notes]);
 
   const generateLearnSequence = useCallback(() => {

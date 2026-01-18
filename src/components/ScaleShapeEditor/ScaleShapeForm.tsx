@@ -25,6 +25,7 @@ interface ScaleShapeFormProps {
   shapeToGeneralize: string;
   setShapeToGeneralize: (id: string) => void;
   handleGeneralize: () => void;
+  handleRegenerate: () => void;
   scaleType: string;
   setScaleType: (type: string) => void;
   SCALE_TYPES: string[];
@@ -59,6 +60,7 @@ export const ScaleShapeForm: React.FC<ScaleShapeFormProps> = ({
   shapeToGeneralize,
   setShapeToGeneralize,
   handleGeneralize,
+  handleRegenerate,
   scaleType,
   setScaleType,
   SCALE_TYPES,
@@ -173,6 +175,7 @@ export const ScaleShapeForm: React.FC<ScaleShapeFormProps> = ({
           ))}
         </select>
         <Button onClick={handleGeneralize} className="mt-4">Generalize</Button>
+        <Button onClick={handleRegenerate} variant="outline" className="mt-4 ml-2">Regenerate (Overwrite)</Button>
       </div>
     </>
   );

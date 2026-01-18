@@ -9,6 +9,8 @@ interface UsePieceMasteryProps {
     audioUrl: string | null;
     segmentSeconds?: number;
     initialBlockIndex?: number;
+    initialOffset?: number;
+    initialPitchShift?: number;
     onProgress?: (blockIndex: number) => void;
     onLoopComplete?: (blockIndex: number, loopCount: number) => void;
 }
@@ -77,6 +79,8 @@ export function usePieceMastery({
     audioUrl,
     segmentSeconds: initialSegmentSeconds = 5,
     initialBlockIndex = 0,
+    initialOffset = 0,
+    initialPitchShift = 0,
     onProgress,
     onLoopComplete
 }: UsePieceMasteryProps) {
@@ -96,9 +100,9 @@ export function usePieceMastery({
     const [currentTime, setCurrentTime] = useState(0);
     const [playbackUrl, setPlaybackUrl] = useState<string | null>(null);
     const [loopCount, setLoopCount] = useState(0);
-    const [offset, setOffset] = useState(0);
+    const [offset, setOffset] = useState(initialOffset);
     const [segmentSeconds, setSegmentSeconds] = useState(Number(initialSegmentSeconds));
-    const [pitchShift, setPitchShift] = useState(0); // Semitones (-12 to +12)
+    const [pitchShift, setPitchShift] = useState(initialPitchShift);
 
     // Pitch shift effect ref
     const pitchShiftRef = useRef<Tone.PitchShift | null>(null);

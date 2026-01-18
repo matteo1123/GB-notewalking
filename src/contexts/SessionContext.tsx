@@ -192,36 +192,53 @@ export function SessionProvider({ children }: { children: ReactNode }) {
                 return;
             }
 
-            // TODO: Fetch active goals from database
-            // For now, create a sample session
+            // Default sample session for new users - includes ALL modules
+            // for a better first impression with variety
             const sampleGoals: GoalWithProgress[] = [
                 {
                     id: '1',
                     lesson_id: lessonId || 'default',
                     module_type: 'rhythm',
-                    module_config: { rhythm_level: 5 },
-                    target_level: 5,
+                    module_config: { rhythm_level: 1 },
+                    target_level: 3,
                     priority: 8,
-                    progress: {
-                        time_practiced_minutes: 30,
-                        mastery_level: 0.4,
-                    },
+                    progress: { time_practiced_minutes: 0, mastery_level: 0 },
                 },
                 {
                     id: '2',
                     lesson_id: lessonId || 'default',
                     module_type: 'notewalking',
-                    module_config: {
-                        key: 'C',
-                        chords: ['I', 'IV', 'V'],
-                        measures_per_chord: 4,
-                    },
+                    module_config: { key: 'C', chords: ['I', 'IV', 'V'], measures_per_chord: 4 },
                     target_level: 3,
-                    priority: 7,
-                    progress: {
-                        time_practiced_minutes: 15,
-                        mastery_level: 0.2,
-                    },
+                    priority: 8,
+                    progress: { time_practiced_minutes: 0, mastery_level: 0 },
+                },
+                {
+                    id: '3',
+                    lesson_id: lessonId || 'default',
+                    module_type: 'scale',
+                    module_config: {},
+                    target_level: 3,
+                    priority: 8,
+                    progress: { time_practiced_minutes: 0, mastery_level: 0 },
+                },
+                {
+                    id: '4',
+                    lesson_id: lessonId || 'default',
+                    module_type: 'arpeggio',
+                    module_config: {},
+                    target_level: 3,
+                    priority: 8,
+                    progress: { time_practiced_minutes: 0, mastery_level: 0 },
+                },
+                {
+                    id: '5',
+                    lesson_id: lessonId || 'default',
+                    module_type: 'chord_progressions',
+                    module_config: {},
+                    target_level: 3,
+                    priority: 8,
+                    progress: { time_practiced_minutes: 0, mastery_level: 0 },
                 },
             ];
 

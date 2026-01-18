@@ -15,16 +15,21 @@ interface PieceMasteryProps {
     onBack: () => void;
     // Exit callback for standalone/freeplay mode
     onExit?: () => void;
+    // Persistence for loop settings
+    moduleConfig?: { offset?: number; segmentSeconds?: number; pitchShift?: number };
+    onConfigChange?: (config: { offset: number; segmentSeconds: number; pitchShift: number }) => void;
 }
 
-export function PieceMastery({ piece, onBack, onExit }: PieceMasteryProps) {
+export function PieceMastery({ piece, onBack, onExit, moduleConfig, onConfigChange }: PieceMasteryProps) {
     const [autoAdvance, setAutoAdvance] = useState(false);
     const [notes, setNotes] = useState(piece.notes || "");
     const { toast } = useToast();
 
     const { state, controls } = usePieceMastery({
         audioUrl: piece.audio_url,
-        segmentSeconds: piece.segment_seconds || 5,
+        segmentSeconds: moduleConfig?.segmentSeconds || piece.segment_seconds || 5,
+        initialOffset: moduleConfig?.offset || 0,
+        initialPitchShift: moduleConfig?.pitchShift || 0,
         onLoopComplete: (blockIndex, loopCount) => {
             // Optional: Auto-advance logic
             if (autoAdvance && loopCount >= 3) controls.nextBlock();
@@ -80,11 +85,17 @@ export function PieceMastery({ piece, onBack, onExit }: PieceMasteryProps) {
     const handleRangeChange = (values: number[]) => {
         if (values.length === 2) {
             const [newStart, newEnd] = values;
-            controls.setOffset(newStart);
-
-            // Ensure minimum duration prevents 0-length loops
-            const newDuration = Math.max(1, newEnd - newStart);
+            const newOffset = Math.round(newStart);
+            // Minimum 2 seconds to prevent thumb overlap issues
+            const newDuration = Math.max(2, Math.round(newEnd - newStart));
+            controls.setOffset(newOffset);
             controls.setSegmentSeconds(newDuration);
+            // Persist config
+            onConfigChange?.({
+                offset: newOffset,
+                segmentSeconds: newDuration,
+                pitchShift: state.pitchShift
+            });
         }
     };
 
@@ -142,7 +153,7 @@ export function PieceMastery({ piece, onBack, onExit }: PieceMasteryProps) {
                         <div className="space-y-2">
                             <div className="flex justify-between text-xs text-muted-foreground mb-1">
                                 <span className="flex items-center gap-1"><Settings2 className="w-3 h-3" /> Loop Region</span>
-                                <span>Start: {formatTime(offset)} • Size: {segmentSeconds}s</span>
+                                <span>Start: {formatTime(offset)} • Size: {Math.round(segmentSeconds)}s</span>
                             </div>
                             <Slider
                                 value={[offset, offset + segmentSeconds]}
@@ -214,7 +225,14 @@ export function PieceMastery({ piece, onBack, onExit }: PieceMasteryProps) {
                             min={-6}
                             max={6}
                             step={1}
-                            onValueChange={([value]) => controls.setPitchShift(value)}
+                            onValueChange={([value]) => {
+                                controls.setPitchShift(value);
+                                onConfigChange?.({
+                                    offset: state.offset,
+                                    segmentSeconds: state.segmentSeconds,
+                                    pitchShift: value
+                                });
+                            }}
                             className="py-2"
                         />
                         <div className="flex justify-between text-[10px] text-muted-foreground mt-1">

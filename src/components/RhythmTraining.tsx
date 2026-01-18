@@ -21,8 +21,8 @@ import { Slider } from "./ui/slider";
 import { Label } from "./ui/label";
 import { Switch } from "./ui/switch";
 import { Checkbox } from "./ui/checkbox";
-import { SkipForward, ChevronLeft, ChevronRight, Check, Mic, Settings, ChevronUp, Shuffle, ListOrdered, X } from "lucide-react";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui/collapsible";
+import { SkipForward, ChevronLeft, ChevronRight, Check, Mic, Settings, Shuffle, ListOrdered, X } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
 import { ForceLandscapeWrapper } from "./ForceLandscapeWrapper";
 
 interface RhythmTrainingProps {
@@ -61,11 +61,41 @@ export function RhythmTraining({ autoStart = false, sessionId, onExit }: RhythmT
     // Auto-switch settings
     const [autoSwitch, setAutoSwitch] = useState(false);
     const [switchMeasures, setSwitchMeasures] = useState(4);
+    const [changeBpm, setChangeBpm] = useState(false);  // Variance BPM feature
+    const [practiceCount, setPracticeCount] = useState(0); // How many patterns practiced
     const [measureCount, setMeasureCount] = useState(0);
     const [settingsOpen, setSettingsOpen] = useState(false);
 
     // Track beats for auto-switch (4 beats per measure)
     const beatCountRef = useRef(0);
+
+    // CRITICAL: Use refs for values accessed in onTick callback to avoid stale closures
+    const autoSwitchRef = useRef(autoSwitch);
+    const hasConfirmedRef = useRef(hasConfirmed);
+    const switchMeasuresRef = useRef(switchMeasures);
+    const changeBpmRef = useRef(changeBpm);
+    const practiceCountRef = useRef(practiceCount);
+    const rhythmModeRef = useRef(rhythmMode);
+    const deviationTypesRef = useRef(deviationTypes);
+    const levelRef = useRef(level);
+
+    // Keep refs in sync with state
+    useEffect(() => { autoSwitchRef.current = autoSwitch; }, [autoSwitch]);
+    useEffect(() => { hasConfirmedRef.current = hasConfirmed; }, [hasConfirmed]);
+    useEffect(() => { switchMeasuresRef.current = switchMeasures; }, [switchMeasures]);
+    useEffect(() => { changeBpmRef.current = changeBpm; }, [changeBpm]);
+    useEffect(() => { practiceCountRef.current = practiceCount; }, [practiceCount]);
+    useEffect(() => { rhythmModeRef.current = rhythmMode; }, [rhythmMode]);
+    useEffect(() => { deviationTypesRef.current = deviationTypes; }, [deviationTypes]);
+    useEffect(() => { levelRef.current = level; }, [level]);
+
+    // Reset beat counter when auto-switch is enabled or switchMeasures changes
+    // This ensures auto-switch starts counting fresh immediately
+    useEffect(() => {
+        if (autoSwitch) {
+            beatCountRef.current = 0;
+        }
+    }, [autoSwitch, switchMeasures]);
 
     // Auto-recording (uses global context setting)
     const recording = useAutoRecording({
@@ -115,14 +145,35 @@ export function RhythmTraining({ autoStart = false, sessionId, onExit }: RhythmT
             recording.handleTick(state.currentBeat + (state.currentMeasure - 1) * 4);
 
             // Auto-switch logic: count beats (4 beats per measure)
-            if (autoSwitch && !hasConfirmed) {
+            // Use refs to get current values (avoid stale closure)
+            if (autoSwitchRef.current && !hasConfirmedRef.current) {
                 beatCountRef.current += 1;
                 // Each measure = 4 beats, switch after switchMeasures * 4 beats
-                if (beatCountRef.current >= switchMeasures * 4) {
+                if (beatCountRef.current >= switchMeasuresRef.current * 4) {
                     beatCountRef.current = 0;
                     setMeasureCount(prev => prev + 1);
-                    // Generate new pattern at same level
-                    setPattern(generateRhythmPattern(level));
+                    setPracticeCount(prev => prev + 1);
+
+                    // Generate new random pattern at current level
+                    setPattern(generateRhythmPattern({
+                        mode: rhythmModeRef.current,
+                        deviationTypes: deviationTypesRef.current,
+                        level: levelRef.current,
+                        systematicIndex: rhythmModeRef.current === 'systematic' ? (levelRef.current + 1) % 16 : undefined
+                    }));
+
+                    // If systematic mode, also advance the level
+                    if (rhythmModeRef.current === 'systematic') {
+                        setLevel(prev => (prev + 1) % 16);
+                    }
+
+                    // If BPM variance is enabled, randomize the tempo
+                    if (changeBpmRef.current) {
+                        // BPM range grows with practice count: 60 + random() * (practiceCount * 2)
+                        const maxVariance = Math.min(practiceCountRef.current * 2, 80); // Cap at 80 BPM variance
+                        const newBpm = 60 + Math.floor(Math.random() * (maxVariance + 1));
+                        setBpm(newBpm);
+                    }
                 }
             }
         },
@@ -487,42 +538,58 @@ export function RhythmTraining({ autoStart = false, sessionId, onExit }: RhythmT
                                 </div>
                             )}
 
-                            {/* Settings - HIDDEN on mobile */}
-                            <Collapsible open={settingsOpen} onOpenChange={setSettingsOpen} className="hidden sm:block">
-                                <CollapsibleTrigger asChild>
-                                    <Button variant="ghost" className="w-full flex items-center justify-between p-2 h-auto">
-                                        <div className="flex items-center gap-2">
-                                            <Settings className="w-4 h-4" />
-                                            <span className="text-sm">Settings</span>
-                                        </div>
-                                        <ChevronUp className={`w-4 h-4 transition-transform ${settingsOpen ? '' : 'rotate-180'}`} />
+                            {/* Settings - Floating Dialog (works on all devices) */}
+                            <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+                                <DialogTrigger asChild>
+                                    <Button variant="ghost" size="sm" className="w-full flex items-center justify-center gap-2 h-8">
+                                        <Settings className="w-4 h-4" />
+                                        <span className="text-xs sm:text-sm">Settings</span>
                                     </Button>
-                                </CollapsibleTrigger>
-                                <CollapsibleContent className="space-y-3 pt-2">
-                                    <div className="flex items-center justify-between bg-muted/30 rounded-lg p-3">
-                                        <div>
-                                            <Label htmlFor="auto-switch">Auto-Switch</Label>
-                                            <p className="text-xs text-muted-foreground">Auto-advance to new pattern</p>
-                                        </div>
-                                        <Switch id="auto-switch" checked={autoSwitch} onCheckedChange={setAutoSwitch} />
-                                    </div>
-                                    {autoSwitch && (
-                                        <div className="bg-muted/30 rounded-lg p-3">
-                                            <div className="flex items-center justify-between mb-2">
-                                                <Label>Measures between switches</Label>
-                                                <span className="text-sm font-semibold">{switchMeasures}</span>
+                                </DialogTrigger>
+                                <DialogContent className="max-w-sm">
+                                    <DialogHeader>
+                                        <DialogTitle>Rhythm Settings</DialogTitle>
+                                    </DialogHeader>
+                                    <div className="space-y-4 pt-2">
+                                        <div className="flex items-center justify-between bg-muted/30 rounded-lg p-3">
+                                            <div>
+                                                <Label htmlFor="auto-switch">Auto-Switch</Label>
+                                                <p className="text-xs text-muted-foreground">Auto-advance to new pattern</p>
                                             </div>
-                                            <Slider
-                                                min={1}
-                                                max={8}
-                                                step={1}
-                                                value={[switchMeasures]}
-                                                onValueChange={([value]) => setSwitchMeasures(value)}
-                                            />
+                                            <Switch id="auto-switch" checked={autoSwitch} onCheckedChange={setAutoSwitch} />
                                         </div>
-                                    )}
-                                </CollapsibleContent>
-                            </Collapsible>
+                                        {autoSwitch && (
+                                            <div className="bg-muted/30 rounded-lg p-3">
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <Label>Measures between switches</Label>
+                                                    <span className="text-sm font-semibold">{switchMeasures}</span>
+                                                </div>
+                                                <Slider
+                                                    min={1}
+                                                    max={8}
+                                                    step={1}
+                                                    value={[switchMeasures]}
+                                                    onValueChange={([value]) => setSwitchMeasures(value)}
+                                                />
+                                            </div>
+                                        )}
+                                        {autoSwitch && (
+                                            <div className="flex items-center justify-between bg-muted/30 rounded-lg p-3">
+                                                <div>
+                                                    <Label htmlFor="change-bpm">Change BPM</Label>
+                                                    <p className="text-xs text-muted-foreground">
+                                                        Randomize tempo each switch
+                                                        {practiceCount > 0 && (
+                                                            <span className="block">Range: 60-{60 + Math.min(practiceCount * 2, 80)} BPM</span>
+                                                        )}
+                                                    </p>
+                                                </div>
+                                                <Switch id="change-bpm" checked={changeBpm} onCheckedChange={setChangeBpm} />
+                                            </div>
+                                        )}
+                                    </div>
+                                </DialogContent>
+                            </Dialog>
                         </div>
 
                         {/* Metronome Controls */}

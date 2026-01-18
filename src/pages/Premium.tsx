@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import RiffPractice from "@/components/RiffPractice";
@@ -11,7 +11,7 @@ import Paywall from "@/components/Premium/Paywall";
 import { ModuleLibrary } from "@/components/ModuleLibrary";
 import { PriorityManager } from "@/components/PriorityManager";
 import { PressStart } from "@/components/PressStart";
-import { ProgressDashboard } from "@/components/ProgressDashboard";
+import { SessionRecap } from "@/components/SessionRecap";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { SessionProvider, useSession } from "@/contexts/SessionContext";
@@ -28,7 +28,7 @@ const PremiumContent = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   // Lift session state check to here
-  const { activeSession, completeSession } = useSession();
+  const { activeSession, endSession } = useSession();
 
   const [selectedRiff, setSelectedRiff] = useState<RepertoireItem | null>(null);
   const [exercises, setExercises] = useState<RepertoireItem[]>([]);
@@ -43,17 +43,17 @@ const PremiumContent = () => {
   const [checkingPremium, setCheckingPremium] = useState(true);
   const [activeTab, setActiveTab] = useState("priorities");
 
-  // Handle Session Completion
-  const handleSessionComplete = async () => {
-    // This function can handle any post-session wrap up logic if needed
-    // But mostly it's handled by SessionWrapUp component which calls completeSession(false) eventually?
-    // Actually SessionExecutor calls nextBlock/complete. 
-    // If activeSession is done, we might want to show wrap up.
-    // The SessionContext handles 'activeSession' state. 
-    // If session is complete, it might be null or marked complete.
-    // Let's rely on the context to clear activeSession when done.
-    completeSession();
-  };
+  // Track previous session state to detect completion
+  const prevActiveSessionRef = useRef(activeSession);
+
+  // Redirect to recap tab when session completes
+  useEffect(() => {
+    // If we had an active session before but now it's null, session completed
+    if (prevActiveSessionRef.current && !activeSession) {
+      setActiveTab("recap");
+    }
+    prevActiveSessionRef.current = activeSession;
+  }, [activeSession]);
 
   useEffect(() => {
     if (searchParams.get("success")) {
@@ -304,7 +304,7 @@ const PremiumContent = () => {
             <TabsList className="inline-flex w-auto min-w-full sm:grid sm:grid-cols-4 gap-1">
               <TabsTrigger value="start" className="text-xs sm:text-sm px-2 sm:px-4 whitespace-nowrap">🚀 Start</TabsTrigger>
               <TabsTrigger value="priorities" className="text-xs sm:text-sm px-2 sm:px-4 whitespace-nowrap">⚙️ Priorities</TabsTrigger>
-              <TabsTrigger value="progress" className="text-xs sm:text-sm px-2 sm:px-4 whitespace-nowrap">📊 Progress</TabsTrigger>
+              <TabsTrigger value="recap" className="text-xs sm:text-sm px-2 sm:px-4 whitespace-nowrap">📝 Recap</TabsTrigger>
               <TabsTrigger value="modules" className="text-xs sm:text-sm px-2 sm:px-4 whitespace-nowrap">🎯 Modules</TabsTrigger>
             </TabsList>
           </div>
@@ -317,8 +317,8 @@ const PremiumContent = () => {
             <PriorityManager onStart={() => setActiveTab("start")} />
           </TabsContent>
 
-          <TabsContent value="progress" className="flex-1 min-h-0 overflow-y-auto data-[state=active]:block p-6">
-            <ProgressDashboard />
+          <TabsContent value="recap" className="flex-1 min-h-0 overflow-y-auto data-[state=active]:block p-6">
+            <SessionRecap onStartNewSession={() => setActiveTab("start")} />
           </TabsContent>
 
           <TabsContent value="modules" className="flex-1 min-h-0 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col">

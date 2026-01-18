@@ -10,19 +10,19 @@ export const standardTuning = ['E', 'B', 'G', 'D', 'A', 'E'];
 
 
 export const findAllNoteOccurrences = (noteName: string, tuning: string[] = standardTuning): { string: number, fret: number }[] => {
-  const occurrences = [];
-  const noteIndex = notes.indexOf(noteName);
-  const noteWithFlatIndex = notesWithFlats.indexOf(noteName);
+    const occurrences = [];
+    const noteIndex = notes.indexOf(noteName);
+    const noteWithFlatIndex = notesWithFlats.indexOf(noteName);
 
-  for (let s = 1; s <= tuning.length; s++) {
-    for (let f = 0; f <= FRET_COUNT; f++) {
-      const currentNoteIndex = (notes.indexOf(tuning[s - 1]) + f) % 12;
-      if (currentNoteIndex === noteIndex || currentNoteIndex === noteWithFlatIndex) {
-        occurrences.push({ string: s, fret: f });
-      }
+    for (let s = 1; s <= tuning.length; s++) {
+        for (let f = 0; f <= FRET_COUNT; f++) {
+            const currentNoteIndex = (notes.indexOf(tuning[s - 1]) + f) % 12;
+            if (currentNoteIndex === noteIndex || currentNoteIndex === noteWithFlatIndex) {
+                occurrences.push({ string: s, fret: f });
+            }
+        }
     }
-  }
-  return occurrences;
+    return occurrences;
 };
 
 export const CHROMATIC_SCALE = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
@@ -57,45 +57,45 @@ export function getNoteFromFret(string: number, fret: number): string {
 }
 
 export const getNote = (string: number, fret: number): string => {
-  const tuning = ['E', 'B', 'G', 'D', 'A', 'E'];
-  if (string < 1 || string > tuning.length) {
-    throw new Error(`Invalid string number: ${string}`);
-  }
-  const openStringNote = tuning[string - 1];
-  const openStringNoteIndex = CHROMATIC_SCALE.indexOf(openStringNote);
-  if (openStringNoteIndex === -1) {
-    throw new Error(`Invalid note in tuning: ${openStringNote}`);
-  }
-  const noteIndex = (openStringNoteIndex + fret) % 12;
-  return CHROMATIC_SCALE[noteIndex];
+    const tuning = ['E', 'B', 'G', 'D', 'A', 'E'];
+    if (string < 1 || string > tuning.length) {
+        throw new Error(`Invalid string number: ${string}`);
+    }
+    const openStringNote = tuning[string - 1];
+    const openStringNoteIndex = CHROMATIC_SCALE.indexOf(openStringNote);
+    if (openStringNoteIndex === -1) {
+        throw new Error(`Invalid note in tuning: ${openStringNote}`);
+    }
+    const noteIndex = (openStringNoteIndex + fret) % 12;
+    return CHROMATIC_SCALE[noteIndex];
 };
 
 export function createDegreeMap(
-  majorKey: string,
-  mode: string = "major"
+    majorKey: string,
+    mode: string = "major"
 ): Map<string, number> {
-  const formulas: { [key: string]: number[] } = {
-    major: [0, 2, 4, 5, 7, 9, 11],
-    dorian: [0, 2, 3, 5, 7, 9, 10],
-    phrygian: [0, 1, 3, 5, 7, 8, 10],
-    lydian: [0, 2, 4, 6, 7, 9, 11],
-    mixolydian: [0, 2, 4, 5, 7, 9, 10],
-    minor: [0, 2, 3, 5, 7, 8, 10],
-    locrian: [0, 1, 3, 5, 6, 8, 10],
-  };
+    const formulas: { [key: string]: number[] } = {
+        major: [0, 2, 4, 5, 7, 9, 11],
+        dorian: [0, 2, 3, 5, 7, 9, 10],
+        phrygian: [0, 1, 3, 5, 7, 8, 10],
+        lydian: [0, 2, 4, 6, 7, 9, 11],
+        mixolydian: [0, 2, 4, 5, 7, 9, 10],
+        minor: [0, 2, 3, 5, 7, 8, 10],
+        locrian: [0, 1, 3, 5, 6, 8, 10],
+    };
 
-  const formula = formulas[mode] || formulas.major;
-  const scale = majorKey.includes('b') ? CHROMATIC_SCALE_FLATS : CHROMATIC_SCALE;
-  const rootIndex = scale.indexOf(majorKey);
-  const degreeMap = new Map<string, number>();
+    const formula = formulas[mode] || formulas.major;
+    const scale = majorKey.includes('b') ? CHROMATIC_SCALE_FLATS : CHROMATIC_SCALE;
+    const rootIndex = scale.indexOf(majorKey);
+    const degreeMap = new Map<string, number>();
 
-  formula.forEach((interval, index) => {
-    const noteName = scale[(rootIndex + interval) % 12];
-    const degree = index + 1;
-    degreeMap.set(noteName, degree);
-  });
+    formula.forEach((interval, index) => {
+        const noteName = scale[(rootIndex + interval) % 12];
+        const degree = index + 1;
+        degreeMap.set(noteName, degree);
+    });
 
-  return degreeMap;
+    return degreeMap;
 }
 
 export function createChromaticDegreeMap(rootNote: string): Map<string, string> {
@@ -248,3 +248,33 @@ export const determineEnharmonicNotes = (noteList: string[], rootNote: string): 
 
     return [...new Set(correctedNotes)];
 };
+
+/**
+ * Normalize note frets to stay within valid fretboard bounds.
+ * If any note has fret < 0, shift ALL notes up 12 frets (one octave).
+ * If any note has fret > maxFret, shift ALL notes down 12 frets.
+ * Allows fret === 0 (open strings).
+ */
+export function normalizeNotesToFretboard<T extends { fret: number }>(
+    notes: T[],
+    maxFret = 22
+): T[] {
+    if (notes.length === 0) return notes;
+
+    let normalized = notes.map(n => ({ ...n })) as T[];
+
+    // Shift up if any note < 0
+    while (normalized.some(n => n.fret < 0)) {
+        normalized = normalized.map(n => ({ ...n, fret: n.fret + 12 })) as T[];
+    }
+
+    // Shift down if any note > maxFret (but don't go negative)
+    while (
+        normalized.some(n => n.fret > maxFret) &&
+        !normalized.some(n => n.fret - 12 < 0)
+    ) {
+        normalized = normalized.map(n => ({ ...n, fret: n.fret - 12 })) as T[];
+    }
+
+    return normalized;
+}

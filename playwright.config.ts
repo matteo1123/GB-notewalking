@@ -8,6 +8,9 @@ export default defineConfig({
     workers: process.env.CI ? 1 : undefined,
     reporter: 'html',
 
+    // Create test-results directory for screenshots
+    outputDir: 'test-results',
+
     use: {
         baseURL: 'http://localhost:8080',
         trace: 'on-first-retry',

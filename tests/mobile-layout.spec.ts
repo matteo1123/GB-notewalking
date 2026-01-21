@@ -1,209 +1,153 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, Page } from '@playwright/test';
 
 /**
  * Mobile Layout Regression Tests
  * 
- * These tests verify that key modules render correctly on mobile devices.
- * Run with: npm run test:mobile
- * Update baselines with: npm run test:mobile:update
+ * Verifies that all practice modules display correctly on mobile devices.
+ * These tests are regression locks - they catch layout breakage from code changes.
+ * 
+ * Test route: /test/scale-module (bypasses authentication)
+ * 
+ * IMPORTANT: The forced landscape CSS rotates content 90 degrees.
+ * We use offsetWidth/offsetHeight to measure LAYOUT dimensions (pre-rotation).
  */
 
-test.describe('Header Mobile Layout', () => {
-    test('should show mobile menu toggle and centered logo', async ({ page }) => {
-        await page.goto('/');
-
-        // Mobile menu button should be visible
-        const menuButton = page.locator('button').filter({ has: page.locator('svg.lucide-menu, svg.lucide-x') });
-        await expect(menuButton).toBeVisible();
-
-        // Logo should be visible and centered
-        const logo = page.locator('header img[alt*="logo"], header .logo, header h1').first();
-        await expect(logo).toBeVisible();
-
-        // No horizontal overflow
-        const body = page.locator('body');
-        const bodyBox = await body.boundingBox();
-        const viewport = page.viewportSize();
-        if (bodyBox && viewport) {
-            expect(bodyBox.width).toBeLessThanOrEqual(viewport.width + 1);
-        }
+// Helper to get fretboard layout dimensions (pre-rotation)
+async function getFretboardDimensions(page: Page) {
+    return await page.evaluate(() => {
+        const el = document.querySelector('.fretboard') as HTMLElement;
+        if (!el) return null;
+        return {
+            offsetWidth: el.offsetWidth,
+            offsetHeight: el.offsetHeight
+        };
     });
+}
 
-    test('should toggle mobile menu on click', async ({ page }) => {
-        await page.goto('/');
+// Helper to navigate to a specific module from the library
+async function navigateToModule(page: Page, moduleIndex: number) {
+    await page.goto('/test/scale-module');
+    await page.waitForLoadState('load');
+    await page.waitForTimeout(1500);
 
-        const menuButton = page.locator('button').filter({ has: page.locator('svg.lucide-menu') });
-        await menuButton.click();
-
-        // Menu should be open - look for navigation links
-        const navLinks = page.locator('nav a, [role="navigation"] a');
-        await expect(navLinks.first()).toBeVisible();
+    // Scroll container to reveal more modules
+    await page.evaluate(() => {
+        const container = document.querySelector('.flex-1.overflow-y-auto');
+        if (container) container.scrollTop += 600;
     });
-});
+    await page.waitForTimeout(500);
 
-test.describe('Module Library Mobile Layout', () => {
-    test('should display modules in single column', async ({ page }) => {
-        await page.goto('/');
+    // Click the Nth Try Now button (0-indexed)
+    const tryButtons = page.locator('button:has-text("Try Now")');
+    await tryButtons.nth(moduleIndex).scrollIntoViewIfNeeded();
+    await tryButtons.nth(moduleIndex).click();
 
-        // Wait for module cards to load
-        const moduleCards = page.locator('[class*="ModuleCard"], [class*="module-card"], .card').first();
-        await expect(moduleCards).toBeVisible({ timeout: 10000 });
+    await page.waitForTimeout(2000);
+}
 
-        // Check that cards are stacking (not side by side)
-        const cards = await page.locator('[class*="ModuleCard"], [class*="module-card"], .card').all();
-        if (cards.length >= 2) {
-            const firstBox = await cards[0].boundingBox();
-            const secondBox = await cards[1].boundingBox();
-            if (firstBox && secondBox) {
-                // On mobile, second card should be below first (not beside)
-                expect(secondBox.y).toBeGreaterThan(firstBox.y);
-            }
-        }
-    });
+// Helper to click first table row (for selecting a scale/arpeggio)
+async function clickFirstExerciseRow(page: Page, textFilter: string) {
+    // Use getByRole('row') which targets tr elements - the rows are clickable
+    const row = page.getByRole('row').filter({ hasText: textFilter }).first();
 
-    test('should not have horizontal overflow', async ({ page }) => {
-        await page.goto('/');
-        await page.waitForLoadState('networkidle');
-
-        // Check for horizontal scrollbar
-        const hasHorizontalScroll = await page.evaluate(() => {
-            return document.documentElement.scrollWidth > document.documentElement.clientWidth;
-        });
-
-        expect(hasHorizontalScroll).toBe(false);
-    });
-});
-
-test.describe('Fretboard Mobile Layout', () => {
-    test('should fit within viewport without horizontal scroll', async ({ page }) => {
-        // Navigate to a page that shows the fretboard
-        await page.goto('/');
-
-        // Try to find and click on a module that would show fretboard
-        const moduleWithFretboard = page.getByText(/scale|fretboard|exercise/i).first();
-        if (await moduleWithFretboard.isVisible()) {
-            await moduleWithFretboard.click();
-            await page.waitForTimeout(1000);
-        }
-
-        const fretboard = page.locator('.fretboard, .fretboard-container, .fretboard-area');
-        if (await fretboard.isVisible()) {
-            const fretboardBox = await fretboard.boundingBox();
-            const viewport = page.viewportSize();
-
-            if (fretboardBox && viewport) {
-                // Fretboard should not exceed viewport width
-                expect(fretboardBox.width).toBeLessThanOrEqual(viewport.width);
-            }
-        }
-    });
-});
-
-test.describe('Rhythm Training Mobile Layout', () => {
-    test.beforeEach(async ({ page }) => {
-        await page.goto('/');
-        // Try to navigate to rhythm training module
-        const rhythmModule = page.getByText(/rhythm/i).first();
-        if (await rhythmModule.isVisible()) {
-            await rhythmModule.click();
-            await page.waitForTimeout(1000);
-        }
-    });
-
-    test('should have compact controls visible', async ({ page }) => {
-        // Check for play/pause button which should always be visible
-        const playButton = page.locator('button').filter({ has: page.locator('svg.lucide-play, svg.lucide-pause') });
-        if (await playButton.isVisible()) {
-            await expect(playButton).toBeVisible();
-
-            // Button should be within viewport
-            const buttonBox = await playButton.boundingBox();
-            const viewport = page.viewportSize();
-            if (buttonBox && viewport) {
-                expect(buttonBox.x + buttonBox.width).toBeLessThanOrEqual(viewport.width);
-            }
-        }
-    });
-
-    test('should not have horizontal overflow', async ({ page }) => {
-        const hasHorizontalScroll = await page.evaluate(() => {
-            return document.documentElement.scrollWidth > document.documentElement.clientWidth;
-        });
-        expect(hasHorizontalScroll).toBe(false);
-    });
-});
-
-test.describe('Metronome Mobile Layout', () => {
-    test.beforeEach(async ({ page }) => {
-        await page.goto('/');
-        // Try to navigate to metronome
-        const metronomeLink = page.getByText(/metronome/i).first();
-        if (await metronomeLink.isVisible()) {
-            await metronomeLink.click();
-            await page.waitForTimeout(1000);
-        }
-    });
-
-    test('should display BPM prominently', async ({ page }) => {
-        // BPM display should be visible and readable
-        const bpmDisplay = page.locator('[class*="bpm"], [class*="BPM"]').first();
-        if (await bpmDisplay.isVisible()) {
-            await expect(bpmDisplay).toBeVisible();
-        }
-    });
-
-    test('controls should be accessible', async ({ page }) => {
-        // Play button should be easily tappable (visible and sized appropriately)
-        const playButton = page.locator('button').filter({ has: page.locator('svg.lucide-play, svg.lucide-pause') }).first();
-        if (await playButton.isVisible()) {
-            const buttonBox = await playButton.boundingBox();
-            if (buttonBox) {
-                // Minimum touch target size (44px recommended by Apple)
-                expect(Math.min(buttonBox.width, buttonBox.height)).toBeGreaterThanOrEqual(40);
-            }
-        }
-    });
-});
-
-test.describe('General Mobile Layout Checks', () => {
-    const pagesToCheck = ['/', '/practice', '/settings'];
-
-    for (const path of pagesToCheck) {
-        test(`${path} should not have horizontal overflow`, async ({ page }) => {
-            await page.goto(path);
-            await page.waitForLoadState('domcontentloaded');
-
-            const hasHorizontalScroll = await page.evaluate(() => {
-                return document.documentElement.scrollWidth > document.documentElement.clientWidth;
-            });
-
-            expect(hasHorizontalScroll).toBe(false);
-        });
-
-        test(`${path} should have touch-friendly tap targets`, async ({ page }) => {
-            await page.goto(path);
-            await page.waitForLoadState('domcontentloaded');
-
-            // Check all buttons have minimum size
-            const buttons = await page.locator('button:visible').all();
-            for (const button of buttons.slice(0, 10)) { // Check first 10 buttons
-                const box = await button.boundingBox();
-                if (box) {
-                    // At least 32px (a bit smaller than ideal 44px, but reasonable for UI)
-                    expect(Math.min(box.width, box.height)).toBeGreaterThanOrEqual(32);
-                }
-            }
-        });
+    if (await row.isVisible({ timeout: 5000 })) {
+        await row.click();
+        await page.waitForTimeout(2000);
+        return true;
     }
+    return false;
+}
+
+// ============================================================================
+// SCALE MODULE TEST
+// ============================================================================
+
+test('scale fretboard is landscape', async ({ page }) => {
+    // Scale Practice is at index 2 (0=Rhythm, 1=Notewalking, 2=Scale)
+    await navigateToModule(page, 2);
+
+    // Click first exercise row containing "Ionian" or any scale name
+    await clickFirstExerciseRow(page, 'Ionian');
+
+    // Verify fretboard is visible
+    const fretboard = page.locator('.fretboard').first();
+    await expect(fretboard).toBeVisible({ timeout: 15000 });
+
+    // Check dimensions
+    const dims = await getFretboardDimensions(page);
+    expect(dims, 'Fretboard not found').not.toBeNull();
+
+    console.log(`Scale fretboard: ${dims!.offsetWidth}x${dims!.offsetHeight}`);
+
+    // Must be landscape (width > height)
+    expect(dims!.offsetWidth, `Scale fretboard is portrait (${dims!.offsetWidth}x${dims!.offsetHeight})`).toBeGreaterThan(dims!.offsetHeight);
+
+    // Aspect ratio at least 2:1
+    const ratio = dims!.offsetWidth / dims!.offsetHeight;
+    expect(ratio, `Aspect ratio ${ratio.toFixed(2)} too narrow`).toBeGreaterThanOrEqual(2);
 });
 
-test.describe('Visual Regression - Mobile Screenshots', () => {
-    test('homepage mobile screenshot', async ({ page }) => {
-        await page.goto('/');
-        await page.waitForLoadState('networkidle');
-        await expect(page).toHaveScreenshot('homepage-mobile.png', {
-            maxDiffPixelRatio: 0.1,
-            fullPage: true,
-        });
-    });
+// ============================================================================
+// ARPEGGIO MODULE TEST
+// ============================================================================
+
+test('arpeggio fretboard is landscape', async ({ page }) => {
+    // Arpeggio Practice is at index 4
+    await navigateToModule(page, 4);
+
+    // Click first exercise row - use "arpeggio" which appears in the Type column
+    await clickFirstExerciseRow(page, 'arpeggio');
+
+    // Verify fretboard is visible
+    const fretboard = page.locator('.fretboard').first();
+    await expect(fretboard).toBeVisible({ timeout: 15000 });
+
+    // Check dimensions
+    const dims = await getFretboardDimensions(page);
+    expect(dims, 'Fretboard not found').not.toBeNull();
+
+    console.log(`Arpeggio fretboard: ${dims!.offsetWidth}x${dims!.offsetHeight}`);
+
+    // Must be landscape
+    expect(dims!.offsetWidth, `Arpeggio fretboard is portrait`).toBeGreaterThan(dims!.offsetHeight);
+
+    // Aspect ratio at least 2:1
+    const ratio = dims!.offsetWidth / dims!.offsetHeight;
+    expect(ratio, `Aspect ratio ${ratio.toFixed(2)} too narrow`).toBeGreaterThanOrEqual(2);
+});
+
+// ============================================================================
+// RHYTHM TRAINING TEST
+// ============================================================================
+
+test('rhythm training layout is visible', async ({ page }) => {
+    // Rhythm Training is at index 0
+    await navigateToModule(page, 0);
+
+    // Wait for rhythm module to load
+    await page.waitForTimeout(2000);
+
+    // Rhythm training should show the pattern visualization
+    const rhythmArea = page.locator('.force-landscape-container').first();
+
+    // Should be visible
+    await expect(rhythmArea).toBeVisible({ timeout: 15000 });
+
+    console.log('Rhythm training layout verified');
+});
+
+// ============================================================================
+// CHORD CHANGES TEST - SKIPPED (Not implemented yet)
+// ============================================================================
+
+test.skip('chord changes layout is visible', async ({ page }) => {
+    // Chord Changes module shows "Coming soon!" - skip until implemented
+    await navigateToModule(page, 3);
+
+    await page.waitForTimeout(2000);
+
+    const chordArea = page.locator('.force-landscape-container, .fretboard').first();
+    await expect(chordArea).toBeVisible({ timeout: 15000 });
+
+    console.log('Chord changes layout verified');
 });

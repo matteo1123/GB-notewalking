@@ -84,6 +84,14 @@ export function ForceLandscapeWrapper({ children, className = '' }: ForceLandsca
                     .force-landscape-container .open-notes-container {
                         height: 140px !important;
                         grid-template-columns: 25px !important;
+                        border-right: 2px solid #fff !important;
+                        margin-right: 0 !important;
+                    }
+                    
+                    /* Remove borders that cause offset */
+                    .force-landscape-container .fretboard {
+                        border-left: none !important;
+                        border-right: none !important;
                     }
                     
                     /* Smaller dots for compact fretboard */
@@ -95,6 +103,13 @@ export function ForceLandscapeWrapper({ children, className = '' }: ForceLandsca
                     .force-landscape-container .marker {
                         width: 10px !important;
                         height: 10px !important;
+                    }
+                    
+                    /* Center fretboard perfectly */
+                    .force-landscape-container .fretboard-area {
+                        display: flex !important;
+                        justify-content: center !important;
+                        align-items: center !important;
                     }
                     
                     /* ===== ULTRA-COMPACT HEADER ===== */

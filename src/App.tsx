@@ -20,6 +20,7 @@ import NotFound from "./pages/NotFound";
 import AdminRoute from "./components/AdminRoute";
 import MainLayout from "./components/MainLayout";
 import Profile from "./pages/Profile";
+import TestScaleModule from "./pages/TestScaleModule";
 
 const queryClient = new QueryClient();
 
@@ -46,6 +47,10 @@ const App = () => (
                   <Route path="/admin/chord-trainer" element={<AdminRoute><div className="h-screen p-4"><ChordProgressionTrainer /></div></AdminRoute>} />
                 </Route>
                 <Route path="/auth" element={<Auth />} />
+                {/* Test route for Playwright E2E tests - only in dev */}
+                {import.meta.env.DEV && (
+                  <Route path="/test/scale-module" element={<TestScaleModule />} />
+                )}
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>

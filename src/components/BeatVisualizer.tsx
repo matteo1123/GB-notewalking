@@ -92,6 +92,7 @@ export function BeatVisualizer({
               canEdit && "cursor-text"
             )}
             onClick={() => canEdit && setIsEditing(true)}
+            data-testid="metronome-bpm-display"
           >
             {Math.round(currentBpm)}
           </div>

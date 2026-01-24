@@ -247,7 +247,7 @@ export function MetronomeControls({
           value={mode}
           onValueChange={(value) => updateState({ mode: value as MetronomeMode })}
         >
-          <SelectTrigger className={cn("h-8 text-xs", compact ? "w-28" : "w-full")}>
+          <SelectTrigger className={cn("h-8 text-xs", compact ? "w-28" : "w-full")} data-testid="metronome-mode-select">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -261,6 +261,7 @@ export function MetronomeControls({
           onClick={onPlayPause}
           size="sm"
           className="h-8 px-2"
+          data-testid="metronome-start-button"
         >
           {isPlaying ? (
             <Pause className="h-4 w-4" />
@@ -274,6 +275,7 @@ export function MetronomeControls({
           size="sm"
           className="h-8 px-2"
           title="Restart"
+          data-testid="metronome-restart-button"
         >
           <Repeat className="h-4 w-4" />
         </Button>
@@ -283,6 +285,7 @@ export function MetronomeControls({
           size="sm"
           className="h-8 px-2"
           title="Loop"
+          data-testid="metronome-loop-button"
         >
           <RotateCcw className="h-4 w-4" />
         </Button>
@@ -293,6 +296,7 @@ export function MetronomeControls({
           size="sm"
           className={cn("h-8 px-2", drumBeat && "bg-orange-500 hover:bg-orange-600")}
           title={drumBeat ? "Drum Beat: ON (Kick on 1, Snare on 3)" : "Drum Beat: OFF (click to enable)"}
+          data-testid="metronome-drum-button"
         >
           <Drum className={cn("h-4 w-4", drumBeat && "text-white")} />
         </Button>
@@ -304,6 +308,7 @@ export function MetronomeControls({
             size="sm"
             className={cn("h-8 px-2", autoRecordEnabled && "bg-red-500 hover:bg-red-600")}
             title={autoRecordEnabled ? "Auto-Record: ON (click to disable)" : "Auto-Record: OFF (click to enable)"}
+            data-testid="metronome-record-button"
           >
             <Mic className={cn("h-4 w-4", autoRecordEnabled && "text-white")} />
           </Button>
@@ -314,7 +319,7 @@ export function MetronomeControls({
         <div className={cn(
           "grid gap-1.5 text-xs",
           compact ? "grid-cols-4 items-end" : "grid-cols-2 gap-2"
-        )}>
+        )} data-testid="metronome-advanced-fields">
           <div className="space-y-0.5">
             <Label className="text-[10px]">End BPM</Label>
             <Input
@@ -325,6 +330,7 @@ export function MetronomeControls({
               min={40}
               max={300}
               className="h-7 text-center text-xs px-1"
+              data-testid="metronome-end-bpm"
             />
           </div>
           <div className="space-y-0.5">
@@ -339,6 +345,7 @@ export function MetronomeControls({
               min={2}
               max={100}
               className="h-7 text-center text-xs px-1"
+              data-testid="metronome-increments"
             />
           </div>
           <div className="space-y-0.5">
@@ -355,10 +362,11 @@ export function MetronomeControls({
               min={1}
               max={20}
               className="h-7 text-center text-xs px-1"
+              data-testid="metronome-measures-per-inc"
             />
           </div>
           {mode === "progressive" && (
-            <div className="space-y-0.5">
+            <div className="space-y-0.5" data-testid="metronome-step-bpm-container">
               <Label className="text-[10px]">Step BPM</Label>
               <Input
                 ref={progressiveStepRef}
@@ -372,6 +380,7 @@ export function MetronomeControls({
                 min={1}
                 max={30}
                 className="h-7 text-center text-xs px-1"
+                data-testid="metronome-step-bpm"
               />
             </div>
           )}

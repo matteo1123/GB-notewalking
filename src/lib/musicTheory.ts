@@ -251,9 +251,14 @@ export const determineEnharmonicNotes = (noteList: string[], rootNote: string): 
 
 /**
  * Normalize note frets to stay within valid fretboard bounds.
+ * 
+ * Strategy:
+ * 1. First, try to shift ALL notes uniformly (preserves relative positions)
+ * 2. If that's not possible (shape spans > 22 frets), normalize individual notes
+ * 
  * If any note has fret < 0, shift ALL notes up 12 frets (one octave).
  * If any note has fret > maxFret, shift ALL notes down 12 frets.
- * Allows fret === 0 (open strings).
+ * If uniform shifting isn't possible, shift individual notes to stay in bounds.
  */
 export function normalizeNotesToFretboard<T extends { fret: number }>(
     notes: T[],
@@ -268,12 +273,30 @@ export function normalizeNotesToFretboard<T extends { fret: number }>(
         normalized = normalized.map(n => ({ ...n, fret: n.fret + 12 })) as T[];
     }
 
-    // Shift down if any note > maxFret (but don't go negative)
+    // Try to shift all notes down uniformly if any note > maxFret
     while (
         normalized.some(n => n.fret > maxFret) &&
         !normalized.some(n => n.fret - 12 < 0)
     ) {
         normalized = normalized.map(n => ({ ...n, fret: n.fret - 12 })) as T[];
+    }
+
+    // If we still have notes > maxFret after uniform shifting, 
+    // normalize individual notes that are out of bounds
+    // This handles edge cases where the shape spans more than 22 frets
+    if (normalized.some(n => n.fret > maxFret)) {
+        normalized = normalized.map(n => {
+            let fret = n.fret;
+            // Shift down by octaves until within bounds
+            while (fret > maxFret) {
+                fret -= 12;
+            }
+            // If we went negative, shift back up
+            while (fret < 0) {
+                fret += 12;
+            }
+            return { ...n, fret };
+        }) as T[];
     }
 
     return normalized;

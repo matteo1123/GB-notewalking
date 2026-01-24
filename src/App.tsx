@@ -21,6 +21,7 @@ import AdminRoute from "./components/AdminRoute";
 import MainLayout from "./components/MainLayout";
 import Profile from "./pages/Profile";
 import TestScaleModule from "./pages/TestScaleModule";
+import JsonTroubleshooter from "./pages/Admin/JsonTroubleshooter";
 
 const queryClient = new QueryClient();
 
@@ -45,6 +46,7 @@ const App = () => (
                   <Route path="/admin/audio-sandbox" element={<AdminRoute><AudioSandbox /></AdminRoute>} />
                   {/* LessonBuilder route removed - deprecated lessons system */}
                   <Route path="/admin/chord-trainer" element={<AdminRoute><div className="h-screen p-4"><ChordProgressionTrainer /></div></AdminRoute>} />
+                  <Route path="/admin/json-troubleshooter" element={<AdminRoute><JsonTroubleshooter /></AdminRoute>} />
                 </Route>
                 <Route path="/auth" element={<Auth />} />
                 {/* Test route for Playwright E2E tests - only in dev */}

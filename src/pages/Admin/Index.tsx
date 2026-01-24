@@ -36,6 +36,11 @@ const AdminIndex = () => {
             Chord Progression Trainer (New)
           </Link>
         </li>
+        <li>
+          <Link to="/admin/json-troubleshooter" className="text-blue-500 hover:underline">
+            JSON Troubleshooter
+          </Link>
+        </li>
       </ul>
     </div>
   );

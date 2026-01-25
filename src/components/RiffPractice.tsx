@@ -75,6 +75,8 @@ type AnyNote = Note & {
   highlightOffset?: number;
 };
 
+import { ScaleModuleConfig, ArpeggioModuleConfig } from "@/types/practice";
+
 interface RiffPracticeProps {
   repertoireItem: RepertoireItem;
   sequences: Tables<"sequences">[];
@@ -87,6 +89,9 @@ interface RiffPracticeProps {
   lessonExercise?: Tables<"lesson_exercises"> | null; // For lesson-specific settings
   sessionId?: string; // Optional session ID for grouping logs
   isConfigMode?: boolean; // Config mode: hide metronome, no playback - for session builder
+  // Configuration sync
+  moduleConfig?: ScaleModuleConfig | ArpeggioModuleConfig;
+  onConfigChange?: (config: ScaleModuleConfig | ArpeggioModuleConfig) => void;
 }
 
 const RiffPractice = ({
@@ -101,6 +106,8 @@ const RiffPractice = ({
   lessonExercise,
   sessionId,
   isConfigMode = false,
+  moduleConfig,
+  onConfigChange,
 }: RiffPracticeProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -109,14 +116,28 @@ const RiffPractice = ({
   const [isPlaying, setIsPlaying] = useState(!isConfigMode && autoStart);
 
   // Determine mode: Use progressive when in controlled session + settings say so
-  const effectiveMode: MetronomeMode = isControlledSession && practiceSettings.practiceMode === 'progressive'
-    ? 'progressive'
-    : (lessonExercise?.metronome_mode as MetronomeMode) || 'regular';
+  // Priority: moduleConfig (from troubleshoot) > controlled session > lesson > regular
+  const effectiveMode: MetronomeMode = moduleConfig?.metronome?.mode
+    ? (moduleConfig.metronome.mode as MetronomeMode)
+    : (isControlledSession && practiceSettings.practiceMode === 'progressive'
+      ? 'progressive'
+      : (lessonExercise?.metronome_mode as MetronomeMode) || 'regular');
+
   const [mode, setMode] = useState<MetronomeMode>(effectiveMode);
-  const [loop, setLoop] = useState(!isControlledSession || !practiceSettings.autoAdvance);
+  const [loop, setLoop] = useState(moduleConfig?.metronome?.loop ?? (!isControlledSession || !practiceSettings.autoAdvance));
   const [startTime, setStartTime] = useState<number | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
-  const [metronomeBpm, setMetronomeBpm] = useState(lessonExercise?.starting_bpm || 80);
+  const [metronomeBpm, setMetronomeBpm] = useState(moduleConfig?.metronome?.bpm ?? (lessonExercise?.starting_bpm || 80));
+
+  // Sync prop changes to state
+  useEffect(() => {
+    if (moduleConfig?.metronome) {
+      if (moduleConfig.metronome.bpm !== undefined && moduleConfig.metronome.bpm !== metronomeBpm) setMetronomeBpm(moduleConfig.metronome.bpm);
+      if (moduleConfig.metronome.mode && moduleConfig.metronome.mode !== mode) setMode(moduleConfig.metronome.mode as MetronomeMode);
+      if (moduleConfig.metronome.loop !== undefined && moduleConfig.metronome.loop !== loop) setLoop(moduleConfig.metronome.loop);
+    }
+  }, [moduleConfig?.metronome]); // Deep check via memoized object or specific fields
+
   const [pitchDetectionEnabled, setPitchDetectionEnabled] = useState(true);
   const [activeSequence, setActiveSequence] = useState<Tables<"sequences"> | null>(null);
   const [practiceLog, setPracticeLog] = useState<Tables<'practice_log'> | null>(null);
@@ -411,12 +432,28 @@ const RiffPractice = ({
     (bpm: number) => {
       const wasPlaying = metronome.state.isPlaying;
       setMetronomeBpm(bpm);
+
+      // Sync changes back to moduleConfig if provided
+      if (onConfigChange && moduleConfig) {
+        // We need to determine if we are in Scale or Arpeggio mode to structure the config correctly?
+        // Actually moduleConfig is already typed. We just update the metronome part.
+        // However, TypeScript might complain if we don't know which specific type it is (Scale vs Arpeggio).
+        // But both have `metronome` optional field.
+        onConfigChange({
+          ...moduleConfig,
+          metronome: {
+            ...(moduleConfig.metronome || { mode: 'regular', bpm: bpm, drum_beat: false, auto_record: false }),
+            bpm: bpm
+          }
+        });
+      }
+
       if (mode !== "regular" && wasPlaying) {
         metronome.stop();
         setTimeout(() => metronome.start(), 100);
       }
     },
-    [metronome, mode]
+    [metronome, mode, onConfigChange, moduleConfig]
   );
 
   // Global BPM adjustment controls (anywhere on page)
@@ -757,6 +794,24 @@ const RiffPractice = ({
                       setMetronomeBpm(newState.startBpm);
                       setLoop(newState.loop);
                       setDrumBeat(!!newState.drumBeat);
+
+                      // Sync changes back to moduleConfig if provided
+                      if (onConfigChange && moduleConfig) {
+                        onConfigChange({
+                          ...moduleConfig,
+                          metronome: {
+                            ...(moduleConfig.metronome || { mode: 'regular', bpm: 60, drum_beat: false, auto_record: false }),
+                            mode: newState.mode,
+                            bpm: newState.startBpm,
+                            loop: newState.loop,
+                            drum_beat: newState.drumBeat,
+                            // Preserve or sync other fields
+                            increments: newState.increments,
+                            measures_per_increment: newState.measuresPerIncrement,
+                            step_bpm: newState.progressiveStepBpm
+                          }
+                        });
+                      }
                     }}
                     initialState={{
                       mode,

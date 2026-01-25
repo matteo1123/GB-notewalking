@@ -187,6 +187,8 @@ export function ScalePracticeSession({
                     isControlledSession={true}
                     sessionId={effectiveSessionId}
                     onComplete={handleNext}
+                    moduleConfig={moduleConfig}
+                    onConfigChange={onConfigChange}
                 />
             </div>
         </div>

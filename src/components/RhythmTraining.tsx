@@ -24,33 +24,60 @@ import { Checkbox } from "./ui/checkbox";
 import { SkipForward, ChevronLeft, ChevronRight, Check, Mic, Settings, Shuffle, ListOrdered, X } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
 import { ForceLandscapeWrapper } from "./ForceLandscapeWrapper";
+import { RhythmModuleConfig } from "@/types/practice"; // Import config type
 
 interface RhythmTrainingProps {
     autoStart?: boolean;
     sessionId?: string;
     // Exit callback for standalone/freeplay mode
     onExit?: () => void;
+    // Optional configuration for bidirectional sync
+    moduleConfig?: RhythmModuleConfig;
+    onConfigChange?: (config: RhythmModuleConfig) => void;
 }
 
-export function RhythmTraining({ autoStart = false, sessionId, onExit }: RhythmTrainingProps) {
+export function RhythmTraining({ autoStart = false, sessionId, onExit, moduleConfig, onConfigChange }: RhythmTrainingProps) {
     // Rhythm mode and deviation types
     const [rhythmMode, setRhythmMode] = useState<RhythmMode>('random');
     const [deviationTypes, setDeviationTypes] = useState<DeviationOptions>({ skip: true, triplet: false });
     const [systematicIndex, setSystematicIndex] = useState(0);
 
     // Pattern state
-    const [level, setLevel] = useState(0);
+    // Initialize level from config if available, otherwise 0
+    const [level, setLevel] = useState(moduleConfig?.rhythm_level ?? 0);
+
+    // Sync level from config prop updates
+    useEffect(() => {
+        if (moduleConfig?.rhythm_level !== undefined && moduleConfig.rhythm_level !== level) {
+            setLevel(moduleConfig.rhythm_level);
+        }
+    }, [moduleConfig?.rhythm_level]);
+
     const [pattern, setPattern] = useState<RhythmPattern>(() => generateRhythmPattern({
         mode: 'random',
         deviationTypes: { skip: true, triplet: false },
-        level: 0,
+        level: moduleConfig?.rhythm_level ?? 0,
     }));
     const [isPlaying, setIsPlaying] = useState(false);
-    const [bpm, setBpm] = useState(60);
-    const [metronomeMode, setMetronomeMode] = useState<MetronomeMode>("regular");
-    const [loop, setLoop] = useState(true);
-    const [drumBeat, setDrumBeat] = useState(false);
+
+    // Metronome state - init from config
+    const [bpm, setBpm] = useState(moduleConfig?.metronome?.bpm ?? 60);
+    const [metronomeMode, setMetronomeMode] = useState<MetronomeMode>((moduleConfig?.metronome?.mode as MetronomeMode) || "regular");
+    const [loop, setLoop] = useState(moduleConfig?.metronome?.loop ?? true);
+    const [drumBeat, setDrumBeat] = useState(moduleConfig?.metronome?.drum_beat ?? false);
+
+    // Sync metronome from config prop updates
+    useEffect(() => {
+        if (moduleConfig?.metronome) {
+            if (moduleConfig.metronome.bpm !== undefined && moduleConfig.metronome.bpm !== bpm) setBpm(moduleConfig.metronome.bpm);
+            if (moduleConfig.metronome.mode && moduleConfig.metronome.mode !== metronomeMode) setMetronomeMode(moduleConfig.metronome.mode as MetronomeMode);
+            if (moduleConfig.metronome.loop !== undefined && moduleConfig.metronome.loop !== loop) setLoop(moduleConfig.metronome.loop);
+            if (moduleConfig.metronome.drum_beat !== undefined && moduleConfig.metronome.drum_beat !== drumBeat) setDrumBeat(moduleConfig.metronome.drum_beat);
+        }
+    }, [moduleConfig?.metronome]); // Deep dependency check might be needed if object ref changes, but accessors helps
+
     const [tickCount, setTickCount] = useState(0);
+
 
     // Global auto-record setting from context
     const { autoRecordEnabled } = useAutoRecord();
@@ -186,12 +213,24 @@ export function RhythmTraining({ autoStart = false, sessionId, onExit }: RhythmT
         (newBpm: number) => {
             const wasPlaying = metronome.state.isPlaying;
             setBpm(newBpm);
+
+            // Sync changes back to moduleConfig if provided
+            if (onConfigChange && moduleConfig) {
+                onConfigChange({
+                    ...moduleConfig,
+                    metronome: {
+                        ...(moduleConfig.metronome || { mode: 'regular', bpm: newBpm, drum_beat: false, auto_record: false }),
+                        bpm: newBpm
+                    }
+                });
+            }
+
             if (wasPlaying) {
                 metronome.stop();
                 setTimeout(() => metronome.start(), 100);
             }
         },
-        [metronome]
+        [metronome, onConfigChange, moduleConfig]
     );
 
     // Global BPM adjustment controls (scroll, touch, drag, keyboard)
@@ -255,6 +294,15 @@ export function RhythmTraining({ autoStart = false, sessionId, onExit }: RhythmT
     // Handle level change
     const handleLevelChange = useCallback((newLevel: number) => {
         setLevel(newLevel);
+
+        // Sync level change back to config
+        if (onConfigChange && moduleConfig) {
+            onConfigChange({
+                ...moduleConfig,
+                rhythm_level: newLevel
+            });
+        }
+
         setPattern(generateRhythmPattern({
             mode: rhythmMode,
             deviationTypes,
@@ -263,7 +311,7 @@ export function RhythmTraining({ autoStart = false, sessionId, onExit }: RhythmT
         }));
         setHasConfirmed(false);
         beatCountRef.current = 0;
-    }, [rhythmMode, deviationTypes]);
+    }, [rhythmMode, deviationTypes, onConfigChange, moduleConfig]);
 
     // Handle settings changes
     const toggleMode = () => {
@@ -604,6 +652,26 @@ export function RhythmTraining({ autoStart = false, sessionId, onExit }: RhythmT
                                     setBpm(newState.startBpm);
                                     setLoop(newState.loop);
                                     if (newState.drumBeat !== undefined) setDrumBeat(newState.drumBeat);
+
+                                    // Sync changes back to moduleConfig if provided
+                                    if (onConfigChange && moduleConfig) {
+                                        onConfigChange({
+                                            ...moduleConfig,
+                                            metronome: {
+                                                ...(moduleConfig.metronome || { mode: 'regular', bpm: 60, drum_beat: false, auto_record: false }),
+                                                mode: newState.mode,
+                                                bpm: newState.startBpm,
+                                                loop: newState.loop,
+                                                drum_beat: newState.drumBeat,
+                                                // Preserve other fields if they exist in state, but simpler to just spread current moduleConfig.metronome
+                                                // However moduleConfig.metronome might be partial.
+                                                // Let's trust that the ModulePreview passes a full default config usually.
+                                                increments: newState.increments,
+                                                measures_per_increment: newState.measuresPerIncrement,
+                                                step_bpm: newState.progressiveStepBpm
+                                            }
+                                        });
+                                    }
                                 }}
                                 initialState={{
                                     mode: metronomeMode,

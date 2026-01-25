@@ -10,6 +10,7 @@ import type { Piece } from './piece-mastery/types';
 interface ModulePreviewProps {
     config: ModuleConfig;
     isPlaying: boolean;
+    onConfigChange?: (config: ModuleConfig) => void;
 }
 
 /**
@@ -18,7 +19,7 @@ interface ModulePreviewProps {
  * This is a standalone sandbox that renders modules exactly as they would
  * appear in a real practice session, but without session tracking or timers.
  */
-export function ModulePreview({ config, isPlaying }: ModulePreviewProps) {
+export function ModulePreview({ config, isPlaying, onConfigChange }: ModulePreviewProps) {
     const [selectedPiece, setSelectedPiece] = useState<Piece | null>(null);
 
     if (!isPlaying) {
@@ -41,14 +42,22 @@ export function ModulePreview({ config, isPlaying }: ModulePreviewProps) {
         case 'rhythm':
             return (
                 <div className="h-full flex flex-col overflow-hidden">
-                    <RhythmTraining autoStart={true} />
+                    <RhythmTraining
+                        autoStart={true}
+                        moduleConfig={config as any}
+                        onConfigChange={onConfigChange as any}
+                    />
                 </div>
             );
 
         case 'notewalking':
             return (
                 <div className="h-full flex flex-col overflow-hidden">
-                    <ChordProgressionExercise autoStart={true} />
+                    <ChordProgressionExercise
+                        autoStart={true}
+                        moduleConfig={config as any}
+                        onConfigChange={onConfigChange as any}
+                    />
                 </div>
             );
 
@@ -61,6 +70,7 @@ export function ModulePreview({ config, isPlaying }: ModulePreviewProps) {
                         moduleType={moduleType}
                         specificExerciseId={(config as any)?.current_scale_id || (config as any)?.current_arpeggio_id}
                         moduleConfig={config as any}
+                        onConfigChange={onConfigChange as any}
                     />
                 </div>
             );
@@ -85,7 +95,11 @@ export function ModulePreview({ config, isPlaying }: ModulePreviewProps) {
         case 'chord_progressions':
             return (
                 <div className="h-full flex flex-col overflow-hidden">
-                    <ChordProgressionExercise autoStart={true} />
+                    <ChordProgressionExercise
+                        autoStart={true}
+                        moduleConfig={config as any}
+                        onConfigChange={onConfigChange as any}
+                    />
                 </div>
             );
 

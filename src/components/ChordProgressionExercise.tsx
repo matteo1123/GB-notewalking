@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { ChordProgressionSettings } from "@/types/chords";
+import { NotewalkingModuleConfig } from "@/types/practice";
 import { useMetronome, MetronomeSettings } from "@/hooks/useMetronome";
 import { useBpmControls } from "@/hooks/useBpmControls";
 import { useChordProgression } from "@/hooks/useChordProgression";
@@ -72,14 +73,43 @@ interface ChordProgressionExerciseProps {
         onSkip: () => void;
         onExit: () => void;
     };
+    // Configuration sync
+    moduleConfig?: NotewalkingModuleConfig;
+    onConfigChange?: (config: NotewalkingModuleConfig) => void;
 }
 
-export function ChordProgressionExercise({ autoStart = false, sessionId, onExit, sessionControls }: ChordProgressionExerciseProps) {
-    const [settings, setSettings] = useState<ChordProgressionSettings>(DEFAULT_SETTINGS);
+export function ChordProgressionExercise({ autoStart = false, sessionId, onExit, sessionControls, moduleConfig, onConfigChange }: ChordProgressionExerciseProps) {
+    const [settings, setSettings] = useState<ChordProgressionSettings>(() => ({
+        ...DEFAULT_SETTINGS,
+        key: moduleConfig?.key || DEFAULT_SETTINGS.key,
+        selectedChords: (moduleConfig?.chords as any) || DEFAULT_SETTINGS.selectedChords,
+        measuresPerChord: moduleConfig?.measures_per_chord || DEFAULT_SETTINGS.measuresPerChord,
+        droneEnabled: DEFAULT_SETTINGS.droneEnabled,
+    }));
     const [isPlaying, setIsPlaying] = useState(autoStart);
-    const [bpm, setBpm] = useState(80);
-    const [mode, setMode] = useState<MetronomeMode>("regular");
-    const [loop, setLoop] = useState(true);
+    const [bpm, setBpm] = useState(moduleConfig?.metronome?.bpm ?? 80);
+    const [mode, setMode] = useState<MetronomeMode>((moduleConfig?.metronome?.mode as MetronomeMode) || "regular");
+    const [loop, setLoop] = useState(moduleConfig?.metronome?.loop ?? true);
+
+    // Sync from config props
+    useEffect(() => {
+        if (moduleConfig) {
+            setSettings(prev => ({
+                ...prev,
+                key: moduleConfig.key || prev.key,
+                selectedChords: (moduleConfig.chords as any) || prev.selectedChords,
+                measuresPerChord: moduleConfig.measures_per_chord || prev.measuresPerChord,
+                // droneEnabled not in config
+            }));
+
+            if (moduleConfig.metronome) {
+                if (moduleConfig.metronome.bpm !== undefined && moduleConfig.metronome.bpm !== bpm) setBpm(moduleConfig.metronome.bpm);
+                if (moduleConfig.metronome.mode && moduleConfig.metronome.mode !== mode) setMode(moduleConfig.metronome.mode as MetronomeMode);
+                if (moduleConfig.metronome.loop !== undefined && moduleConfig.metronome.loop !== loop) setLoop(moduleConfig.metronome.loop);
+            }
+        }
+    }, [moduleConfig]); // Dependency check simplified
+
     const [metronomeMuted, setMetronomeMuted] = useState(false);
     const [detectedNote, setDetectedNote] = useState<string | null>(null);
     const [pitchConfidence, setPitchConfidence] = useState(0);
@@ -209,12 +239,24 @@ export function ChordProgressionExercise({ autoStart = false, sessionId, onExit,
         (newBpm: number) => {
             const wasPlaying = metronome.state.isPlaying;
             setBpm(newBpm);
+
+            // Sync metronome change to config
+            if (onConfigChange && moduleConfig) {
+                onConfigChange({
+                    ...moduleConfig,
+                    metronome: {
+                        ...(moduleConfig.metronome || { mode: 'regular', bpm: newBpm, drum_beat: false, auto_record: false }),
+                        bpm: newBpm
+                    }
+                });
+            }
+
             if (wasPlaying) {
                 metronome.stop();
                 setTimeout(() => metronome.start(), 100);
             }
         },
-        [metronome]
+        [metronome, onConfigChange, moduleConfig]
     );
 
     useBpmControls({
@@ -252,9 +294,23 @@ export function ChordProgressionExercise({ autoStart = false, sessionId, onExit,
 
     const handleSettingsChange = useCallback(
         (newSettings: Partial<ChordProgressionSettings>) => {
-            setSettings((prev) => ({ ...prev, ...newSettings }));
+            setSettings((prev) => {
+                const updated = { ...prev, ...newSettings };
+
+                // Sync settings change to config
+                if (onConfigChange && moduleConfig) {
+                    onConfigChange({
+                        ...moduleConfig,
+                        key: updated.key,
+                        chords: updated.selectedChords as string[],
+                        measures_per_chord: updated.measuresPerChord
+                    });
+                }
+
+                return updated;
+            });
         },
-        []
+        [onConfigChange, moduleConfig]
     );
 
     const handlePlayPause = useCallback(() => {
@@ -501,6 +557,19 @@ export function ChordProgressionExercise({ autoStart = false, sessionId, onExit,
                                         setMode(newState.mode);
                                         setBpm(newState.startBpm);
                                         setLoop(newState.loop);
+
+                                        // Sync metronome state
+                                        if (onConfigChange && moduleConfig) {
+                                            onConfigChange({
+                                                ...moduleConfig,
+                                                metronome: {
+                                                    ...(moduleConfig.metronome || { mode: 'regular', bpm: 80, drum_beat: false, auto_record: false }),
+                                                    mode: newState.mode,
+                                                    bpm: newState.startBpm,
+                                                    loop: newState.loop
+                                                }
+                                            });
+                                        }
                                     }}
                                     initialState={{
                                         mode,

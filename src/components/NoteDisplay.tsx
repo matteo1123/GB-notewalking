@@ -34,6 +34,7 @@ interface NoteDisplayProps {
   setNoteIndex?: (index: number) => void;
   setCurrentLearnIndex?: (index: number) => void;
   scaleShapeNotes?: { string: number; fret: number }[]; // Unique notes from scale shape for ear training
+  tickCount?: number;
 }
 
 const NoteDisplay = ({

@@ -16,7 +16,7 @@ const DEFAULT_SETTINGS: PracticeSettings = {
     practiceMode: 'progressive',
     autoAdvance: true,
     exerciseDurationMinutes: 2,
-    bpmIncrement: 5,
+    bpmIncrement: 3,
     defaultMetronome: DEFAULT_METRONOME_CONFIG,
 };
 

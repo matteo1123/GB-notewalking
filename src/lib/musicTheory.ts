@@ -262,28 +262,42 @@ export const determineEnharmonicNotes = (noteList: string[], rootNote: string): 
  */
 export function normalizeNotesToFretboard<T extends { fret: number }>(
     notes: T[],
-    maxFret = 22
+    maxFret = 24
 ): T[] {
     if (notes.length === 0) return notes;
 
-    let normalized = notes.map(n => ({ ...n })) as T[];
+    // Ensure all frets are numbers and create a copy
+    let normalized = notes.map(n => ({
+        ...n,
+        fret: Number(n.fret)
+    })) as T[];
 
-    // Shift up if any note < 0
-    while (normalized.some(n => n.fret < 0)) {
+    // 1. Shift up if any note < 0
+    // We loop because a very low note (e.g. -24) might need multiple shifts
+    let iterations = 0;
+    while (normalized.some(n => n.fret < 0) && iterations < 10) {
         normalized = normalized.map(n => ({ ...n, fret: n.fret + 12 })) as T[];
+        iterations++;
     }
 
-    // Try to shift all notes down uniformly if any note > maxFret
+    // 2. Shift down if shape is too high
+    // We only shift down if it doesn't push any notes below fret 0
+    // This preserves the shape's integrity. If the shape is too wide to fit (e.g. spans > 24 frets),
+    // we fall through to individual normalization.
+    iterations = 0;
     while (
         normalized.some(n => n.fret > maxFret) &&
-        !normalized.some(n => n.fret - 12 < 0)
+        !normalized.some(n => n.fret - 12 < 0) &&
+        iterations < 10
     ) {
         normalized = normalized.map(n => ({ ...n, fret: n.fret - 12 })) as T[];
+        iterations++;
     }
 
-    // If we still have notes > maxFret after uniform shifting, 
-    // normalize individual notes that are out of bounds
-    // This handles edge cases where the shape spans more than 22 frets
+    // 3. Fallback: Individual normalization
+    // If the shape is still out of bounds (likely because it's too wide or blocked by low notes),
+    // we strictly enforce bounds by shifting individual notes.
+    // This breaks the shape structure but ensures visibility.
     if (normalized.some(n => n.fret > maxFret)) {
         normalized = normalized.map(n => {
             let fret = n.fret;
@@ -291,7 +305,9 @@ export function normalizeNotesToFretboard<T extends { fret: number }>(
             while (fret > maxFret) {
                 fret -= 12;
             }
-            // If we went negative, shift back up
+            // If we went negative (because of a very restricted range), shift back up
+            // This prioritizes keeping the note >= 0 over <= maxFret if strictly necessary,
+            // but usually 0..24 is plenty of room.
             while (fret < 0) {
                 fret += 12;
             }

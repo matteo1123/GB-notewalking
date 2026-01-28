@@ -14,7 +14,12 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Play, Square, Upload, Copy, Check, Info, Star } from 'lucide-react';
+import { Play, Square, Upload, Copy, Check, Info, Star, ChevronRight, Save } from 'lucide-react';
+import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+} from "@/components/ui/collapsible"
 import { MODULE_REGISTRY } from '@/types/modules';
 import type {
     ModuleType,
@@ -31,6 +36,7 @@ import { DEFAULT_METRONOME_CONFIG } from '@/types/practice';
 import { ModulePreview } from '@/components/ModulePreview';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
+import { usePracticeSettings } from '@/contexts/PracticeSettingsContext';
 
 const MODULE_TYPES: ModuleType[] = ['rhythm', 'scale', 'arpeggio', 'notewalking', 'chord_progressions', 'piece_mastery'];
 
@@ -97,6 +103,46 @@ function getDefaultConfig(moduleType: ModuleType): ModuleConfig {
 /**
  * Reusable Metronome Config Editor Component
  */
+/**
+ * Reusable Collapsible Section Component
+ */
+function CollapsibleSection({
+    title,
+    children,
+    defaultOpen = false,
+    className = ""
+}: {
+    title: string,
+    children: React.ReactNode,
+    defaultOpen?: boolean,
+    className?: string
+}) {
+    const [isOpen, setIsOpen] = useState(defaultOpen);
+
+    return (
+        <Collapsible
+            open={isOpen}
+            onOpenChange={setIsOpen}
+            className={`space-y-2 ${className}`}
+        >
+            <div className="flex items-center justify-between space-x-4 px-1">
+                <CollapsibleTrigger asChild>
+                    <Button variant="ghost" size="sm" className="w-full justify-start p-0 hover:bg-transparent">
+                        <ChevronRight className={`h-4 w-4 transition-transform duration-200 ${isOpen ? "rotate-90" : ""}`} />
+                        <span className="font-semibold text-sm ml-2">{title}</span>
+                    </Button>
+                </CollapsibleTrigger>
+            </div>
+            <CollapsibleContent className="space-y-2 transition-all data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+                {children}
+            </CollapsibleContent>
+        </Collapsible>
+    );
+}
+
+/**
+ * Reusable Metronome Config Editor Component
+ */
 function MetronomeConfigEditor({
     config,
     onChange
@@ -106,9 +152,7 @@ function MetronomeConfigEditor({
 }) {
     return (
         <div className="space-y-4 border rounded-lg p-3 bg-muted/30">
-            <div className="flex items-center justify-between">
-                <Label className="font-semibold text-sm">Metronome Settings</Label>
-            </div>
+            {/* Header removed as it is now handled by CollapsibleSection */}
 
             <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5 col-span-2">
@@ -238,6 +282,54 @@ export default function JsonTroubleshooter() {
     // NEW: Local state for JSON text editing
     const [jsonText, setJsonText] = useState('');
     const [jsonError, setJsonError] = useState<string | null>(null);
+    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+    // Simulation State
+    const { settings } = usePracticeSettings();
+    const [simEndBpm, setSimEndBpm] = useState(60);
+    const [simExercisesCompleted, setSimExercisesCompleted] = useState(1);
+    const [simIncrement, setSimIncrement] = useState(settings.bpmIncrement);
+
+    // Update simulation default when config changes
+    useEffect(() => {
+        if (config.metronome?.bpm) {
+            setSimEndBpm(config.metronome.bpm);
+        }
+    }, [config.metronome?.bpm]);
+
+    // Update simIncrement when settings load/change
+    useEffect(() => {
+        setSimIncrement(settings.bpmIncrement);
+    }, [settings.bpmIncrement]);
+
+    // Handle Simulation
+    const handleSimulateSession = useCallback(() => {
+        const currentMetronome = config.metronome || DEFAULT_METRONOME_CONFIG;
+        const currentBpm = simEndBpm || currentMetronome.bpm;
+
+        // 1. Calculate Next Start BPM
+        const nextStartBpm = currentBpm + simIncrement;
+
+        // 2. Calculate Next Queue Index
+        // Note: For Scale/Arpeggio modules, current_index determines position in queue
+        const currentIndex = (config as ScaleModuleConfig).current_index || 0;
+        const nextIndex = currentIndex + simExercisesCompleted;
+
+        // Update Config
+        setConfig(prev => ({
+            ...prev,
+            current_index: nextIndex,
+            metronome: {
+                ...((prev as any).metronome || DEFAULT_METRONOME_CONFIG),
+                bpm: nextStartBpm
+            }
+        }));
+
+        toast({
+            title: "Session Simulated",
+            description: `Advanced to BPM ${nextStartBpm} and Index ${nextIndex}`,
+        });
+    }, [config, simEndBpm, simExercisesCompleted, simIncrement, toast]);
 
     // Fetch scales on mount
     useEffect(() => {
@@ -258,42 +350,73 @@ export default function JsonTroubleshooter() {
         fetchScales();
     }, []);
 
-    // Sync config to JSON text when config changes (unless user is manually editing an error state)
+    // Sync config to JSON text when config changes (unless user is manually editing)
     useEffect(() => {
-        // Only update text if we don't have a parse error (meaning we might be mid-edit)
-        // OR if the config effectively changed from outside.
-        // To be safe and simple: Always update text when config changes, BUT
-        // we need to avoid fighting the user if they are typing.
-        // Actually, since config only changes via form controls, and form controls update config...
-        // We should just update jsonText whenever config changes.
-        // User edits to JSON text -> parse -> setConfig -> updates jsonText (formatting it).
-        setJsonText(JSON.stringify(config, null, 2));
-        setJsonError(null);
-    }, [config]);
+        // If the user has unsaved changes, we don't want to overwrite unless the config changed externally?
+        // Actually, if the user interacts with the UI form controls, they expect the JSON to update.
+        // But if they are typing in JSON, we don't want form controls to overwrite them?
+        // Wait, form controls update `config`, which triggers this.
+        // If user is typing in JSON, they haven't updated config yet (since we removed auto-update).
+        // So this will only fire if:
+        // 1. Initial load
+        // 2. User interacts with visual form controls
+        // 3. User clicks "Apply" -> updates config -> updates this (but new serialization should match)
+
+        if (!hasUnsavedChanges) {
+            setJsonText(JSON.stringify(config, null, 2));
+            setJsonError(null);
+        }
+    }, [config, hasUnsavedChanges]);
 
     // Handle manual JSON edits
     const handleJsonTextChange = (text: string) => {
         setJsonText(text);
+        setHasUnsavedChanges(true);
+        // Only validate syntax for error display, don't update config
         try {
-            const parsed = JSON.parse(text);
+            JSON.parse(text);
+            setJsonError(null);
+        } catch (e: any) {
+            setJsonError(e.message);
+        }
+    };
+
+    // Apply JSON changes
+    const applyJsonChanges = useCallback(() => {
+        try {
+            const parsed = JSON.parse(jsonText);
             // safe merge with default of current type to ensure robustness
             const currentType = parsed.module_type || selectedType;
             // Only update config if valid
             if (MODULE_TYPES.includes(currentType)) {
-                // We don't want to merge with defaults here aggressively because it might fight deletions
-                // But we do want to ensure shape.
+                // We need to signal that this update comes from JSON apply, so we shouldn't mark it as unsaved
+                // But actually, once we setConfig, the useEffect will fire.
+                // We want the useEffect to update jsonText (reformat) and clear unsaved flag?
+                // Or we clear unsaved flag here.
+
                 setConfig(parsed as ModuleConfig);
                 if (currentType !== selectedType) {
                     setSelectedType(currentType);
                 }
                 setJsonError(null);
+                setHasUnsavedChanges(false);
+
+                toast({
+                    title: "Changes Applied",
+                    description: "Configuration updated successfully.",
+                });
             } else {
                 setJsonError(`Invalid module_type: ${currentType}`);
             }
         } catch (e: any) {
             setJsonError(e.message);
+            toast({
+                title: "Invalid JSON",
+                description: e.message,
+                variant: "destructive"
+            });
         }
-    };
+    }, [jsonText, selectedType, toast]);
 
     // JSON representation of current config
     const configJson = useMemo(() => {
@@ -306,6 +429,7 @@ export default function JsonTroubleshooter() {
         // Reset to default config for this type
         setConfig(getDefaultConfig(newType));
         setIsPlaying(false);
+        setHasUnsavedChanges(false);
     }, []);
 
     // Update a specific config field
@@ -421,87 +545,145 @@ export default function JsonTroubleshooter() {
             {/* Main Content */}
             <div className="flex-1 flex overflow-hidden">
                 {/* Left Panel - Config */}
-                <div className="w-[400px] flex-shrink-0 border-r overflow-y-auto p-4 space-y-4">
-                    {/* Module Type Selector */}
-                    <div className="space-y-2">
-                        <Label>Module Type</Label>
-                        <Select value={selectedType} onValueChange={(v) => handleTypeChange(v as ModuleType)}>
-                            <SelectTrigger>
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {MODULE_TYPES.map(type => (
-                                    <SelectItem key={type} value={type}>
-                                        {MODULE_REGISTRY[type]?.icon} {MODULE_REGISTRY[type]?.name || type}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
+                <div className="w-[400px] flex-shrink-0 border-r flex flex-col h-full bg-background overflow-hidden">
+                    {/* Scrollable Settings Area */}
+                    <div className="flex-shrink-0 overflow-y-auto max-h-[70%] p-4 space-y-4">
+                        {/* Module Type Selector */}
+                        <div className="space-y-2">
+                            {/* Keep Header separate or inside? Inside is fine */}
+                            <Label>Module Type</Label>
+                            <Select value={selectedType} onValueChange={(v) => handleTypeChange(v as ModuleType)}>
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {MODULE_TYPES.map(type => (
+                                        <SelectItem key={type} value={type}>
+                                            {MODULE_REGISTRY[type]?.icon} {MODULE_REGISTRY[type]?.name || type}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
 
-                    {/* Config Form - Dynamic based on module type */}
-                    <Card>
-                        <CardHeader className="pb-3 border-b mb-3">
-                            <CardTitle className="text-lg">Configuration</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-6">
-                            {/* Module Specific Fields */}
-                            <div className="space-y-4">
-                                {renderConfigForm(selectedType, config, updateConfig, availableScales)}
-                            </div>
+                        {/* Collapsible Module Configurations */}
+                        <CollapsibleSection title="Module Settings" defaultOpen={true}>
+                            <Card>
+                                <CardContent className="space-y-6 pt-6">
+                                    <div className="space-y-4">
+                                        {renderConfigForm(selectedType, config, updateConfig, availableScales)}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </CollapsibleSection>
 
-                            <Separator />
-
-                            {/* Universal Metronome Config */}
+                        <CollapsibleSection title="Metronome Settings" defaultOpen={false}>
                             <MetronomeConfigEditor
                                 config={(config as any).metronome || DEFAULT_METRONOME_CONFIG}
                                 onChange={updateMetronome}
                             />
-                        </CardContent>
-                    </Card>
+                        </CollapsibleSection>
 
-                    <Card className="flex flex-col min-h-0 basis-1/2 flex-grow">
-                        <CardHeader className="pb-3 border-b bg-muted/20 flex-shrink-0">
-                            <CardTitle className="text-sm font-medium flex items-center justify-between">
-                                JSON Configuration
-                                <div className="flex gap-1">
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8"
-                                        onClick={() => {
-                                            navigator.clipboard.writeText(jsonText);
-                                            setCopied(true);
-                                            setTimeout(() => setCopied(false), 2000);
-                                        }}
-                                        title="Copy JSON"
-                                    >
-                                        {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
-                                    </Button>
+                        {/* Progression Simulation */}
+                        <CollapsibleSection title="Progression Simulation" defaultOpen={false}>
+                            <div className="space-y-4 border rounded-lg p-3 bg-muted/30">
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs">Simulated End BPM</Label>
+                                    <Input
+                                        type="number"
+                                        value={simEndBpm}
+                                        onChange={(e) => setSimEndBpm(parseInt(e.target.value) || 0)}
+                                    />
+                                    <p className="text-[10px] text-muted-foreground">
+                                        The BPM reached at the end of the session.
+                                    </p>
                                 </div>
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="p-0 flex-1 min-h-0 relative flex flex-col">
-                            <div className="flex-1 min-h-0 relative">
-                                <Textarea
-                                    value={jsonText}
-                                    onChange={(e) => handleJsonTextChange(e.target.value)}
-                                    placeholder="JSON configuration..."
-                                    className={`font-mono text-xs h-full w-full resize-none border-0 focus-visible:ring-0 p-4 rounded-none ${jsonError ? 'bg-destructive/5' : ''}`}
-                                    spellCheck={false}
-                                />
-                            </div>
-                            {jsonError && (
-                                <div className="flex-shrink-0 p-2 bg-destructive/10 text-destructive text-xs border-t border-destructive/20">
-                                    Error: {jsonError}
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="space-y-1.5">
+                                        <Label className="text-xs">Exercises Completed</Label>
+                                        <Input
+                                            type="number"
+                                            value={simExercisesCompleted}
+                                            onChange={(e) => setSimExercisesCompleted(parseInt(e.target.value) || 1)}
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label className="text-xs">Increment (+)</Label>
+                                        <Input
+                                            type="number"
+                                            value={simIncrement}
+                                            onChange={(e) => setSimIncrement(parseInt(e.target.value) || 2)}
+                                        />
+                                    </div>
                                 </div>
-                            )}
-                            <div className="flex-shrink-0 p-2 bg-muted/30 text-[10px] text-muted-foreground border-t flex items-center gap-1.5 justify-end">
-                                <Info className="w-3 h-3" />
-                                <span>Edits apply immediately if valid.</span>
+                                <Button
+                                    className="w-full"
+                                    variant="secondary"
+                                    onClick={handleSimulateSession}
+                                >
+                                    <ChevronRight className="w-4 h-4 mr-2" />
+                                    Simulate Next Session
+                                </Button>
                             </div>
-                        </CardContent>
-                    </Card>
+                        </CollapsibleSection>
+                    </div>
+
+                    {/* Resizable JSON Editor Area */}
+                    <div className="flex-grow flex flex-col min-h-0 border-t">
+                        <div className="p-3 bg-muted/20 border-b flex items-center justify-between flex-shrink-0">
+                            <span className="text-sm font-medium">JSON Configuration</span>
+                            <div className="flex gap-1">
+                                <Button
+                                    variant={hasUnsavedChanges && !jsonError ? "default" : "ghost"}
+                                    size="sm"
+                                    className="h-6 gap-1 px-2"
+                                    onClick={applyJsonChanges}
+                                    disabled={!hasUnsavedChanges || !!jsonError}
+                                    title="Apply Changes (Ctrl+Enter)"
+                                >
+                                    <Save className="w-3 h-3" />
+                                    {hasUnsavedChanges ? "Apply" : "Synced"}
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6"
+                                    onClick={() => {
+                                        navigator.clipboard.writeText(jsonText);
+                                        setCopied(true);
+                                        setTimeout(() => setCopied(false), 2000);
+                                    }}
+                                    title="Copy JSON"
+                                >
+                                    {copied ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+                                </Button>
+                            </div>
+                        </div>
+                        <div className="flex-1 relative min-h-0">
+                            <Textarea
+                                value={jsonText}
+                                onChange={(e) => handleJsonTextChange(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                                        e.preventDefault(); // Prevent newline if that's default behavior (though usually not for Ctrl+Enter)
+                                        applyJsonChanges();
+                                    }
+                                }}
+                                placeholder="JSON configuration..."
+                                className={`font-mono text-xs h-full w-full resize-none border-0 focus-visible:ring-0 p-4 rounded-none ${jsonError ? 'bg-destructive/5' : ''}`}
+                                spellCheck={false}
+                            />
+                        </div>
+                        {jsonError && (
+                            <div className="flex-shrink-0 p-2 bg-destructive/10 text-destructive text-xs border-t border-destructive/20">
+                                Error: {jsonError}
+                            </div>
+                        )}
+                        <div className="flex-shrink-0 p-2 bg-muted/30 text-[10px] text-muted-foreground border-t flex items-center gap-1.5 justify-end">
+                            <Info className="w-3 h-3" />
+                            <span>{hasUnsavedChanges ? "Press Ctrl+Enter to apply changes" : "Edits apply immediately defined by standard controls"}</span>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Right Panel - Module Preview */}

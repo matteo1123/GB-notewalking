@@ -353,21 +353,43 @@ export function RhythmTraining({ autoStart = false, sessionId, onExit, moduleCon
         handleLevelChange(newLevel);
     }, [level, handleLevelChange]);
 
-    // Handle recording via the existing auto-recording hook
+    // Flag to track if we should enter drill mode after recording stops
+    const [pendingDrillMode, setPendingDrillMode] = useState(false);
+
+    const activateDrillMode = useCallback(() => {
+        setAutoSwitch(true);
+        setChangeBpm(true);
+        setSwitchMeasures(8);
+        setHasConfirmed(false); // Reset confirmation state
+
+        // Specifically for Drill Mode:
+        // The user said: "Wait for them to learn, after that it will drill with randoms"
+        // So we should probably generate a NEW random pattern immediately to start the drill
+        handleNext(); // Generates new pattern and starts fresh
+
+        toast({
+            title: "Drill Mode Activated",
+            description: "Auto-switching and variable BPM enabled.",
+        });
+    }, [handleNext, toast]);
+
+    // Watch for recording completion to trigger drill mode
+    useEffect(() => {
+        if (pendingDrillMode && !recording.isRecording && recording.hasRecorded) {
+            setPendingDrillMode(false);
+            activateDrillMode();
+        }
+    }, [pendingDrillMode, recording.isRecording, recording.hasRecorded, activateDrillMode]);
+
+    // Handle manual recording trigger
     const handleRecord = useCallback(() => {
         recording.startManualRecording();
+        setPendingDrillMode(true); // Queue drill mode for after recording
     }, [recording]);
 
-    // Navigate levels
-    const handlePreviousLevel = useCallback(() => {
-        if (level > 0) {
-            handleLevelChange(level - 1);
-        }
-    }, [level, handleLevelChange]);
-
-    const handleNextLevel = useCallback(() => {
-        handleLevelChange(level + 1);
-    }, [level, handleLevelChange]);
+    const handleStartDrill = useCallback(() => {
+        activateDrillMode();
+    }, [activateDrillMode]);
 
     return (
         <ForceLandscapeWrapper>
@@ -378,6 +400,12 @@ export function RhythmTraining({ autoStart = false, sessionId, onExit, moduleCon
                         <div className="flex items-center gap-2">
                             <h1 className="text-sm sm:text-2xl font-bold">Rhythm</h1>
                             <span className="text-xs bg-muted px-1.5 py-0.5 rounded">L{level}</span>
+                            {/* Show Drill Mode indicator if active */}
+                            {autoSwitch && (
+                                <span className="text-xs bg-blue-500/20 text-blue-500 border border-blue-500/50 px-1.5 py-0.5 rounded animate-pulse">
+                                    Drill Mode
+                                </span>
+                            )}
                         </div>
 
                         {/* Center: Session controls or Exit button */}
@@ -538,7 +566,20 @@ export function RhythmTraining({ autoStart = false, sessionId, onExit, moduleCon
                             </div>
 
                             {/* Confirmation Flow - compact on mobile */}
-                            {!hasConfirmed ? (
+                            {autoSwitch ? (
+                                <div className="flex flex-col gap-2">
+                                    <div className="bg-blue-500/20 border border-blue-500/50 rounded p-2 text-center text-xs">
+                                        Drilling... Pattern switches every {switchMeasures} measures
+                                    </div>
+                                    <Button
+                                        onClick={() => setAutoSwitch(false)}
+                                        variant="outline"
+                                        className="h-8 text-xs"
+                                    >
+                                        Stop Drill
+                                    </Button>
+                                </div>
+                            ) : !hasConfirmed ? (
                                 <div className="flex gap-1 sm:flex-col sm:gap-2">
                                     <Button
                                         onClick={handleConfirm}
@@ -562,7 +603,7 @@ export function RhythmTraining({ autoStart = false, sessionId, onExit, moduleCon
                                 <div className="space-y-1 sm:space-y-2">
                                     <div className="hidden sm:block bg-green-500/20 border border-green-500/50 rounded-lg p-2 text-center">
                                         <span className="text-sm font-semibold text-green-700 dark:text-green-400">
-                                            ✓ Great job! What's next?
+                                            ✓ Great job! Ready to drill?
                                         </span>
                                     </div>
                                     <div className="flex gap-1 sm:grid sm:grid-cols-2 sm:gap-2">
@@ -573,14 +614,14 @@ export function RhythmTraining({ autoStart = false, sessionId, onExit, moduleCon
                                             disabled={recording.isRecording}
                                         >
                                             <Mic className="w-3 h-3 sm:w-4 sm:h-4 mr-1 text-red-500" />
-                                            Rec
+                                            Rec & Drill
                                         </Button>
                                         <Button
-                                            onClick={handleNextRhythm}
+                                            onClick={handleStartDrill}
                                             className="flex-1 bg-blue-600 hover:bg-blue-700 h-8 sm:h-10 text-xs sm:text-sm"
                                         >
-                                            <SkipForward className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-                                            Next
+                                            <Play className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+                                            Start Drill
                                         </Button>
                                     </div>
                                 </div>

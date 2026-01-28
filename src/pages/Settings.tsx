@@ -127,25 +127,23 @@ const Settings = () => {
             </div>
           )}
 
-          {/* BPM Increment (for progressive mode) */}
-          {practiceSettings.practiceMode === 'progressive' && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label>BPM Increment</Label>
-                <span className="text-sm font-medium">+{practiceSettings.bpmIncrement} BPM</span>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Start this many BPM higher than your last practice
-              </p>
-              <Slider
-                value={[practiceSettings.bpmIncrement]}
-                min={1}
-                max={15}
-                step={1}
-                onValueChange={([value]) => updatePracticeSettings({ bpmIncrement: value })}
-              />
+          {/* BPM Increment (Between Sessions) */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label>Session BPM Increment</Label>
+              <span className="text-sm font-medium">+{practiceSettings.bpmIncrement} BPM</span>
             </div>
-          )}
+            <p className="text-xs text-muted-foreground">
+              Increase BPM by this amount at the start of each new session
+            </p>
+            <Slider
+              value={[practiceSettings.bpmIncrement]}
+              min={1}
+              max={15}
+              step={1}
+              onValueChange={([value]) => updatePracticeSettings({ bpmIncrement: value })}
+            />
+          </div>
 
           {/* Auto-Advance */}
           <div className="flex items-center justify-between">

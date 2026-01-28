@@ -234,8 +234,8 @@ const RiffPractice = ({
 
       if (data) {
         setPracticeLog(data);
-        setMaxBpm(data.max_bpm || '');
-        setPerfectBpm(data.perfect_bpm || '');
+        setMaxBpm((data as any).max_bpm || '');
+        setPerfectBpm((data as any).perfect_bpm || '');
       }
     };
 
@@ -319,14 +319,30 @@ const RiffPractice = ({
 
   const [drumBeat, setDrumBeat] = useState(false);
 
-  // Calculate starting BPM - in session mode, use last practiced BPM + increment
-  const startingBpm = useMemo(() => {
-    const lastBpm = (practiceLog as any)?.perfect_bpm || (practiceLog as any)?.max_bpm;
-    if (isControlledSession && practiceSettings.practiceMode === 'progressive' && lastBpm) {
-      return Math.min(lastBpm + practiceSettings.bpmIncrement, 200);
+  // Calculate starting BPM
+  // 1. If we found a previous session log, initialize metronomeBpm with progression (last + increment)
+  useEffect(() => {
+    if (practiceLog) {
+      const lastBpm = (practiceLog as any).perfect_bpm || (practiceLog as any).max_bpm;
+      if (lastBpm) {
+        // Apply session increment setting
+        const increment = practiceSettings.bpmIncrement || 0;
+        const nextBpm = Math.min(lastBpm + increment, 200);
+
+        // Only update if we haven't manually changed it significantly? 
+        // For now, assume loading history takes precedence on mount/switch.
+        setMetronomeBpm(nextBpm);
+
+        console.log(`[Session Progression] Applied +${increment} increment. Last: ${lastBpm} -> Next: ${nextBpm}`);
+      }
     }
+  }, [practiceLog, practiceSettings.bpmIncrement]);
+
+  const startingBpm = useMemo(() => {
+    // If we are in a controlled session AND progressive mode, we might want to force logic
+    // But generally, we want to respect the metronomeBpm state which is now seeded from history
     return lessonExercise?.starting_bpm || metronomeBpm;
-  }, [isControlledSession, practiceSettings.practiceMode, practiceSettings.bpmIncrement, practiceLog, lessonExercise?.starting_bpm, metronomeBpm]);
+  }, [lessonExercise?.starting_bpm, metronomeBpm]);
 
   const targetBpm = useMemo(() => {
     if (isControlledSession && practiceSettings.practiceMode === 'progressive') {

@@ -194,6 +194,7 @@ export interface SessionBlock {
   config: ModuleConfig;
   duration_minutes: number;
   order: number;
+  conceptId?: string;
 }
 
 export interface PracticeSession {

@@ -21,7 +21,8 @@ import { Slider } from "./ui/slider";
 import { Label } from "./ui/label";
 import { Switch } from "./ui/switch";
 import { Checkbox } from "./ui/checkbox";
-import { SkipForward, ChevronLeft, ChevronRight, Check, Mic, Settings, Shuffle, ListOrdered, X } from "lucide-react";
+import { SkipForward, ChevronLeft, ChevronRight, Check, Mic, Settings, Shuffle, ListOrdered, X, Play } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
 import { ForceLandscapeWrapper } from "./ForceLandscapeWrapper";
 import { RhythmModuleConfig } from "@/types/practice"; // Import config type
@@ -81,6 +82,7 @@ export function RhythmTraining({ autoStart = false, sessionId, onExit, moduleCon
 
     // Global auto-record setting from context
     const { autoRecordEnabled } = useAutoRecord();
+    const { toast } = useToast();
 
     // Confirmation flow state
     const [hasConfirmed, setHasConfirmed] = useState(false);
@@ -313,6 +315,19 @@ export function RhythmTraining({ autoStart = false, sessionId, onExit, moduleCon
         beatCountRef.current = 0;
     }, [rhythmMode, deviationTypes, onConfigChange, moduleConfig]);
 
+    // Level navigation helpers
+    const handlePreviousLevel = useCallback(() => {
+        if (level > 0) {
+            handleLevelChange(level - 1);
+        }
+    }, [level, handleLevelChange]);
+
+    const handleNextLevel = useCallback(() => {
+        if (level < 15) {
+            handleLevelChange(level + 1);
+        }
+    }, [level, handleLevelChange]);
+
     // Handle settings changes
     const toggleMode = () => {
         const newMode = rhythmMode === 'random' ? 'systematic' : 'random';
@@ -392,6 +407,7 @@ export function RhythmTraining({ autoStart = false, sessionId, onExit, moduleCon
     }, [activateDrillMode]);
 
     return (
+        /* @LANDSCAPE-LOCK: Do not remove ForceLandscapeWrapper — it forces landscape on mobile phones */
         <ForceLandscapeWrapper>
             <div className="flex flex-col h-full bpm-control-area">
                 <div className="flex-1 flex flex-col p-2 sm:p-3 min-h-0 overflow-hidden">

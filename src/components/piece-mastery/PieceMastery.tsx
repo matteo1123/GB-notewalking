@@ -4,7 +4,9 @@ import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { Play, Pause, ChevronLeft, ChevronRight, RotateCcw, ArrowLeft, Mic, Volume2, Music, Settings2, PlusCircle, Save, X } from "lucide-react";
+import { Play, Pause, ChevronLeft, ChevronRight, RotateCcw, ArrowLeft, Mic, Volume2, Music, Settings2, PlusCircle, Save, X, Timer } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { usePieceMastery, PracticePhase } from "@/hooks/usePieceMastery";
 import { Piece } from "./types";
 import { cn } from "@/lib/utils";
@@ -16,13 +18,15 @@ interface PieceMasteryProps {
     // Exit callback for standalone/freeplay mode
     onExit?: () => void;
     // Persistence for loop settings
-    moduleConfig?: { offset?: number; segmentSeconds?: number; pitchShift?: number };
-    onConfigChange?: (config: { offset: number; segmentSeconds: number; pitchShift: number }) => void;
+    moduleConfig?: { offset?: number; segmentSeconds?: number; pitchShift?: number; quickRecordMode?: boolean; recordDuration?: number };
+    onConfigChange?: (config: { offset: number; segmentSeconds: number; pitchShift: number; quickRecordMode?: boolean; recordDuration?: number }) => void;
 }
 
 export function PieceMastery({ piece, onBack, onExit, moduleConfig, onConfigChange }: PieceMasteryProps) {
     const [autoAdvance, setAutoAdvance] = useState(false);
     const [notes, setNotes] = useState(piece.notes || "");
+    const [quickRecordMode, setQuickRecordMode] = useState(moduleConfig?.quickRecordMode ?? false);
+    const [recordDuration, setRecordDuration] = useState(moduleConfig?.recordDuration ?? 30);
     const { toast } = useToast();
 
     const { state, controls } = usePieceMastery({
@@ -30,6 +34,8 @@ export function PieceMastery({ piece, onBack, onExit, moduleConfig, onConfigChan
         segmentSeconds: moduleConfig?.segmentSeconds || piece.segment_seconds || 5,
         initialOffset: moduleConfig?.offset || 0,
         initialPitchShift: moduleConfig?.pitchShift || 0,
+        skipPiecePhase: quickRecordMode,
+        recordDurationSeconds: recordDuration,
         onLoopComplete: (blockIndex, loopCount) => {
             // Optional: Auto-advance logic
             if (autoAdvance && loopCount >= 3) controls.nextBlock();
@@ -240,6 +246,65 @@ export function PieceMastery({ piece, onBack, onExit, moduleConfig, onConfigChan
                             <span>0</span>
                             <span>+6</span>
                         </div>
+                    </div>
+
+                    {/* Quick Record Mode Control */}
+                    <div className="bg-muted/50 rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                                <Timer className="w-4 h-4" />
+                                <Label htmlFor="quick-record-toggle" className="text-sm font-medium cursor-pointer">
+                                    Quick Record
+                                </Label>
+                            </div>
+                            <Switch
+                                id="quick-record-toggle"
+                                checked={quickRecordMode}
+                                onCheckedChange={(checked) => {
+                                    setQuickRecordMode(checked);
+                                    onConfigChange?.({
+                                        offset: state.offset,
+                                        segmentSeconds: state.segmentSeconds,
+                                        pitchShift: state.pitchShift,
+                                        quickRecordMode: checked,
+                                        recordDuration
+                                    });
+                                }}
+                            />
+                        </div>
+                        {quickRecordMode && (
+                            <div className="space-y-2">
+                                <div className="flex justify-between text-xs text-muted-foreground">
+                                    <span>Duration</span>
+                                    <Badge variant="secondary">{recordDuration}s</Badge>
+                                </div>
+                                <Slider
+                                    value={[recordDuration]}
+                                    min={10}
+                                    max={60}
+                                    step={5}
+                                    onValueChange={([value]) => {
+                                        setRecordDuration(value);
+                                        onConfigChange?.({
+                                            offset: state.offset,
+                                            segmentSeconds: state.segmentSeconds,
+                                            pitchShift: state.pitchShift,
+                                            quickRecordMode,
+                                            recordDuration: value
+                                        });
+                                    }}
+                                    className="py-2"
+                                />
+                                <div className="flex justify-between text-[10px] text-muted-foreground">
+                                    <span>10s</span>
+                                    <span>30s</span>
+                                    <span>60s</span>
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-2">
+                                    Skip listening phase—just record and playback.
+                                </p>
+                            </div>
+                        )}
                     </div>
 
                 </div>

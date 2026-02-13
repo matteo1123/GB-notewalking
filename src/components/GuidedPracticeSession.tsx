@@ -1,21 +1,18 @@
 import { usePracticeSession } from '@/hooks/usePracticeSession';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
-import { Progress } from './ui/progress';
-import { getModuleIcon } from '@/lib/sessionPlanner';
-import {
-    Play,
-    Pause,
-    SkipForward,
-    X,
-    Clock,
-    CheckCircle2,
-    ListTodo,
-} from 'lucide-react';
+import { Clock } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { RhythmTraining } from './RhythmTraining';
+import RiffPractice from './RiffPractice';
+import { ChordProgressionExercise } from './ChordProgressionExercise';
+import { ChordProgressionTrainer } from './ChordProgressionTrainer';
+import { LessonNavWrapper } from './LessonNavWrapper';
 
 /**
  * Guided Practice Session Component
- * Displays current activity, timer, and navigation controls
+ * Uses LessonNavWrapper to provide consistent navigation across all modules.
  */
 export function GuidedPracticeSession() {
     const session = usePracticeSession();
@@ -78,141 +75,112 @@ export function GuidedPracticeSession() {
 
     const currentBlock = activeSession.currentBlock;
     const totalBlocks = activeSession.session.session_plan.length;
-    const progressPercent = ((activeSession.currentBlockIndex + 1) / totalBlocks) * 100;
-    const blockProgressPercent = ((currentBlock.duration_minutes * 60 - timer.timeRemaining) / (currentBlock.duration_minutes * 60)) * 100;
+
+    const hasPrevious = activeSession.currentBlockIndex > 0;
+    const hasNext = activeSession.currentBlockIndex < totalBlocks - 1;
+    const nextPlan = activeSession.session.session_plan[activeSession.currentBlockIndex + 1];
+    const nextLabel = nextPlan ? formatModuleType(nextPlan.module_type) : 'Finish';
 
     return (
-        <div className="space-y-4">
-            {/* Session Header */}
-            <Card className="p-4">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="text-2xl">{getModuleIcon(currentBlock.module_type)}</div>
-                        <div>
-                            <h3 className="font-semibold">
-                                Activity {activeSession.currentBlockIndex + 1} of {totalBlocks}
-                            </h3>
-                            <p className="text-sm text-muted-foreground">
-                                {formatModuleType(currentBlock.module_type)}
-                            </p>
-                        </div>
-                    </div>
-
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => session.endSession(false)}
-                    >
-                        <X className="w-4 h-4" />
-                    </Button>
-                </div>
-
-                {/* Overall Progress */}
-                <div className="mt-4 space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">Session Progress</span>
-                        <span className="font-medium">{Math.round(progressPercent)}%</span>
-                    </div>
-                    <Progress value={progressPercent} className="h-2" />
-                </div>
-            </Card>
-
-            {/* Current Block Timer */}
-            <Card className="p-6">
-                <div className="text-center space-y-4">
-                    {/* Timer Display */}
-                    <div>
-                        <div className="text-6xl font-bold font-mono tabular-nums">
-                            {formatTime(timer.timeRemaining)}
-                        </div>
-                        <p className="text-sm text-muted-foreground mt-2">
-                            Time remaining in this activity
-                        </p>
-                    </div>
-
-                    {/* Block Progress */}
-                    <div className="max-w-md mx-auto">
-                        <Progress value={blockProgressPercent} className="h-3" />
-                    </div>
-
-                    {/* Controls */}
-                    <div className="flex items-center justify-center gap-3 pt-4">
-                        {session.isPaused ? (
-                            <Button
-                                onClick={session.resumeSession}
-                                size="lg"
-                                className="gap-2"
-                            >
-                                <Play className="w-5 h-5" />
-                                Resume
-                            </Button>
-                        ) : (
-                            <Button
-                                onClick={session.pauseSession}
-                                size="lg"
-                                variant="outline"
-                                className="gap-2"
-                            >
-                                <Pause className="w-5 h-5" />
-                                Pause
-                            </Button>
-                        )}
-
-                        <Button
-                            onClick={session.skipBlock}
-                            size="lg"
-                            variant="outline"
-                            className="gap-2"
-                        >
-                            <SkipForward className="w-5 h-5" />
-                            Skip
-                        </Button>
-                    </div>
-
-                    {/* Total Time Remaining */}
-                    <div className="text-sm text-muted-foreground pt-4 border-t">
-                        <Clock className="w-4 h-4 inline mr-2" />
-                        {formatTime(timer.totalTimeRemaining)} total remaining
-                    </div>
-                </div>
-            </Card>
-
-            {/* Upcoming Activities */}
-            <Card className="p-4">
-                <div className="flex items-center gap-2 mb-3">
-                    <ListTodo className="w-4 h-4" />
-                    <h4 className="font-semibold">Upcoming Activities</h4>
-                </div>
-
-                <div className="space-y-2">
-                    {activeSession.session.session_plan
-                        .slice(activeSession.currentBlockIndex + 1)
-                        .slice(0, 3)
-                        .map((block, index) => (
-                            <div
-                                key={index}
-                                className="flex items-center justify-between p-2 rounded bg-muted/30"
-                            >
-                                <div className="flex items-center gap-2">
-                                    <span className="text-lg">{getModuleIcon(block.module_type)}</span>
-                                    <span className="text-sm">{formatModuleType(block.module_type)}</span>
-                                </div>
-                                <span className="text-xs text-muted-foreground">
-                                    {block.duration_minutes} min
-                                </span>
-                            </div>
-                        ))}
-
-                    {activeSession.currentBlockIndex + 1 === totalBlocks && (
-                        <div className="flex items-center justify-center gap-2 p-3 rounded bg-green-500/10 text-green-700 dark:text-green-400">
-                            <CheckCircle2 className="w-4 h-4" />
-                            <span className="text-sm font-medium">Last activity!</span>
-                        </div>
-                    )}
-                </div>
-            </Card>
-        </div>
+        <LessonNavWrapper
+            currentIndex={activeSession.currentBlockIndex}
+            totalBlocks={totalBlocks}
+            blockLabel={formatModuleType(currentBlock.module_type)}
+            blockModuleType={currentBlock.module_type}
+            timeRemaining={timer.timeRemaining}
+            isPaused={session.isPaused}
+            hasPrevious={hasPrevious}
+            hasNext={hasNext}
+            onPrevious={session.previousBlock}
+            onNext={session.nextBlock}
+            onPause={session.pauseSession}
+            onResume={session.resumeSession}
+            onSkip={session.skipBlock}
+            onExit={() => session.endSession(false)}
+            nextBlockLabel={nextLabel}
+        >
+            <RenderModule
+                currentBlock={currentBlock}
+                sessionId={activeSession.session.id}
+            />
+        </LessonNavWrapper>
     );
+}
+
+// ── Module Renderer ──────────────────────────────────────────
+// Separated so it can be wrapped cleanly by LessonNavWrapper.
+
+function RenderModule({ currentBlock, sessionId }: { currentBlock: any; sessionId?: string }) {
+    const config = currentBlock.config || {};
+    const [scaleData, setScaleData] = useState<{ item: any; sequences: any[] } | null>(null);
+
+    // Fetch scale data if current block is scale
+    useEffect(() => {
+        const fetchScale = async () => {
+            if (currentBlock.module_type === 'scale' || currentBlock.module_type === 'arpeggio') {
+                const scaleId = currentBlock.config?.scale_id;
+                if (!scaleId) return;
+
+                const { data: scale } = await supabase.from('scales').select('*').eq('id', scaleId).single();
+                const { data: sequences } = await supabase.from('sequences').select('*');
+
+                if (scale) {
+                    setScaleData({ item: scale, sequences: sequences || [] });
+                }
+            } else {
+                setScaleData(null);
+            }
+        };
+        fetchScale();
+    }, [currentBlock.module_type, currentBlock.config]);
+
+    switch (currentBlock.module_type) {
+        case 'rhythm':
+            return (
+                <div className="h-full">
+                    <RhythmTraining
+                        autoStart
+                        sessionId={sessionId}
+                        moduleConfig={config}
+                    />
+                </div>
+            );
+        case 'notewalking':
+            return (
+                <div className="h-full">
+                    <ChordProgressionExercise
+                        autoStart
+                        sessionId={sessionId}
+                        moduleConfig={config}
+                    />
+                </div>
+            );
+        case 'chord_progressions':
+            return (
+                <div className="h-full">
+                    <ChordProgressionTrainer
+                        moduleConfig={config}
+                    />
+                </div>
+            );
+        case 'scale':
+        case 'arpeggio':
+            if (!scaleData) return <div className="flex items-center justify-center h-48">Loading scale...</div>;
+            return (
+                <div className="h-full">
+                    <RiffPractice
+                        repertoireItem={scaleData.item}
+                        sequences={scaleData.sequences}
+                        autoStart
+                        sessionId={sessionId}
+                        moduleConfig={config}
+                        isControlledSession={true}
+                    />
+                </div>
+            );
+        default:
+            return <div className="p-4">Unknown module type: {currentBlock.module_type}</div>;
+    }
 }
 
 /**
@@ -228,13 +196,4 @@ function formatModuleType(type: string): string {
         chord_progressions: 'Chord Changes',
     };
     return labels[type] || type;
-}
-
-/**
- * Format seconds to MM:SS
- */
-function formatTime(seconds: number): string {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')} `;
 }

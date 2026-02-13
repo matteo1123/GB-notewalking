@@ -24,7 +24,12 @@ export function PieceList({ onSelectPiece, onExit }: PieceListProps) {
     const [editingPiece, setEditingPiece] = useState<Piece | null>(null);
 
     const fetchPieces = async () => {
-        if (!user) return;
+        if (!user) {
+            // No user logged in - show empty state instead of endless loading
+            setLoading(false);
+            setPieces([]);
+            return;
+        }
         try {
             const { data, error } = await supabase
                 .from('pieces')
@@ -35,6 +40,8 @@ export function PieceList({ onSelectPiece, onExit }: PieceListProps) {
             setPieces(data as Piece[]);
         } catch (error) {
             console.error("Error fetching pieces:", error);
+            // On error, show empty state rather than endless loading
+            setPieces([]);
         } finally {
             setLoading(false);
         }

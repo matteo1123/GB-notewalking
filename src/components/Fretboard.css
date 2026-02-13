@@ -108,8 +108,11 @@
   justify-content: center;
 }
 
-/* ====== MOBILE STYLES (Default - Mobile First) ====== */
-/* Mobile Landscape Optimization */
+/* ======================================================================
+ * MOBILE STYLES (Default - Mobile First)
+ * @LANDSCAPE-LOCK: Mobile fretboard sizing — changes here affect landscape layout
+ * DO NOT MODIFY without checking force-landscape.css for conflicts
+ * ====================================================================== */
 @media (max-width: 1023px) {
   .dot {
     width: clamp(18px, 5vw, 32px);
@@ -275,7 +278,11 @@
   /* Ensure visibility over others */
 }
 
-/* Mobile landscape optimization - LARGER SIZES for visibility */
+/* ======================================================================
+ * Mobile landscape optimization - LARGER SIZES for visibility
+ * @LANDSCAPE-LOCK: Landscape-specific fretboard sizing
+ * DO NOT MODIFY without checking force-landscape.css for conflicts
+ * ====================================================================== */
 @media (max-width: 900px) and (orientation: landscape) {
   .open-notes-container {
     grid-template-columns: 30px;

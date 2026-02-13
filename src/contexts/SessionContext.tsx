@@ -1,8 +1,15 @@
 import { createContext, useContext, useState, useCallback, useEffect, useRef, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import type { PracticeSession, SessionBlock } from '@/types/practice';
-import { generateSessionPlan, type GoalWithProgress } from '@/lib/sessionPlanner';
+import type { PracticeSession, SessionBlock, ModuleType, ModuleConfig } from '@/types/practice';
+
+// Local type for session generation
+interface SampleGoal {
+    id: string;
+    lesson_id: string;
+    module_type: ModuleType;
+    module_config: ModuleConfig;
+}
 
 export interface ActiveSession {
     session: PracticeSession;
@@ -101,7 +108,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
         try {
             // Update session in database
-            await supabase
+            await (supabase as any)
                 .from('practice_sessions')
                 .update({
                     ended_at: new Date().toISOString(),
@@ -194,70 +201,60 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
             // Default sample session for new users - includes ALL modules
             // for a better first impression with variety
-            const sampleGoals: GoalWithProgress[] = [
+            const sampleGoals: SampleGoal[] = [
                 {
                     id: '1',
                     lesson_id: lessonId || 'default',
                     module_type: 'rhythm',
-                    module_config: { rhythm_level: 1 },
-                    target_level: 3,
-                    priority: 8,
-                    progress: { time_practiced_minutes: 0, mastery_level: 0 },
+                    module_config: { module_type: 'rhythm', rhythm_level: 1 },
                 },
                 {
                     id: '2',
                     lesson_id: lessonId || 'default',
                     module_type: 'notewalking',
-                    module_config: { key: 'C', chords: ['I', 'IV', 'V'], measures_per_chord: 4 },
-                    target_level: 3,
-                    priority: 8,
-                    progress: { time_practiced_minutes: 0, mastery_level: 0 },
+                    module_config: { module_type: 'notewalking', key: 'C', chords: ['I', 'IV', 'V'], measures_per_chord: 4 },
                 },
                 {
                     id: '3',
                     lesson_id: lessonId || 'default',
                     module_type: 'scale',
-                    module_config: {},
-                    target_level: 3,
-                    priority: 8,
-                    progress: { time_practiced_minutes: 0, mastery_level: 0 },
+                    module_config: { module_type: 'scale' },
                 },
                 {
                     id: '4',
                     lesson_id: lessonId || 'default',
                     module_type: 'arpeggio',
-                    module_config: {},
-                    target_level: 3,
-                    priority: 8,
-                    progress: { time_practiced_minutes: 0, mastery_level: 0 },
+                    module_config: { module_type: 'arpeggio' },
                 },
                 {
                     id: '5',
                     lesson_id: lessonId || 'default',
                     module_type: 'chord_progressions',
-                    module_config: {},
-                    target_level: 3,
-                    priority: 8,
-                    progress: { time_practiced_minutes: 0, mastery_level: 0 },
+                    module_config: { module_type: 'chord_progressions', key: 'C', progression_id: '' },
                 },
             ];
 
-            // Generate session plan
-            const blocks = generateSessionPlan(sampleGoals, [], {
-                availableTimeMinutes,
-                blockDurationMinutes: 5,
-            });
+            // Generate session plan directly from sample goals
+            // This bypasses the intelligent curriculum system that's still being integrated
+            const blocks: SessionBlock[] = sampleGoals.map((goal, index) => ({
+                module_type: goal.module_type,
+                config: goal.module_config,
+                duration_minutes: Math.floor(availableTimeMinutes / sampleGoals.length),
+                order: index,
+                conceptId: `sample-${goal.id}`
+            }));
 
             if (blocks.length === 0) {
                 toast({
-                    title: 'No goals found',
-                    description: 'Please set up some practice goals first',
+                    title: 'Session setup failed',
+                    description: 'Could not generate practice blocks. Please try again.',
+                    variant: 'destructive',
                 });
                 return;
             }
 
             // Create session in database
-            const { data: session, error } = await supabase
+            const { data: session, error } = await (supabase as any)
                 .from('practice_sessions')
                 .insert({
                     user_id: user.id,

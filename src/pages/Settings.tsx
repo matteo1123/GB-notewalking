@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { usePracticeSettings } from "@/contexts/PracticeSettingsContext";
 
+import { PrioritySettings } from "@/components/settings/PrioritySettings";
+
 const Settings = () => {
   const { user } = useAuth();
   const [settings, setSettings] = useState({ autoRecord: false });
@@ -56,6 +58,9 @@ const Settings = () => {
 
   return (
     <div className="p-4 space-y-6 max-w-2xl mx-auto">
+      {/* Intelligent Curriculum Priorities */}
+      <PrioritySettings />
+
       {/* General Settings */}
       <Card>
         <CardHeader>

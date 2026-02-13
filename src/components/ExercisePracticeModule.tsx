@@ -184,6 +184,7 @@ export function ExercisePracticeModule({
     // Exercise view (when an exercise is selected)
     if (selectedExercise) {
         return (
+            /* @LANDSCAPE-LOCK: Do not remove ForceLandscapeWrapper — it forces landscape on mobile phones */
             <ForceLandscapeWrapper>
                 <div className="h-full flex flex-col bg-background">
                     {/* Navigation bar - mobile optimized */}

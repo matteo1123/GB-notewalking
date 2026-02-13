@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import type { PracticeSession, SessionBlock, ModuleType } from '@/types/practice';
-import { generateSessionPlan, type GoalWithProgress } from '@/lib/sessionPlanner';
+import { generateSessionPlan } from '@/lib/sessionPlanner';
 
 export interface ActiveSession {
     session: PracticeSession;
@@ -48,62 +48,116 @@ export function usePracticeSession() {
                 return;
             }
 
-            // TODO: Fetch active goals from database
-            // For now, create a sample session
-            const sampleGoals: GoalWithProgress[] = [
-                {
-                    id: '1',
-                    lesson_id: lessonId || 'default',
-                    module_type: 'rhythm',
-                    module_config: { rhythm_level: 5 },
-                    target_level: 5,
-                    priority: 8,
-                    progress: {
-                        time_practiced_minutes: 30,
-                        mastery_level: 0.4,
-                    },
-                },
-                {
-                    id: '2',
-                    lesson_id: lessonId || 'default',
-                    module_type: 'notewalking',
-                    module_config: {
-                        key: 'C',
-                        chords: ['I', 'IV', 'V'],
-                        measures_per_chord: 4,
-                    },
-                    target_level: 3,
-                    priority: 7,
-                    progress: {
-                        time_practiced_minutes: 15,
-                        mastery_level: 0.2,
-                    },
-                },
-            ];
+            // 1. Fetch User Profile (Priorities)
+            const { data: profile } = await (supabase as any)
+                .from('profiles')
+                .select('priorities')
+                .eq('id', user.id)
+                .single();
 
-            // Generate session plan
-            const blocks = generateSessionPlan(sampleGoals, [], {
-                availableTimeMinutes,
-                blockDurationMinutes: 5,
-            });
+            // 2. Fetch Curriculum Concepts
+            const { data: concepts, error: conceptsError } = await (supabase as any)
+                .from('curriculum_concepts')
+                .select('*');
+
+            if (conceptsError) throw conceptsError;
+
+            // 3. Fetch User Progress
+            const { data: progressData, error: progressError } = await (supabase as any)
+                .from('user_concept_progress')
+                .select('*')
+                .eq('user_id', user.id);
+
+            if (progressError) throw progressError;
+
+            // Construct UserProfile object for planner
+            const progressMap: Record<string, any> = {};
+            if (progressData) {
+                progressData.forEach(p => {
+                    progressMap[p.concept_id] = p;
+                });
+            }
+
+            const userProfile = {
+                id: user.id,
+                priorities: (profile?.priorities || { rhythm: 5, improv: 5, technique: 5, repertoire: 5 }) as any,
+                progress: progressMap
+            };
+
+            // 4. Generate Session Plan
+            // If specific lesson requested, we might want to handle differently, 
+            // but for now we assume "startSession" means "Give me what I need"
+            const blocks = generateSessionPlan(
+                userProfile,
+                (concepts || []) as any,
+                {
+                    availableTimeMinutes,
+                    blockDurationMinutes: 5,
+                    maintenanceSplit: 0.2
+                }
+            );
 
             if (blocks.length === 0) {
-                toast({
-                    title: 'No goals found',
-                    description: 'Please set up some practice goals first',
+                // Fallback if no intelligent blocks generated (e.g. valid DB but no matching concepts?)
+                // Or empty DB?
+                console.warn("Intelligent planner returned 0 blocks. Using robust fallback defaults.");
+
+                // Create a standard warmup session manually
+                blocks.push(
+                    {
+                        module_type: 'rhythm',
+                        config: { module_type: 'rhythm', rhythm_level: 1 },
+                        duration_minutes: 5,
+                        order: 0,
+                        conceptId: 'fallback-rhythm'
+                    },
+                    {
+                        module_type: 'scale',
+                        config: {
+                            module_type: 'scale',
+                            // Default to C Major if no specific scale
+                            type_filter: 'Major',
+                            group_by_shape: true
+                        },
+                        duration_minutes: 5,
+                        order: 1,
+                        conceptId: 'fallback-scale'
+                    },
+                    {
+                        module_type: 'chord_progressions',
+                        config: {
+                            module_type: 'chord_progressions',
+                            key: 'C',
+                            progression_id: '' // Component will default to first available
+                        },
+                        duration_minutes: 5,
+                        order: 2,
+                        conceptId: 'fallback-chords'
+                    }
+                );
+            }
+
+            // Double check validation to prevent "No goals established" error
+            if (blocks.length === 0) {
+                // This should be impossible now, but just in case
+                blocks.push({
+                    module_type: 'rhythm',
+                    config: { module_type: 'rhythm', rhythm_level: 0 },
+                    duration_minutes: 5,
+                    order: 0,
+                    conceptId: 'emergency-fallback'
                 });
-                return;
             }
 
             // Create session in database
-            const { data: session, error } = await supabase
+            const { data: session, error } = await (supabase as any)
                 .from('practice_sessions')
                 .insert({
                     user_id: user.id,
-                    lesson_id: lessonId,
+                    lesson_id: lessonId, // Optional, might be null
                     started_at: new Date().toISOString(),
                     total_duration_seconds: availableTimeMinutes * 60,
-                    session_plan: blocks,
+                    session_plan: blocks as any, // Cast to any for JSON compatibility
                     completed: false,
                 })
                 .select()
@@ -114,7 +168,7 @@ export function usePracticeSession() {
             // Set active session
             const firstBlock = blocks[0];
             setActiveSession({
-                session,
+                session: session as PracticeSession,
                 currentBlockIndex: 0,
                 currentBlock: firstBlock,
                 timeElapsed: 0,
@@ -131,7 +185,7 @@ export function usePracticeSession() {
 
             toast({
                 title: 'Session started!',
-                description: `${blocks.length} activities planned for ${availableTimeMinutes} minutes`,
+                description: `${blocks.length} activities planned based on your priorities.`,
             });
 
         } catch (error) {
@@ -231,6 +285,38 @@ export function usePracticeSession() {
     }, [nextBlock]);
 
     /**
+     * Move to previous block
+     */
+    const previousBlock = useCallback(() => {
+        if (!activeSession) return;
+
+        const prevIndex = activeSession.currentBlockIndex - 1;
+        if (prevIndex < 0) return; // Already at first block
+
+        const blocks = activeSession.session.session_plan;
+        const prevBlock = blocks[prevIndex];
+
+        setActiveSession(prev => {
+            if (!prev) return null;
+            return {
+                ...prev,
+                currentBlockIndex: prevIndex,
+                currentBlock: prevBlock,
+            };
+        });
+
+        setTimer(prev => ({
+            ...prev,
+            timeRemaining: prevBlock.duration_minutes * 60,
+        }));
+
+        toast({
+            title: 'Previous activity',
+            description: `Returning to block ${prevIndex + 1} of ${blocks.length}`,
+        });
+    }, [activeSession, toast]);
+
+    /**
      * End session
      */
     const endSession = useCallback(async (completed: boolean = false) => {
@@ -238,7 +324,7 @@ export function usePracticeSession() {
 
         try {
             // Update session in database
-            await supabase
+            await (supabase as any)
                 .from('practice_sessions')
                 .update({
                     ended_at: new Date().toISOString(),
@@ -294,6 +380,7 @@ export function usePracticeSession() {
         pauseSession,
         resumeSession,
         nextBlock,
+        previousBlock,
         skipBlock,
         endSession,
         isActive: activeSession !== null,

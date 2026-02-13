@@ -26,8 +26,19 @@ const DEFAULT_SETTINGS: ChordProgressionSettings = {
     droneVolume: 0.5,
 };
 
-export function ChordProgressionTrainer() {
-    const [settings, setSettings] = useState<ChordProgressionSettings>(DEFAULT_SETTINGS);
+interface ChordProgressionTrainerProps {
+    moduleConfig?: {
+        key?: string;
+        progression_id?: string;
+        target_bpm?: number;
+    };
+}
+
+export function ChordProgressionTrainer({ moduleConfig }: ChordProgressionTrainerProps) {
+    const [settings, setSettings] = useState<ChordProgressionSettings>({
+        ...DEFAULT_SETTINGS,
+        key: moduleConfig?.key || DEFAULT_SETTINGS.key,
+    });
     const [isPlaying, setIsPlaying] = useState(false);
     const [bpm, setBpm] = useState(80);
     const [mode, setMode] = useState<MetronomeMode>("regular");
@@ -192,11 +203,11 @@ export function ChordProgressionTrainer() {
     // Auto-recording with mic cloning
     const recording = useAutoRecording({
         enabled: autoRecordEnabled && isPlaying,
-        moduleType: 'notewalking',
+        moduleType: 'chord_progressions',
         moduleConfig: {
+            module_type: 'chord_progressions',
+            progression_id: selectedProgressionId,
             key: settings.key,
-            chords: settings.selectedChords,
-            measures_per_chord: settings.measuresPerChord,
         },
         existingMicStream: pitchDetection.audioStream || undefined,
     });

@@ -11,6 +11,10 @@ interface UsePieceMasteryProps {
     initialBlockIndex?: number;
     initialOffset?: number;
     initialPitchShift?: number;
+    /** When true, skip the "listen to piece" phase - 2-part loop: record → playback */
+    skipPiecePhase?: boolean;
+    /** Duration in seconds for recording when skipPiecePhase is true (default: 30) */
+    recordDurationSeconds?: number;
     onProgress?: (blockIndex: number) => void;
     onLoopComplete?: (blockIndex: number, loopCount: number) => void;
 }
@@ -81,6 +85,8 @@ export function usePieceMastery({
     initialBlockIndex = 0,
     initialOffset = 0,
     initialPitchShift = 0,
+    skipPiecePhase = false,
+    recordDurationSeconds = 30,
     onProgress,
     onLoopComplete
 }: UsePieceMasteryProps) {
@@ -184,16 +190,26 @@ export function usePieceMastery({
         // Use REF to get current phase to avoid stale closure issues in setTimeout
         const currentPhase = phaseRef.current;
 
-        // Map flow
-        const nextPhaseMap: Record<PracticePhase, PracticePhase> = {
-            'idle': 'piece',
-            'piece': 'user',
-            'user': 'playback',
-            'playback': 'piece'
-        };
+        // Map flow - different depending on skipPiecePhase
+        const nextPhaseMap: Record<PracticePhase, PracticePhase> = skipPiecePhase
+            ? {
+                'idle': 'user',      // Skip piece, go straight to user recording
+                'piece': 'user',     // In case we somehow end up here
+                'user': 'playback',
+                'playback': 'user'   // Loop back to user (skip piece)
+            }
+            : {
+                'idle': 'piece',
+                'piece': 'user',
+                'user': 'playback',
+                'playback': 'piece'
+            };
 
         const nextPhase = nextPhaseMap[currentPhase];
-        const duration = loopRange.end - loopRange.start;
+
+        // Duration depends on mode and phase
+        const segmentDuration = loopRange.end - loopRange.start;
+        const recordingDuration = skipPiecePhase ? recordDurationSeconds : segmentDuration;
 
         // Cleanup previous phase
         if (currentPhase === 'piece') {
@@ -214,7 +230,7 @@ export function usePieceMastery({
                 audioRef.current.currentTime = loopRange.start;
                 try {
                     await audioRef.current.play();
-                    scheduleTransition(duration * 1000);
+                    scheduleTransition(segmentDuration * 1000);
                 } catch (e) {
                     console.error("Play failed", e);
                     setIsPlaying(false);
@@ -223,7 +239,7 @@ export function usePieceMastery({
         } else if (nextPhase === 'user') {
             try {
                 await startRecording();
-                scheduleTransition(duration * 1000);
+                scheduleTransition(recordingDuration * 1000);
             } catch (e) {
                 console.error("Recording failed", e);
                 // Toast removed to avoid annoyance if mic is just blocked
@@ -233,7 +249,7 @@ export function usePieceMastery({
         }
         // 'playback' phase is handled by effect
 
-    }, [loopRange, startRecording, stopRecording, toast]);
+    }, [loopRange, startRecording, stopRecording, toast, skipPiecePhase, recordDurationSeconds]);
 
     const scheduleTransition = (ms: number) => {
         if (loopTimeoutRef.current) clearTimeout(loopTimeoutRef.current);
@@ -275,19 +291,34 @@ export function usePieceMastery({
         }
     }, [isPlaying]);
 
-    const startPractice = () => {
+    const startPractice = async () => {
         setIsPlaying(true);
-        setPhase('piece');
-        if (audioRef.current) {
-            audioRef.current.currentTime = loopRange.start;
-            const duration = loopRange.end - loopRange.start;
 
-            audioRef.current.play().then(() => {
-                scheduleTransition(duration * 1000);
-            }).catch(e => {
-                console.error("Start failed", e);
+        if (skipPiecePhase) {
+            // Quick Record mode: start directly with user recording
+            setPhase('user');
+            phaseStartTimeRef.current = Date.now();
+            try {
+                await startRecording();
+                scheduleTransition(recordDurationSeconds * 1000);
+            } catch (e) {
+                console.error("Recording failed", e);
                 setIsPlaying(false);
-            });
+            }
+        } else {
+            // Normal mode: start with piece playback
+            setPhase('piece');
+            if (audioRef.current) {
+                audioRef.current.currentTime = loopRange.start;
+                const duration = loopRange.end - loopRange.start;
+
+                audioRef.current.play().then(() => {
+                    scheduleTransition(duration * 1000);
+                }).catch(e => {
+                    console.error("Start failed", e);
+                    setIsPlaying(false);
+                });
+            }
         }
     };
 
@@ -346,7 +377,9 @@ export function usePieceMastery({
             audioRef,
             offset,
             segmentSeconds,
-            pitchShift
+            pitchShift,
+            skipPiecePhase,
+            recordDurationSeconds
         },
         controls: {
             togglePlay,

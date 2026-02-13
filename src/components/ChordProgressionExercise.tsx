@@ -61,24 +61,12 @@ interface ChordProgressionExerciseProps {
     sessionId?: string;
     // Exit callback for standalone/freeplay mode
     onExit?: () => void;
-    // Session control props (optional - for when used in a lesson)
-    sessionControls?: {
-        timeRemaining: number;
-        totalDuration: number; // in minutes
-        isPaused: boolean;
-        currentBlockIndex: number;
-        totalBlocks: number;
-        onPause: () => void;
-        onResume: () => void;
-        onSkip: () => void;
-        onExit: () => void;
-    };
     // Configuration sync
     moduleConfig?: NotewalkingModuleConfig;
     onConfigChange?: (config: NotewalkingModuleConfig) => void;
 }
 
-export function ChordProgressionExercise({ autoStart = false, sessionId, onExit, sessionControls, moduleConfig, onConfigChange }: ChordProgressionExerciseProps) {
+export function ChordProgressionExercise({ autoStart = false, sessionId, onExit, moduleConfig, onConfigChange }: ChordProgressionExerciseProps) {
     const [settings, setSettings] = useState<ChordProgressionSettings>(() => ({
         ...DEFAULT_SETTINGS,
         key: moduleConfig?.key || DEFAULT_SETTINGS.key,
@@ -357,6 +345,7 @@ export function ChordProgressionExercise({ autoStart = false, sessionId, onExit,
 
     return (
         <>
+            {/* @LANDSCAPE-LOCK: Do not remove ForceLandscapeWrapper — it forces landscape on mobile phones */}
             <ForceLandscapeWrapper>
                 <div className="flex flex-col h-full w-full bpm-control-area overflow-hidden">
                     {/* MOBILE LANDSCAPE LAYOUT - 3 Columns */}
@@ -435,44 +424,8 @@ export function ChordProgressionExercise({ autoStart = false, sessionId, onExit,
                                     <span className="text-xs text-muted-foreground">Key of {settings.key}</span>
                                 </div>
 
-                                {/* Right Half: Session Controls (only if in a lesson) */}
-                                {sessionControls && (
-                                    <div className="flex-1 bg-card border rounded px-2 py-1 flex items-center justify-between gap-2">
-                                        {/* Timer */}
-                                        <div className="flex items-center gap-1 text-sm">
-                                            <Clock className="w-3 h-3" />
-                                            <span className="font-mono font-bold">
-                                                {Math.floor(sessionControls.timeRemaining / 60)}:{(sessionControls.timeRemaining % 60).toString().padStart(2, '0')}
-                                            </span>
-                                        </div>
-
-                                        {/* Progress */}
-                                        <span className="text-xs text-muted-foreground">
-                                            {sessionControls.currentBlockIndex + 1}/{sessionControls.totalBlocks}
-                                        </span>
-
-                                        {/* Controls */}
-                                        <div className="flex items-center gap-1">
-                                            <Button
-                                                size="sm"
-                                                variant={sessionControls.isPaused ? "default" : "outline"}
-                                                className="h-6 w-6 p-0"
-                                                onClick={sessionControls.isPaused ? sessionControls.onResume : sessionControls.onPause}
-                                            >
-                                                {sessionControls.isPaused ? <Play className="w-3 h-3" /> : <Pause className="w-3 h-3" />}
-                                            </Button>
-                                            <Button size="sm" variant="outline" className="h-6 w-6 p-0" onClick={sessionControls.onSkip}>
-                                                <SkipForward className="w-3 h-3" />
-                                            </Button>
-                                            <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={sessionControls.onExit}>
-                                                Exit
-                                            </Button>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Freeplay Exit (when not in session but onExit provided) */}
-                                {!sessionControls && onExit && (
+                                {/* Exit (freeplay mode — session nav is handled by parent LessonNavWrapper) */}
+                                {onExit && (
                                     <div className="bg-card border rounded px-2 py-1 flex items-center">
                                         <Button size="sm" variant="ghost" className="h-6 px-2 text-xs gap-1" onClick={onExit}>
                                             <X className="w-3 h-3" /> Exit

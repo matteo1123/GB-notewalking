@@ -45,7 +45,7 @@
 
 .fretboard {
   display: grid;
-  grid-template-columns: repeat(24, minmax(20px, 1fr));
+  grid-template-columns: repeat(22, minmax(20px, 1fr));
   grid-template-rows: repeat(6, 1fr);
   position: relative;
   background-color: #000;
@@ -147,7 +147,7 @@
     max-width: 1200px;
     height: 180px;
     max-height: 200px;
-    grid-template-columns: repeat(24, minmax(35px, 50px));
+    grid-template-columns: repeat(22, minmax(35px, 50px));
     grid-template-rows: repeat(6, minmax(25px, 35px));
     margin: 0 auto;
   }
@@ -295,7 +295,7 @@
   }
 
   .fretboard {
-    grid-template-columns: repeat(24, minmax(24px, 1fr));
+    grid-template-columns: repeat(22, minmax(24px, 1fr));
   }
 
   .dot {
@@ -320,7 +320,7 @@
   }
 
   .fretboard {
-    grid-template-columns: repeat(24, minmax(14px, 1fr));
+    grid-template-columns: repeat(22, minmax(14px, 1fr));
   }
 
   .dot {
@@ -346,7 +346,7 @@
 }
 
 .fretboard-modal-view .fretboard {
-  grid-template-columns: repeat(24, 40px);
+  grid-template-columns: repeat(22, 40px);
   grid-template-rows: repeat(6, 35px);
   max-width: none;
   width: auto;

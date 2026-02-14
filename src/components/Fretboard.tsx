@@ -137,7 +137,7 @@ const Fretboard: React.FC<FretboardProps> = ({
 
   const fretMarkers = {
     3: 'single', 5: 'single', 7: 'single', 9: 'single', 12: 'double',
-    15: 'single', 17: 'single', 19: 'single', 21: 'single', 24: 'double',
+    15: 'single', 17: 'single', 19: 'single', 21: 'single',
   };
 
   const renderMarkers = () => {

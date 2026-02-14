@@ -1,5 +1,5 @@
 
-export const FRET_COUNT = 24;
+export const FRET_COUNT = 22;
 export const STRING_COUNT = 6;
 
 export const notes = ['E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B', 'C', 'C#', 'D', 'D#'];
@@ -262,7 +262,7 @@ export const determineEnharmonicNotes = (noteList: string[], rootNote: string): 
  */
 export function normalizeNotesToFretboard<T extends { fret: number }>(
     notes: T[],
-    maxFret = 24
+    maxFret = 22
 ): T[] {
     if (notes.length === 0) return notes;
 

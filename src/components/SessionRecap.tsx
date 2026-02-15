@@ -78,7 +78,7 @@ export function SessionRecap({ onStartNewSession }: SessionRecapProps) {
         try {
             // Get the most recent completed or ended session
             const { data: session, error } = await supabase
-                .from('practice_sessions' as any)
+                .from('practice_sessions')
                 .select('*')
                 .eq('user_id', user.id)
                 .not('ended_at', 'is', null)
@@ -106,7 +106,7 @@ export function SessionRecap({ onStartNewSession }: SessionRecapProps) {
 
             // Fetch recordings from this session
             const { data: recordingsData } = await supabase
-                .from('practice_logs' as any)
+                .from('practice_log')
                 .select('id, audio, module_type, duration, created_at')
                 .eq('session_id', session.id)
                 .not('audio', 'is', null);

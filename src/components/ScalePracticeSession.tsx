@@ -53,6 +53,7 @@ export function ScalePracticeSession({
         typeFilter: moduleConfig?.type_filter,
         orderBy: moduleConfig?.order_by || 'created_at',
         initialIndex: moduleConfig?.current_index || 0,
+        groupByShape: true, // Always group by scale_shape for shape-by-shape learning
     };
 
     // Use the exercise queue hook

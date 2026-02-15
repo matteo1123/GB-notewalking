@@ -123,7 +123,10 @@ export interface ScaleModuleConfig {
   metronome?: MetronomeConfig;
   ear_training?: EarTrainingModuleOptions;  // Opens module directly in ear training mode
   current_scale_id?: string;        // Currently active scale (for navigation state)
-  priority_scale_ids?: string[];    // User-defined order (UUIDs to practice first)
+  // LEGACY: priority_scale_ids are exercise IDs (scale IDs) - kept for backward compatibility
+  priority_scale_ids?: string[];    // User-defined order (scale UUIDs to practice first)
+  // NEW: priority_scale_shape_ids are shape IDs - for shape-by-shape learning progression
+  priority_scale_shape_ids?: string[]; // User-defined order (scale_shape UUIDs to practice first)
   type_filter?: string;             // Filter by Type field (e.g., "3 Notes Per String")
   group_by_shape?: boolean;         // If true, show only one exercise per scale_shape
   order_by?: 'created_at' | 'name'; // Fallback ordering after priority list is exhausted
@@ -158,7 +161,10 @@ export interface ArpeggioModuleConfig {
   metronome?: MetronomeConfig;
   ear_training?: EarTrainingModuleOptions;  // Opens module directly in ear training mode
   current_arpeggio_id?: string;      // Currently active arpeggio (for navigation state)
-  priority_arpeggio_ids?: string[];  // User-defined order (UUIDs to practice first)
+  // LEGACY: priority_arpeggio_ids are exercise IDs (scale IDs) - kept for backward compatibility
+  priority_arpeggio_ids?: string[];  // User-defined order (scale UUIDs to practice first)
+  // NEW: priority_arpeggio_shape_ids are shape IDs - for shape-by-shape learning progression
+  priority_arpeggio_shape_ids?: string[]; // User-defined order (scale_shape UUIDs to practice first)
   type_filter?: string;              // Filter by Type field
   order_by?: 'created_at' | 'name';  // Fallback ordering
   current_index?: number;            // Current position in the queue

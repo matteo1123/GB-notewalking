@@ -4,10 +4,14 @@ import { RepertoireItem } from '@/types/repertoire';
 
 export interface UseExerciseQueueOptions {
     moduleType: 'scale' | 'arpeggio';
-    priorityIds?: string[];       // Practice these first (in this order)
+    // LEGACY: priorityIds are exercise IDs (scale IDs) - kept for backward compatibility
+    priorityIds?: string[];       // Practice these first (in this order) - these are scale IDs
+    // NEW: priorityShapeIds are shape IDs - for shape-by-shape learning progression
+    priorityShapeIds?: string[];  // Practice these shapes first (in this order) - these are scale_shape IDs
     typeFilter?: string;          // Filter by Type field
     orderBy?: 'created_at' | 'name'; // Fallback ordering
     initialIndex?: number;        // Starting position in queue
+    groupByShape?: boolean;       // If true, show only one exercise per scale_shape (default: true for scale/arpeggio)
 }
 
 export interface UseExerciseQueueReturn {
@@ -25,16 +29,21 @@ export interface UseExerciseQueueReturn {
 /**
  * Hook to manage an ordered queue of exercises for a module instance.
  * 
- * Ordering logic:
- * 1. Priority exercises (from priorityIds) come first, in specified order
- * 2. Remaining exercises ordered by scale_shapes.created_at (or name)
+ * Ordering logic (when groupByShape is true - default for scale/arpeggio):
+ * 1. Priority scale_shapes (from priorityIds) come first, in specified order
+ * 2. For each scale_shape, pick one representative scale (first by position or alphabetically)
+ * 3. Remaining scale_shapes ordered by scale_shapes.created_at (or name)
+ * 
+ * This ensures users progress shape-by-shape rather than key-by-key within the same shape.
  */
 export function useExerciseQueue({
     moduleType,
-    priorityIds = [],
+    priorityIds = [],        // LEGACY: exercise IDs (scale IDs)
+    priorityShapeIds = [],   // NEW: shape IDs (scale_shape IDs)
     typeFilter,
     orderBy = 'created_at',
     initialIndex = 0,
+    groupByShape = true, // Default to true for shape-by-shape learning
 }: UseExerciseQueueOptions): UseExerciseQueueReturn {
     const [queue, setQueue] = useState<RepertoireItem[]>([]);
     const [currentIndex, setCurrentIndex] = useState(initialIndex);
@@ -47,10 +56,11 @@ export function useExerciseQueue({
 
     // Stable key for dependency tracking (prevents infinite loop from array reference)
     const priorityIdsKey = JSON.stringify(priorityIds);
+    const priorityShapeIdsKey = JSON.stringify(priorityShapeIds);
 
     // Fetch and sort exercises
     useEffect(() => {
-        const fetchKey = `${moduleType}-${priorityIdsKey}-${typeFilter}-${orderBy}`;
+        const fetchKey = `${moduleType}-${priorityIdsKey}-${priorityShapeIdsKey}-${typeFilter}-${orderBy}-${groupByShape}`;
 
         // Skip if already fetching or same request
         if (fetchingRef.current) return;
@@ -64,7 +74,6 @@ export function useExerciseQueue({
 
             try {
                 // Build query for scales/arpeggios
-                // Using select('*') to get all columns since column names vary
                 let query = supabase
                     .from('scales')
                     .select('*');
@@ -112,8 +121,28 @@ export function useExerciseQueue({
                     return;
                 }
 
+                // Fetch scale_shapes data for ordering
+                // Get unique scale_shape IDs from filtered scales
+                const shapeIds = [...new Set(filteredScales
+                    .map((s: any) => s.scale_shape)
+                    .filter(Boolean))];
+                
+                let shapeDataMap = new Map<string, { created_at: string }>();
+                if (shapeIds.length > 0) {
+                    const { data: shapes } = await supabase
+                        .from('scale_shapes')
+                        .select('id, created_at')
+                        .in('id', shapeIds);
+                    
+                    if (shapes) {
+                        shapes.forEach((shape: any) => {
+                            shapeDataMap.set(shape.id, { created_at: shape.created_at });
+                        });
+                    }
+                }
+
                 // Transform to RepertoireItem format
-                // Using correct column names from database: root_note, notes_json, Position
+                // Include scale_shape data for grouping and ordering
                 const exercises: RepertoireItem[] = filteredScales.map((scale: any) => ({
                     id: scale.id,
                     name: scale.name || 'Unknown',
@@ -127,35 +156,82 @@ export function useExerciseQueue({
                     created_at: scale.created_at,
                     position: scale.Position,
                     scale_shape: scale.scale_shape,
+                    scale_shape_created_at: scale.scale_shape 
+                        ? shapeDataMap.get(scale.scale_shape)?.created_at 
+                        : undefined,
                     major_key: scale.major_key,
                 }));
 
-                // Sort: priority exercises first, then by created_at or name
-                const sortedQueue: RepertoireItem[] = [];
-                const remainingExercises = [...exercises];
+                // Group by scale_shape if enabled (default for scale/arpeggio modules)
+                // This ensures we show one exercise per shape, not all 12 keys of the same shape
+                let processedExercises = exercises;
+                if (groupByShape) {
+                    const shapeMap = new Map<string, RepertoireItem>();
+                    exercises.forEach(exercise => {
+                        const shapeId = exercise.scale_shape;
+                        if (shapeId) {
+                            // Keep the first (lowest position/most natural key) for each shape
+                            if (!shapeMap.has(shapeId)) {
+                                shapeMap.set(shapeId, exercise);
+                            } else {
+                                const existing = shapeMap.get(shapeId)!;
+                                // Prefer lower position, or if same position, earlier in alphabet
+                                const posDiff = (exercise.position ?? 9999) - (existing.position ?? 9999);
+                                if (posDiff < 0 || (posDiff === 0 && exercise.name < existing.name)) {
+                                    shapeMap.set(shapeId, exercise);
+                                }
+                            }
+                        } else {
+                            // For exercises without a scale_shape, use the exercise ID as key
+                            shapeMap.set(exercise.id, exercise);
+                        }
+                    });
+                    processedExercises = Array.from(shapeMap.values());
+                }
 
-                // Add priority exercises first (in order specified)
-                for (const priorityId of priorityIds) {
-                    const idx = remainingExercises.findIndex(e => e.id === priorityId);
+                // Sort: priority exercises/shapes first, then by scale_shapes.created_at or name
+                const sortedQueue: RepertoireItem[] = [];
+                const remainingExercises = [...processedExercises];
+
+                // Priority 1: priorityShapeIds (NEW - scale_shape IDs for shape-by-shape learning)
+                // These take precedence as they're the new shape-based priority system
+                for (const priorityShapeId of priorityShapeIds) {
+                    const idx = remainingExercises.findIndex(e => e.scale_shape === priorityShapeId);
                     if (idx !== -1) {
                         sortedQueue.push(remainingExercises[idx]);
                         remainingExercises.splice(idx, 1);
                     }
                 }
 
-                // Sort remaining by fallback order
+                // Priority 2: priorityIds (LEGACY - exercise IDs for backward compatibility)
+                // These are exercise IDs (scale IDs), not shape IDs
+                // When groupByShape is true, we find the exercise that matches the ID,
+                // or if that exercise was deduplicated, we find the representative for its shape
+                for (const priorityId of priorityIds) {
+                    // First try to find the exact exercise by ID
+                    let idx = remainingExercises.findIndex(e => e.id === priorityId);
+                    if (idx === -1) {
+                        // If not found (maybe it was deduplicated), find by shape
+                        const priorityExercise = exercises.find(e => e.id === priorityId);
+                        if (priorityExercise?.scale_shape) {
+                            idx = remainingExercises.findIndex(e => e.scale_shape === priorityExercise.scale_shape);
+                        }
+                    }
+                    if (idx !== -1) {
+                        sortedQueue.push(remainingExercises[idx]);
+                        remainingExercises.splice(idx, 1);
+                    }
+                }
+
+                // Sort remaining by scale_shape creation date (not scale creation date)
                 remainingExercises.sort((a, b) => {
                     if (orderBy === 'name') {
                         return (a.name || '').localeCompare(b.name || '');
                     }
-                    // Default: order by position first, then by created_at
-                    const posA = a.position ?? 9999;
-                    const posB = b.position ?? 9999;
-                    if (posA !== posB) {
-                        return posA - posB;
-                    }
-                    const dateA = new Date(a.created_at || 0).getTime();
-                    const dateB = new Date(b.created_at || 0).getTime();
+                    // Default: order by scale_shape created_at (natural learning progression)
+                    // This ensures we go shape-by-shape, not through all 12 keys of one shape
+                    const dateA = new Date(a.scale_shape_created_at || a.created_at || 0).getTime();
+                    const dateB = new Date(b.scale_shape_created_at || b.created_at || 0).getTime();
                     return dateA - dateB;
                 });
 
@@ -178,7 +254,7 @@ export function useExerciseQueue({
         }
 
         loadExercises();
-    }, [moduleType, priorityIdsKey, typeFilter, orderBy, initialIndex, queue.length]);
+    }, [moduleType, priorityIdsKey, priorityShapeIdsKey, typeFilter, orderBy, initialIndex, queue.length, groupByShape]);
 
     // Navigation functions
     const next = useCallback(() => {

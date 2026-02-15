@@ -124,7 +124,9 @@ const RiffPractice = ({
       : (lessonExercise?.metronome_mode as MetronomeMode) || 'regular');
 
   const [mode, setMode] = useState<MetronomeMode>(effectiveMode);
-  const [loop, setLoop] = useState(moduleConfig?.metronome?.loop ?? (!isControlledSession || !practiceSettings.autoAdvance));
+  // Loop should default to true unless explicitly set to false in config
+  // This ensures speed builder mode continues looping instead of stopping
+  const [loop, setLoop] = useState(moduleConfig?.metronome?.loop ?? true);
   const [startTime, setStartTime] = useState<number | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [metronomeBpm, setMetronomeBpm] = useState(moduleConfig?.metronome?.bpm ?? (lessonExercise?.starting_bpm || 80));
@@ -184,7 +186,8 @@ const RiffPractice = ({
       }, 500);
       return () => clearTimeout(timer);
     }
-  }, [autoStart, isConfigMode]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoStart, isConfigMode, metronome.start, metronome.audioContext]);
 
   const availableSequences = useMemo(() => {
     const itemType = repertoireItem.Type?.toLowerCase();

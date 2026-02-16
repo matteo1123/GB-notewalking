@@ -12,22 +12,22 @@ const tools = [
         functionDeclarations: [
             {
                 name: "search_scale_shapes",
-                description: "Search for scale or arpeggio shapes by criteria. Returns shape IDs that can be added to priority_scale_shape_ids.",
+                description: "Search the scales database for exercises. Returns shape IDs for creating module configs. Make only ONE search per user request.",
                 parameters: {
                     type: "object",
                     properties: {
                         module_type: {
                             type: "string",
                             enum: ["scale", "arpeggio"],
-                            description: "Type of exercise to search for",
+                            description: "Filter to scales or arpeggios only. If type_filter is provided, this is optional.",
                         },
                         root_note: {
                             type: "string",
-                            description: "Root note like C, C#, D, etc.",
+                            description: "Root note: C, C#, Db, D, Eb, E, F, F#, Gb, G, Ab, A, Bb, B",
                         },
                         tonality: {
                             type: "string",
-                            description: "Tonality like major, minor, dominant7, etc.",
+                            description: "Scale quality: major, minor, dorian, phrygian, lydian, mixolydian, locrian, dominant7, minor7, major7, diminished, augmented",
                         },
                         position: {
                             type: "number",
@@ -35,7 +35,11 @@ const tools = [
                         },
                         type_filter: {
                             type: "string",
-                            description: "Type filter like '3 Notes Per String', 'CAGED', etc.",
+                            description: "Shape system filter. Use: '3 notes per string', '2 notes per string', '4 notes per string', or 'arpeggio'. Can also use shorthand: 3nps, 2nps, 4nps",
+                        },
+                        major_key: {
+                            type: "string",
+                            description: "Filter by parent major key (e.g., 'G' finds G major, E minor, A dorian, etc.)",
                         },
                     },
                 },
@@ -115,26 +119,56 @@ const tools = [
 const SYSTEM_PROMPT = `You are Guitar Brain Coach, an AI assistant helping guitarists configure their practice.
 
 ## Your Primary Job
-Help users configure **individual practice modules** by searching for the right exercises and creating module configs.
+Help users configure **individual practice modules** by searching for exercises and creating module configs.
+
+## DATABASE SCHEMA - How to Search
+
+The \`scales\` table contains all exercises. Key columns:
+- \`Type\`: Shape system. Values are like "3 notes per string scale", "2 notes per string scale", "arpeggio"
+- \`root_note\`: Root note like "C", "C#", "D", "Eb", "F#", etc.
+- \`tonality\`: Scale quality like "major", "minor", "dorian", "mixolydian", "dominant7"
+- \`Position\`: Fretboard position 1-7 (nullable)
+- \`major_key\`: The major key this belongs to (e.g., "G" for G major and E minor)
+- \`scale_shape\`: Links to scale_shapes table (used for grouping)
+
+## AVAILABLE CONTENT (NO CAGED!)
+This app uses **Notes-Per-String** patterns only:
+- "3 notes per string" (3nps) - most common
+- "2 notes per string" (2nps)
+- "4 notes per string" (4nps)
+- Arpeggios
+
+Do NOT suggest CAGED - it doesn't exist here.
+
+## SEARCH EXAMPLES
+To find C# minor 3nps scales:
+  { root_note: "C#", tonality: "minor", type_filter: "3 notes per string" }
+
+To find all major arpeggios:
+  { tonality: "major", type_filter: "arpeggio" }
+
+To find position 1 scales:
+  { position: 1 }
+
+To find everything in the key of G:
+  { root_note: "G" } or search by major_key
 
 ## Workflow
 1. User describes what they want to practice
-2. You search for matching scale_shapes using search_scale_shapes
-3. You create a module config with those shape IDs using create_module_config
-4. Present the result to the user
+2. Make ONE search call with appropriate filters
+3. If results found, create module config with those shape IDs
+4. If no results, tell user what's not available - don't retry
 
 ## Progression Modes
-- "cycle": Rotate through all exercises each session (DEFAULT)
+- "cycle": Rotate through all exercises (DEFAULT)
 - "sequential": Complete in order, stop at end
-- "focus": Auto-switch to lowest BPM exercise until it hits target (great for mastery)
+- "focus": Auto-switch to lowest BPM exercise until target reached
 
 ## Guidelines
-- Always search first before creating configs
-- Ask clarifying questions if needed: "Which positions?" "What's your target BPM?"
-- When user says "all positions", search for shapes in positions 1-7
-- Default progression_mode to "cycle" unless user wants to master something (then "focus")
-- Be concise - guitar players want to practice, not read essays
-- Show what you found before creating the config`;
+- Make only 1 search call per user request
+- If search returns 0 results, explain what filters didn't match
+- Ask clarifying questions: "3nps or 2nps?" "Which positions?"
+- Be concise - guitarists want to practice, not read`;
 
 serve(async (req) => {
     // Handle CORS preflight
@@ -347,59 +381,93 @@ async function executeToolCall(
 
 async function searchScaleShapes(supabase: any, input: any) {
     try {
-        // First get scales matching criteria
-        let scalesQuery = supabase.from("scales").select("id, name, root_note, tonality, Position, Type, scale_shape");
+        // Build query against scales table
+        let scalesQuery = supabase.from("scales").select("id, name, root_note, tonality, Position, Type, scale_shape, major_key");
 
-        if (input.module_type === "arpeggio") {
+        // Filter by type (arpeggio vs scale vs specific nps)
+        if (input.type_filter) {
+            // Handle common shorthand
+            let typePattern = input.type_filter;
+            if (typePattern === "3nps" || typePattern === "3 nps") {
+                typePattern = "3 notes per string";
+            } else if (typePattern === "2nps" || typePattern === "2 nps") {
+                typePattern = "2 notes per string";
+            } else if (typePattern === "4nps" || typePattern === "4 nps") {
+                typePattern = "4 notes per string";
+            }
+            scalesQuery = scalesQuery.ilike("Type", `%${typePattern}%`);
+        } else if (input.module_type === "arpeggio") {
             scalesQuery = scalesQuery.ilike("Type", "%arpeggio%");
         } else if (input.module_type === "scale") {
+            // Exclude arpeggios when looking for scales
             scalesQuery = scalesQuery.not("Type", "ilike", "%arpeggio%");
         }
 
+        // Filter by root note (case-insensitive, handle sharps/flats)
         if (input.root_note) {
-            scalesQuery = scalesQuery.ilike("root_note", input.root_note);
+            // Normalize: "c#" -> "C#", "db" -> "Db"
+            const normalized = input.root_note.charAt(0).toUpperCase() + input.root_note.slice(1).toLowerCase();
+            scalesQuery = scalesQuery.ilike("root_note", normalized);
         }
 
+        // Filter by tonality
         if (input.tonality) {
             scalesQuery = scalesQuery.ilike("tonality", `%${input.tonality}%`);
         }
 
+        // Filter by position
         if (input.position) {
             scalesQuery = scalesQuery.eq("Position", input.position);
         }
 
-        if (input.type_filter) {
-            scalesQuery = scalesQuery.ilike("Type", `%${input.type_filter}%`);
+        // Filter by major key
+        if (input.major_key) {
+            scalesQuery = scalesQuery.ilike("major_key", input.major_key);
         }
 
-        const { data: scales, error } = await scalesQuery.limit(50);
+        const { data: scales, error } = await scalesQuery.limit(100);
 
-        if (error) return { error: error.message };
+        if (error) {
+            return { error: error.message, query_attempted: input };
+        }
+
         if (!scales || scales.length === 0) {
-            return { found: 0, message: "No exercises found matching criteria" };
+            return {
+                found: 0,
+                message: "No exercises found matching criteria",
+                filters_used: input,
+                suggestion: "Try broadening your search. Available types: '3 notes per string', '2 notes per string', 'arpeggio'"
+            };
         }
 
-        // Get unique shape IDs
+        // Get unique shape IDs for grouping
         const shapeIds = [...new Set(scales.map((s: any) => s.scale_shape).filter(Boolean))];
 
-        // Get shape details
-        const { data: shapes } = await supabase
-            .from("scale_shapes")
-            .select("id, name, intervals")
-            .in("id", shapeIds);
+        // Get shape details if we have shape IDs
+        let shapes: any[] = [];
+        if (shapeIds.length > 0) {
+            const { data: shapeData } = await supabase
+                .from("scale_shapes")
+                .select("id, name, intervals")
+                .in("id", shapeIds);
+            shapes = shapeData || [];
+        }
 
         return {
-            found: shapeIds.length,
-            shapes: (shapes || []).map((s: any) => ({
+            found: scales.length,
+            unique_shapes: shapeIds.length,
+            shapes: shapes.map((s: any) => ({
                 shape_id: s.id,
                 name: s.name,
-                intervals: s.intervals,
             })),
-            sample_exercises: scales.slice(0, 5).map((s: any) => ({
+            sample_exercises: scales.slice(0, 8).map((s: any) => ({
                 name: s.name,
+                root_note: s.root_note,
+                tonality: s.tonality,
                 position: s.Position,
                 type: s.Type,
             })),
+            filters_used: input,
         };
     } catch (err: any) {
         return { error: err.message };

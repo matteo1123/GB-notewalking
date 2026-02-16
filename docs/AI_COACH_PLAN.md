@@ -1070,3 +1070,60 @@ Since all changes are additive:
 2. **Tool Call Visibility**: Show users what the AI is doing (searching, creating)?
 3. **Rate Limits**: How many AI requests per user per day?
 4. **Routine Sharing**: Should users be able to share routines publicly?
+
+---
+
+## Future Roadmap
+
+### User Feedback System
+
+**Status:** Planned
+
+A system for users to submit feedback, suggestions, and feature requests directly from the app.
+
+#### Components:
+1. **Feedback Button/Modal** - Accessible from settings or floating button
+2. **Database Table** - `user_feedback` to store submissions
+3. **AI Coach Tool** - `submit_feedback` for the AI to log improvement ideas
+
+#### Database Schema:
+```sql
+CREATE TABLE user_feedback (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users,
+  feedback_type TEXT NOT NULL, -- 'bug', 'feature', 'suggestion', 'ai_observation'
+  content TEXT NOT NULL,
+  context JSONB, -- Current page, module, etc.
+  source TEXT DEFAULT 'user', -- 'user', 'ai_coach'
+  created_at TIMESTAMPTZ DEFAULT now(),
+  status TEXT DEFAULT 'new' -- 'new', 'reviewed', 'planned', 'implemented'
+);
+```
+
+#### AI Coach Feedback Tool:
+```typescript
+{
+  name: "submit_feedback",
+  description: "Log an observation or suggestion for app improvement. Use when you notice the user struggling with something or when you have ideas to make the app better.",
+  parameters: {
+    feedback_type: "suggestion" | "missing_feature" | "usability_issue",
+    content: string,  // The observation or suggestion
+    context: string,  // What the user was trying to do
+  }
+}
+```
+
+This allows the AI to proactively submit feedback like:
+- "User wanted CAGED shapes but system only has NPS"
+- "User asked for feature X that doesn't exist"
+- "Search returned no results for common request Y"
+
+---
+
+## Current Known Limitations
+
+### AI Coach (Experimental)
+- **Shape System**: Only 2nps, 3nps, 4nps shapes available (no CAGED)
+- **Tool Loop Issue**: Sometimes makes excessive search calls
+- **Error Handling**: Needs better user-facing error messages
+- **Model**: Using Gemini 3 Flash Preview (may change)

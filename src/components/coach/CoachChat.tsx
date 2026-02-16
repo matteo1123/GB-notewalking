@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Send, Sparkles, Bot, User, Play, Save } from 'lucide-react';
+import { Loader2, Send, Sparkles, Bot, User, Play, Save, FlaskConical } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { useSession } from '@/contexts/SessionContext';
@@ -41,10 +41,10 @@ interface Message {
 }
 
 const SUGGESTION_CHIPS = [
-    { label: 'C# minor routine', prompt: 'Create a module for practicing C# minor in all positions' },
+    { label: 'C# minor 3nps', prompt: 'Create a module for practicing C# minor using 3 notes per string shapes' },
     { label: 'Analyze my progress', prompt: 'Analyze my practice progress over the last month' },
     { label: 'What should I practice?', prompt: 'Based on my history, what should I focus on next?' },
-    { label: 'Position 1 scales', prompt: 'Find all scales in position 1 and create a practice module' },
+    { label: 'All major scales', prompt: 'Find all major scale exercises and create a practice module' },
 ];
 
 export function CoachChat() {
@@ -182,6 +182,15 @@ export function CoachChat() {
 
     return (
         <div className="flex flex-col h-full">
+            {/* Experimental Banner */}
+            <div className="flex-shrink-0 px-4 py-2 bg-amber-500/10 border-b border-amber-500/20">
+                <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
+                    <FlaskConical className="w-4 h-4" />
+                    <span className="text-xs font-medium">Experimental Feature</span>
+                    <span className="text-xs text-muted-foreground">— AI responses may be inaccurate</span>
+                </div>
+            </div>
+
             {/* Messages Area */}
             <ScrollArea ref={scrollRef} className="flex-1 p-4">
                 {messages.length === 0 ? (
@@ -190,7 +199,12 @@ export function CoachChat() {
                         <div className="w-16 h-16 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center mb-4">
                             <Bot className="w-8 h-8 text-white" />
                         </div>
-                        <h2 className="text-xl font-semibold mb-2">Guitar Brain Coach</h2>
+                        <div className="flex items-center gap-2 mb-2">
+                            <h2 className="text-xl font-semibold">Guitar Brain Coach</h2>
+                            <span className="px-2 py-0.5 text-xs font-medium bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded-full border border-amber-500/30">
+                                Experimental
+                            </span>
+                        </div>
                         <p className="text-muted-foreground mb-6 max-w-sm">
                             I can help you create practice modules, analyze your progress,
                             and find the right exercises for your goals.

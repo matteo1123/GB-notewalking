@@ -28,3 +28,8 @@ test-results/
 playwright-report/
 blob-report/
 
+# Supabase secrets
+supabase/.env.local
+.env.local
+.env
+

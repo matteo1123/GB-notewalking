@@ -1,6 +1,15 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { RepertoireItem } from '@/types/repertoire';
+import { useAuth } from '@/contexts/AuthContext';
+import type { ProgressionMode, ExerciseProgressState } from '@/types/practice';
+import {
+    getNextExercise,
+    updateProgressionState,
+    loadExerciseProgress,
+    getProgressSummary,
+    type ProgressionContext,
+} from '@/lib/progressionEngine';
 
 export interface UseExerciseQueueOptions {
     moduleType: 'scale' | 'arpeggio';
@@ -12,6 +21,9 @@ export interface UseExerciseQueueOptions {
     orderBy?: 'created_at' | 'name'; // Fallback ordering
     initialIndex?: number;        // Starting position in queue
     groupByShape?: boolean;       // If true, show only one exercise per scale_shape (default: true for scale/arpeggio)
+    // NEW: Progression mode options
+    progressionMode?: ProgressionMode;  // 'cycle' | 'sequential' | 'focus'
+    focusTargetBpm?: number;            // Target BPM for focus mode (default 90)
 }
 
 export interface UseExerciseQueueReturn {
@@ -24,6 +36,12 @@ export interface UseExerciseQueueReturn {
     goTo: (index: number) => void;
     loading: boolean;
     error: string | null;
+    // NEW: Progression mode features
+    progressionMode: ProgressionMode;
+    exerciseProgress: Record<string, ExerciseProgressState>;
+    progressSummary: ReturnType<typeof getProgressSummary> | null;
+    recordExerciseComplete: (exerciseId: string, achievedBpm: number) => void;
+    isCompleted: boolean; // True if sequential mode and all done
 }
 
 /**
@@ -44,11 +62,16 @@ export function useExerciseQueue({
     orderBy = 'created_at',
     initialIndex = 0,
     groupByShape = true, // Default to true for shape-by-shape learning
+    progressionMode = 'cycle',
+    focusTargetBpm = 90,
 }: UseExerciseQueueOptions): UseExerciseQueueReturn {
+    const { user } = useAuth();
     const [queue, setQueue] = useState<RepertoireItem[]>([]);
     const [currentIndex, setCurrentIndex] = useState(initialIndex);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [exerciseProgress, setExerciseProgress] = useState<Record<string, ExerciseProgressState>>({});
+    const [isCompleted, setIsCompleted] = useState(false);
 
     // Prevent duplicate fetches using a ref
     const fetchingRef = useRef(false);
@@ -289,6 +312,64 @@ export function useExerciseQueue({
         return queue[currentIndex];
     }, [queue, currentIndex]);
 
+    // Load exercise progress from database when user and queue are ready
+    useEffect(() => {
+        if (!user?.id || queue.length === 0) return;
+
+        const exerciseIds = queue.map(e => e.id);
+        loadExerciseProgress(user.id, exerciseIds).then(progress => {
+            setExerciseProgress(progress);
+        });
+    }, [user?.id, queue]);
+
+    // Compute progress summary for display
+    const progressSummary = useMemo(() => {
+        if (queue.length === 0) return null;
+
+        const context: ProgressionContext = {
+            mode: progressionMode,
+            exerciseIds: queue.map(e => e.id),
+            currentIndex,
+            targetBpm: focusTargetBpm,
+            exerciseProgress,
+        };
+
+        return getProgressSummary(context);
+    }, [queue, currentIndex, progressionMode, focusTargetBpm, exerciseProgress]);
+
+    // Record exercise completion and advance based on progression mode
+    const recordExerciseComplete = useCallback((exerciseId: string, achievedBpm: number) => {
+        const context: ProgressionContext = {
+            mode: progressionMode,
+            exerciseIds: queue.map(e => e.id),
+            currentIndex,
+            targetBpm: focusTargetBpm,
+            exerciseProgress,
+        };
+
+        const updatedState = updateProgressionState(context, exerciseId, achievedBpm);
+        setExerciseProgress(updatedState.exerciseProgress || {});
+
+        // Handle navigation based on mode
+        if (progressionMode === 'sequential') {
+            const nextResult = getNextExercise(updatedState);
+            if (nextResult === null) {
+                setIsCompleted(true);
+                // Stay on current (last) exercise
+            } else {
+                setCurrentIndex(nextResult.index);
+            }
+        } else if (progressionMode === 'focus') {
+            const nextResult = getNextExercise({ ...updatedState, exerciseProgress: updatedState.exerciseProgress });
+            if (nextResult) {
+                setCurrentIndex(nextResult.index);
+            }
+        } else {
+            // cycle mode - just advance normally
+            next();
+        }
+    }, [queue, currentIndex, progressionMode, focusTargetBpm, exerciseProgress, next]);
+
     return {
         currentExercise,
         currentIndex,
@@ -299,5 +380,11 @@ export function useExerciseQueue({
         goTo,
         loading,
         error,
+        // Progression mode features
+        progressionMode,
+        exerciseProgress,
+        progressSummary,
+        recordExerciseComplete,
+        isCompleted,
     };
 }

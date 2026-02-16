@@ -28,6 +28,7 @@ interface SessionContextType {
     activeSession: ActiveSession | null;
     timer: SessionTimerState;
     startSession: (availableTimeMinutes?: number, lessonId?: string) => Promise<void>;
+    startSessionWithPlan: (name: string, blocks: SessionBlock[]) => Promise<void>;
     pauseSession: () => void;
     resumeSession: () => void;
     nextBlock: () => Promise<void>;
@@ -303,6 +304,87 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }, [startTimer, toast]);
 
     /**
+     * Start a session with a pre-built plan (e.g., from AI coach or saved routine)
+     */
+    const startSessionWithPlan = useCallback(async (
+        name: string,
+        blocks: SessionBlock[]
+    ) => {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                toast({
+                    title: 'Not authenticated',
+                    description: 'Please sign in to start a practice session',
+                    variant: 'destructive',
+                });
+                return;
+            }
+
+            if (blocks.length === 0) {
+                toast({
+                    title: 'Empty session',
+                    description: 'No practice blocks configured',
+                    variant: 'destructive',
+                });
+                return;
+            }
+
+            // Calculate total duration
+            const totalDurationSeconds = blocks.reduce(
+                (sum, block) => sum + (block.duration_minutes || 10) * 60,
+                0
+            );
+
+            // Create session in database
+            const { data: session, error } = await (supabase as any)
+                .from('practice_sessions')
+                .insert({
+                    user_id: user.id,
+                    started_at: new Date().toISOString(),
+                    total_duration_seconds: totalDurationSeconds,
+                    session_plan: blocks,
+                    completed: false,
+                })
+                .select()
+                .single();
+
+            if (error) throw error;
+
+            // Set active session
+            const firstBlock = blocks[0];
+            setActiveSession({
+                session,
+                currentBlockIndex: 0,
+                currentBlock: firstBlock,
+                timeElapsed: 0,
+                isPaused: false,
+            });
+
+            setTimer({
+                timeRemaining: (firstBlock.duration_minutes || 10) * 60,
+                totalTimeRemaining: totalDurationSeconds,
+            });
+
+            // Start timer
+            startTimer();
+
+            toast({
+                title: `Started: ${name}`,
+                description: `${blocks.length} activity${blocks.length > 1 ? 'ies' : ''} planned`,
+            });
+
+        } catch (error) {
+            console.error('Failed to start session:', error);
+            toast({
+                title: 'Failed to start session',
+                description: 'Please try again',
+                variant: 'destructive',
+            });
+        }
+    }, [startTimer, toast]);
+
+    /**
      * Auto-advance when block timer reaches zero
      */
     useEffect(() => {
@@ -316,6 +398,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             activeSession,
             timer,
             startSession,
+            startSessionWithPlan,
             pauseSession,
             resumeSession,
             nextBlock,

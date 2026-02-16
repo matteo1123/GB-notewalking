@@ -13,10 +13,21 @@ import { PriorityManager } from "@/components/PriorityManager";
 import { PressStart } from "@/components/PressStart";
 import { SessionRecap } from "@/components/SessionRecap";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, Settings } from "lucide-react";
 import { SessionProvider, useSession } from "@/contexts/SessionContext";
 import { SessionExecutor } from "@/components/SessionExecutor";
 import { SessionWrapUp } from "@/components/SessionWrapUp";
+import { MyRoutines } from "@/components/routines";
+import { CoachChat } from "@/components/coach";
+import { ProgressDashboard } from "@/components/ProgressDashboard";
+import { useRoutines } from "@/hooks/useRoutines";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 
 // Updated Stripe Price ID
 const STRIPE_PRICE_ID = "price_1SknWkEOnRZP4MxPtX889sCh";
@@ -28,7 +39,8 @@ const PremiumContent = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   // Lift session state check to here
-  const { activeSession, endSession } = useSession();
+  const { activeSession, endSession, startSessionWithPlan } = useSession();
+  const { getRoutine, recordPractice } = useRoutines();
 
   const [selectedRiff, setSelectedRiff] = useState<RepertoireItem | null>(null);
   const [exercises, setExercises] = useState<RepertoireItem[]>([]);
@@ -41,19 +53,31 @@ const PremiumContent = () => {
   const [isPremium, setIsPremium] = useState(false);
   const [isSubscribing, setIsSubscribing] = useState(false);
   const [checkingPremium, setCheckingPremium] = useState(true);
-  const [activeTab, setActiveTab] = useState("priorities");
+  const [activeTab, setActiveTab] = useState("practice");
+  const [prioritiesOpen, setPrioritiesOpen] = useState(false);
 
   // Track previous session state to detect completion
   const prevActiveSessionRef = useRef(activeSession);
 
-  // Redirect to recap tab when session completes
+  // Redirect to progress tab when session completes
   useEffect(() => {
     // If we had an active session before but now it's null, session completed
     if (prevActiveSessionRef.current && !activeSession) {
-      setActiveTab("recap");
+      setActiveTab("progress");
     }
     prevActiveSessionRef.current = activeSession;
   }, [activeSession]);
+
+  // Handle starting a routine
+  const handleStartRoutine = async (routineId: string) => {
+    const routine = await getRoutine(routineId);
+    if (routine && routine.session_plan && routine.session_plan.length > 0) {
+      await recordPractice(routineId);
+      // Start session with the routine's saved session plan
+      await startSessionWithPlan(routine.name, routine.session_plan);
+      // The component will re-render to show SessionExecutor when activeSession is set
+    }
+  };
 
   useEffect(() => {
     if (searchParams.get("success")) {
@@ -109,9 +133,9 @@ const PremiumContent = () => {
           .limit(1);
 
         if (sessionsData && sessionsData.length > 0) {
-          setActiveTab("start");
+          setActiveTab("practice");
         } else {
-          setActiveTab("priorities");
+          setActiveTab("practice");
         }
       }
       setCheckingPremium(false);
@@ -288,6 +312,15 @@ const PremiumContent = () => {
           )}
           <Button
             variant="ghost"
+            size="icon"
+            onClick={() => setPrioritiesOpen(true)}
+            className="h-8 w-8"
+            title="Learning Priorities"
+          >
+            <Settings className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
             size="sm"
             onClick={() => window.location.href = '/profile'}
             className="px-2 sm:px-3"
@@ -301,33 +334,56 @@ const PremiumContent = () => {
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden p-2 sm:p-4">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0 overflow-hidden">
           <div className="overflow-x-auto flex-shrink-0 mb-2 sm:mb-4 -mx-2 px-2">
-            <TabsList className="inline-flex w-auto min-w-full sm:grid sm:grid-cols-4 gap-1">
-              <TabsTrigger value="start" className="text-xs sm:text-sm px-2 sm:px-4 whitespace-nowrap">🚀 Start</TabsTrigger>
-              <TabsTrigger value="priorities" className="text-xs sm:text-sm px-2 sm:px-4 whitespace-nowrap">⚙️ Priorities</TabsTrigger>
-              <TabsTrigger value="recap" className="text-xs sm:text-sm px-2 sm:px-4 whitespace-nowrap">📝 Recap</TabsTrigger>
-              <TabsTrigger value="modules" className="text-xs sm:text-sm px-2 sm:px-4 whitespace-nowrap">🎯 Modules</TabsTrigger>
+            <TabsList className="inline-flex w-auto min-w-full sm:grid sm:grid-cols-5 gap-1">
+              <TabsTrigger value="practice" className="text-xs sm:text-sm px-2 sm:px-4 whitespace-nowrap">🎸 Practice</TabsTrigger>
+              <TabsTrigger value="routines" className="text-xs sm:text-sm px-2 sm:px-4 whitespace-nowrap">📋 Routines</TabsTrigger>
+              <TabsTrigger value="library" className="text-xs sm:text-sm px-2 sm:px-4 whitespace-nowrap">🎯 Library</TabsTrigger>
+              <TabsTrigger value="coach" className="text-xs sm:text-sm px-2 sm:px-4 whitespace-nowrap">🤖 Coach</TabsTrigger>
+              <TabsTrigger value="progress" className="text-xs sm:text-sm px-2 sm:px-4 whitespace-nowrap">📊 Progress</TabsTrigger>
             </TabsList>
           </div>
 
-          <TabsContent value="start" className="flex-1 min-h-0 overflow-y-auto data-[state=active]:block p-6">
+          {/* Practice - Quick start or pick a routine */}
+          <TabsContent value="practice" className="flex-1 min-h-0 overflow-y-auto data-[state=active]:block p-6">
             <PressStart />
           </TabsContent>
 
-          <TabsContent value="priorities" className="flex-1 min-h-0 overflow-y-auto data-[state=active]:block p-6">
-            <PriorityManager onStart={() => setActiveTab("start")} />
+          {/* Routines - Named, saved practice configurations */}
+          <TabsContent value="routines" className="flex-1 min-h-0 overflow-y-auto data-[state=active]:block p-6">
+            <MyRoutines onStartRoutine={handleStartRoutine} />
           </TabsContent>
 
-          <TabsContent value="recap" className="flex-1 min-h-0 overflow-y-auto data-[state=active]:block p-6">
-            <SessionRecap onStartNewSession={() => setActiveTab("start")} />
-          </TabsContent>
-
-          <TabsContent value="modules" className="flex-1 min-h-0 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col">
+          {/* Library - Browse all exercises and modules */}
+          <TabsContent value="library" className="flex-1 min-h-0 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col">
             <ModuleLibrary />
           </TabsContent>
 
-          {/* Lessons tab removed - using SessionBuilder in Modules tab for custom routines */}
+          {/* Coach - AI chat interface */}
+          <TabsContent value="coach" className="flex-1 min-h-0 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col">
+            <CoachChat />
+          </TabsContent>
+
+          {/* Progress - Analytics, history, recaps */}
+          <TabsContent value="progress" className="flex-1 min-h-0 overflow-y-auto data-[state=active]:block p-6">
+            <ProgressDashboard />
+          </TabsContent>
         </Tabs>
       </div>
+
+      {/* Priorities Settings Sheet */}
+      <Sheet open={prioritiesOpen} onOpenChange={setPrioritiesOpen}>
+        <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Learning Priorities</SheetTitle>
+          </SheetHeader>
+          <div className="mt-4">
+            <PriorityManager onStart={() => {
+              setPrioritiesOpen(false);
+              setActiveTab("practice");
+            }} />
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 };

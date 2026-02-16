@@ -54,6 +54,8 @@ export function ScalePracticeSession({
         orderBy: moduleConfig?.order_by || 'created_at',
         initialIndex: moduleConfig?.current_index || 0,
         groupByShape: true, // Always group by scale_shape for shape-by-shape learning
+        progressionMode: moduleConfig?.progression_mode || 'cycle',
+        focusTargetBpm: moduleConfig?.focus_target_bpm || 90,
     };
 
     // Use the exercise queue hook

@@ -131,6 +131,13 @@ export interface ScaleModuleConfig {
   group_by_shape?: boolean;         // If true, show only one exercise per scale_shape
   order_by?: 'created_at' | 'name'; // Fallback ordering after priority list is exhausted
   current_index?: number;           // Current position in the queue
+
+  // Progression mode: how to advance through exercises
+  // - cycle: rotate through all, loop back (default)
+  // - sequential: complete in order, stop at end
+  // - focus: auto-switch to lowest BPM exercise
+  progression_mode?: 'cycle' | 'sequential' | 'focus';
+  focus_target_bpm?: number;        // For focus mode: target BPM threshold (default 90)
 }
 
 export interface RhythmModuleConfig {
@@ -169,6 +176,13 @@ export interface ArpeggioModuleConfig {
   order_by?: 'created_at' | 'name';  // Fallback ordering
   current_index?: number;            // Current position in the queue
   pattern?: 'ascending' | 'descending' | 'alternating';
+
+  // Progression mode: how to advance through exercises
+  // - cycle: rotate through all, loop back (default)
+  // - sequential: complete in order, stop at end
+  // - focus: auto-switch to lowest BPM exercise
+  progression_mode?: 'cycle' | 'sequential' | 'focus';
+  focus_target_bpm?: number;        // For focus mode: target BPM threshold (default 90)
 }
 
 export interface PieceMasteryModuleConfig {
@@ -285,4 +299,107 @@ export interface ChordProgressionProgress {
   time_practiced_seconds: number;
   last_practiced?: string;
   mastery_level: number;
+}
+
+// ============================================================================
+// Practice Routines - Named, reusable practice configurations
+// ============================================================================
+
+/**
+ * Progression modes for scale/arpeggio modules
+ * - cycle: Rotate through all exercises each session (default, loops back)
+ * - sequential: Complete exercises in order, stop at end
+ * - focus: Auto-switch to lowest BPM exercise until it reaches target
+ *
+ * Note: These primarily apply to scale/arpeggio modules. Other modules
+ * may interpret these differently or ignore them.
+ */
+export type ProgressionMode = 'cycle' | 'sequential' | 'focus';
+
+/**
+ * Tracks BPM progress for individual exercises within a module.
+ * Used by 'focus' mode to determine which exercise needs the most work.
+ */
+export interface ExerciseProgressState {
+  exercise_id: string;
+  scale_shape_id?: string;
+  max_bpm: number;
+  target_bpm: number;
+  last_practiced?: string;
+  times_practiced: number;
+}
+
+/**
+ * Named practice routine - a saved, reusable practice configuration
+ * Examples: "C# Minor Mastery", "General Guitar Skills", "Away from Instrument"
+ */
+export interface PracticeRoutine {
+  id: string;
+  user_id: string;
+
+  // Identity
+  name: string;
+  description?: string;
+  icon: string;
+  color: string;
+
+  // Practice Configuration
+  session_plan: SessionBlock[];
+  total_duration_minutes?: number;
+
+  // Metadata
+  is_active: boolean;
+  is_favorite: boolean;
+  last_practiced_at?: string;
+  times_practiced: number;
+  created_at: string;
+  updated_at: string;
+
+  // AI-generated tracking
+  created_by_ai: boolean;
+  ai_prompt?: string;
+}
+
+/**
+ * Summary view of a routine for list displays
+ */
+export interface PracticeRoutineSummary {
+  id: string;
+  name: string;
+  description?: string;
+  icon: string;
+  color: string;
+  is_favorite: boolean;
+  last_practiced_at?: string;
+  times_practiced: number;
+  module_count: number;
+  total_duration_minutes?: number;
+  created_by_ai: boolean;
+}
+
+/**
+ * Input for creating a new routine
+ */
+export interface CreateRoutineInput {
+  name: string;
+  description?: string;
+  icon?: string;
+  color?: string;
+  session_plan: SessionBlock[];
+  is_favorite?: boolean;
+  created_by_ai?: boolean;
+  ai_prompt?: string;
+}
+
+/**
+ * Input for updating an existing routine
+ */
+export interface UpdateRoutineInput {
+  name?: string;
+  description?: string;
+  icon?: string;
+  color?: string;
+  session_plan?: SessionBlock[];
+  is_active?: boolean;
+  is_favorite?: boolean;
 }

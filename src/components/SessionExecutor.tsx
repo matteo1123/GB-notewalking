@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Button } from './ui/button';
 import { Progress } from './ui/progress';
 import { Play, Pause, SkipForward, CheckCircle, Clock } from 'lucide-react';
-import type { SessionBlock } from '@/lib/sessionGenerator';
+import type { SessionBlock, ModuleType } from '@/types/practice';
 // Import module components
 import { RhythmTraining } from './RhythmTraining';
 import { ChordProgressionExercise } from './ChordProgressionExercise';
@@ -12,6 +12,28 @@ import { PieceMastery } from './piece-mastery/PieceMastery';
 import { PieceList } from './piece-mastery/PieceList';
 import type { Piece } from './piece-mastery/types';
 import { useSession } from '@/contexts/SessionContext';
+
+// Helper to get display info from module type
+function getModuleDisplayInfo(moduleType: ModuleType): { icon: string; title: string; description: string } {
+    switch (moduleType) {
+        case 'scale':
+            return { icon: '🎵', title: 'Scale Practice', description: 'Practice scales with metronome' };
+        case 'arpeggio':
+            return { icon: '🎹', title: 'Arpeggio Practice', description: 'Practice arpeggios with metronome' };
+        case 'rhythm':
+            return { icon: '🥁', title: 'Rhythm Training', description: 'Develop your timing skills' };
+        case 'notewalking':
+            return { icon: '🎤', title: 'Note Walking', description: 'Chord progressions and ear training' };
+        case 'chord_progressions':
+            return { icon: '🎼', title: 'Chord Changes', description: 'Practice chord transitions' };
+        case 'piece_mastery':
+            return { icon: '🎸', title: 'Piece Mastery', description: 'Master your repertoire' };
+        case 'riff':
+            return { icon: '🔥', title: 'Riff Practice', description: 'Learn and practice riffs' };
+        default:
+            return { icon: '🎯', title: 'Practice', description: 'Focus on your skills' };
+    }
+}
 
 /**
  * Session Executor - Actions governed by SessionContext
@@ -62,15 +84,10 @@ export function SessionExecutor() {
                 <div className="flex items-center justify-between gap-4 mb-2">
                     {/* Left: Title & Block Info */}
                     <div className="flex items-center gap-3 min-w-0 flex-1">
-                        {currentBlock.type === 'warmup' && (
-                            <span className="text-xl">🔥</span>
-                        )}
-                        {currentBlock.type === 'priority' && (
-                            <span className="text-xl">🎯</span>
-                        )}
+                        <span className="text-xl">{getModuleDisplayInfo(currentBlock.module_type).icon}</span>
                         <div className="min-w-0 flex-1">
-                            <h3 className="font-semibold truncate text-sm">{currentBlock.title}</h3>
-                            <p className="text-xs text-muted-foreground truncate">{currentBlock.description}</p>
+                            <h3 className="font-semibold truncate text-sm">{getModuleDisplayInfo(currentBlock.module_type).title}</h3>
+                            <p className="text-xs text-muted-foreground truncate">{getModuleDisplayInfo(currentBlock.module_type).description}</p>
                         </div>
                     </div>
 

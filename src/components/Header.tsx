@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { Button } from '@/components/ui/button';
 import { Music, Crown, LogIn, LogOut, Home, Menu, X } from 'lucide-react';
+import { SuggestionBox } from '@/components/SuggestionBox';
 
 const Header = () => {
   const { user, signOut } = useAuth();
@@ -75,6 +76,7 @@ const Header = () => {
                 </Button>
               </Link>
             )}
+            <SuggestionBox />
           </div>
 
           {/* Mobile: Hamburger button */}

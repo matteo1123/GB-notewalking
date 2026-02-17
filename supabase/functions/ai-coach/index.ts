@@ -35,7 +35,7 @@ const tools = [
                         },
                         type_filter: {
                             type: "string",
-                            description: "Shape system filter. Use: '3 notes per string', '2 notes per string', '4 notes per string', or 'arpeggio'. Can also use shorthand: 3nps, 2nps, 4nps",
+                            description: "Shape system filter. Use: '3 notes per string', '2 notes per string', '4 notes per string', or 'arpeggio'.",
                         },
                         major_key: {
                             type: "string",
@@ -112,11 +112,29 @@ const tools = [
                     },
                 },
             },
+            {
+                name: "submit_suggestion",
+                description: "Submit a suggestion for platform improvement. Use this when you identify a gap in the automated coaching tools or have an idea to improve the app based on your interaction with the user. You are encouraged to proactively use this.",
+                parameters: {
+                    type: "object",
+                    properties: {
+                        suggestion: {
+                            type: "string",
+                            description: "The suggestion content.",
+                        },
+                    },
+                    required: ["suggestion"],
+                },
+            },
         ],
     },
 ];
 
 const SYSTEM_PROMPT = `You are Guitar Brain Coach, an AI assistant helping guitarists configure their practice.
+
+## Your Personality & Philosophy
+1. **Daily Progress on Pillars:** You believe in continuous progress on core pillars (scales, arpeggios, rhythm). You are designed to guide users to practice these daily, tracking where they left off and always giving a "slight inch" nudge in progress. While you allow customization, you should firmly guide users back to this daily consistency on core skills.
+2. **Extreme Note Awareness (The "Why"):** you understand that guitarists often have the "weakest ears" of any musicians because they rely on visual shapes rather than sonic awareness. Unlike piano where keys are obvious, guitarists can play blind patterns. Therefore, you **strictly emphasize** awareness of every note's function (1-7) within the key context. You discourage mindless shape playing. You heavily promote **"notewalking"** (practicing chord tones over changing pedal notes) as the cure for this. Always remind the user to pay attention to the specific intervals they are playing.
 
 ## Your Primary Job
 Help users configure **individual practice modules** by searching for exercises and creating module configs.
@@ -168,7 +186,8 @@ To find everything in the key of G:
 - Make only 1 search call per user request
 - If search returns 0 results, explain what filters didn't match
 - Ask clarifying questions: "3nps or 2nps?" "Which positions?"
-- Be concise - guitarists want to practice, not read`;
+- Be concise - guitarists want to practice, not read.
+- **Always** mention note function awareness when relevant.`;
 
 serve(async (req) => {
     // Handle CORS preflight
@@ -374,6 +393,9 @@ async function executeToolCall(
         case "analyze_progress":
             return await analyzeProgress(supabase, userId, input);
 
+        case "submit_suggestion":
+            return await submitSuggestion(supabase, userId, input);
+
         default:
             return { error: `Unknown tool: ${toolName}` };
     }
@@ -502,6 +524,13 @@ async function getPracticeHistory(supabase: any, userId: string, input: any) {
         const daysBack = input.days_back || 30;
         const since = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000).toISOString();
 
+        // Debug: First check if ANY practice_log entries exist for this user (no date filter)
+        const { data: allUserLogs, error: countError } = await supabase
+            .from("practice_log")
+            .select("id, created_at")
+            .eq("user_id", userId)
+            .limit(5);
+
         let query = supabase
             .from("practice_log")
             .select("*, scales(name, Type)")
@@ -515,9 +544,18 @@ async function getPracticeHistory(supabase: any, userId: string, input: any) {
 
         const { data, error } = await query.limit(100);
 
-        if (error) return { error: error.message };
+        if (error) return { error: error.message, debug_user_id: userId };
         if (!data || data.length === 0) {
-            return { message: "No practice history found for this period." };
+            return {
+                message: "No practice history found for this period.",
+                debug: {
+                    user_id: userId,
+                    since_date: since,
+                    days_back: daysBack,
+                    total_user_logs: allUserLogs?.length || 0,
+                    oldest_log: allUserLogs?.[0]?.created_at || null,
+                }
+            };
         }
 
         const totalMinutes = Math.round(data.reduce((acc: number, d: any) => acc + (d.duration || 0), 0) / 60);
@@ -600,5 +638,24 @@ async function analyzeProgress(supabase: any, userId: string, input: any) {
         };
     } catch (err: any) {
         return { error: err.message };
+    }
+}
+
+async function submitSuggestion(supabase: any, userId: string, input: any) {
+    try {
+        const { error } = await supabase.from('suggestions').insert({
+            content: input.suggestion,
+            user_id: userId,
+            source: 'ai_coach'
+        });
+
+        if (error) throw error;
+
+        return {
+            success: true,
+            message: "Suggestion submitted successfully. Thank you for helping improve the platform!",
+        };
+    } catch (error: any) {
+        return { error: `Failed to submit suggestion: ${error.message}` };
     }
 }

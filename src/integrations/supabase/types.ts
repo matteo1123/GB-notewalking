@@ -6,35 +6,35 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
-export type Database = {
+export interface Database {
   public: {
     Tables: {
       chord_progression_progress: {
         Row: {
           id: string
-          last_practiced: string | null
-          mastery_level: number | null
-          max_clean_bpm: number | null
+          last_practiced: string
+          mastery_level: number
+          max_clean_bpm: number
           progression_id: string
-          time_practiced_seconds: number | null
+          time_practiced_seconds: number
           user_id: string
         }
         Insert: {
           id?: string
-          last_practiced?: string | null
-          mastery_level?: number | null
-          max_clean_bpm?: number | null
+          last_practiced: string
+          mastery_level?: number
+          max_clean_bpm?: number
           progression_id: string
-          time_practiced_seconds?: number | null
+          time_practiced_seconds?: number
           user_id: string
         }
         Update: {
           id?: string
-          last_practiced?: string | null
-          mastery_level?: number | null
-          max_clean_bpm?: number | null
+          last_practiced?: string
+          mastery_level?: number
+          max_clean_bpm?: number
           progression_id?: string
-          time_practiced_seconds?: number | null
+          time_practiced_seconds?: number
           user_id?: string
         }
         Relationships: [
@@ -45,352 +45,174 @@ export type Database = {
             referencedRelation: "chord_progressions"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "chord_progression_progress_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
         ]
       }
       chord_progressions: {
         Row: {
-          chords: Json | null
-          created_at: string | null
-          created_by: string | null
+          category: string
+          chords: Json
+          created_at: string
           description: string | null
-          difficulty: number | null
-          genre: string | null
+          difficulty: string
           id: string
-          is_public: boolean | null
-          key: string | null
-          measures_per_chord: number | null
+          is_custom: boolean
           name: string
-          progression_string: string
-          strumming_pattern: string | null
-          tempo: number | null
-          updated_at: string | null
+          user_id: string | null
         }
         Insert: {
-          chords?: Json | null
-          created_at?: string | null
-          created_by?: string | null
+          category: string
+          chords: Json
+          created_at?: string
           description?: string | null
-          difficulty?: number | null
-          genre?: string | null
+          difficulty: string
           id?: string
-          is_public?: boolean | null
-          key?: string | null
-          measures_per_chord?: number | null
+          is_custom?: boolean
           name: string
-          progression_string: string
-          strumming_pattern?: string | null
-          tempo?: number | null
-          updated_at?: string | null
+          user_id?: string | null
         }
         Update: {
-          chords?: Json | null
-          created_at?: string | null
-          created_by?: string | null
+          category?: string
+          chords?: Json
+          created_at?: string
           description?: string | null
-          difficulty?: number | null
-          genre?: string | null
+          difficulty?: string
           id?: string
-          is_public?: boolean | null
-          key?: string | null
-          measures_per_chord?: number | null
+          is_custom?: boolean
           name?: string
-          progression_string?: string
-          strumming_pattern?: string | null
-          tempo?: number | null
-          updated_at?: string | null
+          user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "chord_progressions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       chords: {
         Row: {
-          abc_notation: string | null
-          category: string
-          created_at: string | null
-          created_by: string | null
-          description: string | null
-          difficulty: string
-          finger_positions: Json
+          chord_name: string
+          chord_quality: string
+          chord_shape: string | null
+          created_at: string
           id: string
-          is_public: boolean | null
-          name: string
-          updated_at: string | null
-          variations: Json | null
+          intervals: string | null
+          is_movable: boolean
+          position: number
+          root_note: string
+          user_id: string | null
         }
         Insert: {
-          abc_notation?: string | null
-          category: string
-          created_at?: string | null
-          created_by?: string | null
-          description?: string | null
-          difficulty?: string
-          finger_positions: Json
+          chord_name: string
+          chord_quality: string
+          chord_shape?: string | null
+          created_at?: string
           id?: string
-          is_public?: boolean | null
-          name: string
-          updated_at?: string | null
-          variations?: Json | null
+          intervals?: string | null
+          is_movable?: boolean
+          position: number
+          root_note: string
+          user_id?: string | null
         }
         Update: {
-          abc_notation?: string | null
-          category?: string
-          created_at?: string | null
-          created_by?: string | null
-          description?: string | null
-          difficulty?: string
-          finger_positions?: Json
+          chord_name?: string
+          chord_quality?: string
+          chord_shape?: string | null
+          created_at?: string
           id?: string
-          is_public?: boolean | null
-          name?: string
-          updated_at?: string | null
-          variations?: Json | null
+          intervals?: string | null
+          is_movable?: boolean
+          position?: number
+          root_note?: string
+          user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "chords_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       exercises: {
         Row: {
-          bpm: number
-          created_at: string
-          id: string
-          name: string
-          rhythm_value: number
-          scale_id: string
-          sequence_id: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          bpm?: number
-          created_at?: string
-          id?: string
-          name: string
-          rhythm_value?: number
-          scale_id: string
-          sequence_id: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          bpm?: number
-          created_at?: string
-          id?: string
-          name?: string
-          rhythm_value?: number
-          scale_id?: string
-          sequence_id?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "exercises_scale_id_fkey"
-            columns: ["scale_id"]
-            isOneToOne: false
-            referencedRelation: "scales"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "exercises_sequence_id_fkey"
-            columns: ["sequence_id"]
-            isOneToOne: false
-            referencedRelation: "sequences"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      legacy_exercises: {
-        Row: {
-          bpm: number
-          created_at: string
-          created_by: string
-          id: string
-          is_public: boolean | null
-          name: string
-          rhythm_value: number
-          scale_id: string
-          sequence_id: string
-          updated_at: string
-        }
-        Insert: {
-          bpm?: number
-          created_at?: string
-          created_by: string
-          id?: string
-          is_public?: boolean | null
-          name: string
-          rhythm_value?: number
-          scale_id: string
-          sequence_id: string
-          updated_at?: string
-        }
-        Update: {
-          bpm?: number
-          created_at?: string
-          created_by?: string
-          id?: string
-          is_public?: boolean | null
-          name?: string
-          rhythm_value?: number
-          scale_id?: string
-          sequence_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "legacy_exercises_scale_id_fkey"
-            columns: ["scale_id"]
-            isOneToOne: false
-            referencedRelation: "scales"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "legacy_exercises_sequence_id_fkey"
-            columns: ["sequence_id"]
-            isOneToOne: false
-            referencedRelation: "sequences"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      lesson_exercises: {
-        Row: {
+          category: string
           created_at: string
           description: string | null
-          id: string
-          lesson_id: string
-          order_index: number
-          scale_id: string
-          time: number
-        }
-        Insert: {
-          created_at?: string
-          description?: string | null
-          id?: string
-          lesson_id: string
-          order_index: number
-          scale_id: string
-          time: number
-        }
-        Update: {
-          created_at?: string
-          description?: string | null
-          id?: string
-          lesson_id?: string
-          order_index?: number
-          scale_id?: string
-          time?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "lesson_exercises_lesson_id_fkey"
-            columns: ["lesson_id"]
-            isOneToOne: false
-            referencedRelation: "lessons"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "lesson_exercises_scale_id_fkey"
-            columns: ["scale_id"]
-            isOneToOne: false
-            referencedRelation: "scales"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      lessons: {
-        Row: {
-          created_at: string
-          description: string | null
+          difficulty: number
           id: string
           name: string
-          total_time: number
+          tab_content: string | null
+          video_url: string | null
         }
         Insert: {
+          category: string
           created_at?: string
           description?: string | null
+          difficulty?: number
           id?: string
           name: string
-          total_time: number
+          tab_content?: string | null
+          video_url?: string | null
         }
         Update: {
+          category?: string
           created_at?: string
           description?: string | null
+          difficulty?: number
           id?: string
           name?: string
-          total_time?: number
-        }
-        Relationships: []
-      }
-      practice_sessions: {
-        Row: {
-          completed: boolean | null
-          created_at: string | null
-          ended_at: string | null
-          id: string
-          session_plan: Json | null
-          started_at: string | null
-          total_duration_seconds: number | null
-          user_id: string
-        }
-        Insert: {
-          completed?: boolean | null
-          created_at?: string | null
-          ended_at?: string | null
-          id?: string
-          session_plan?: Json | null
-          started_at?: string | null
-          total_duration_seconds?: number | null
-          user_id: string
-        }
-        Update: {
-          completed?: boolean | null
-          created_at?: string | null
-          ended_at?: string | null
-          id?: string
-          session_plan?: Json | null
-          started_at?: string | null
-          total_duration_seconds?: number | null
-          user_id?: string
+          tab_content?: string | null
+          video_url?: string | null
         }
         Relationships: []
       }
       practice_log: {
         Row: {
-          audio: string | null
           created_at: string
           duration: number
           id: string
+          mastery_level: number | null
           max_bpm: number | null
           module_config: Json | null
-          module_type: string | null
+          module_type: string
           notes: string | null
           scale_id: string | null
-          session_id: string | null
           user_id: string
         }
         Insert: {
-          audio?: string | null
           created_at?: string
           duration: number
           id?: string
+          mastery_level?: number | null
           max_bpm?: number | null
           module_config?: Json | null
-          module_type?: string | null
+          module_type: string
           notes?: string | null
           scale_id?: string | null
-          session_id?: string | null
           user_id: string
         }
         Update: {
-          audio?: string | null
           created_at?: string
           duration?: number
           id?: string
+          mastery_level?: number | null
           max_bpm?: number | null
           module_config?: Json | null
-          module_type?: string | null
+          module_type?: string
           notes?: string | null
           scale_id?: string | null
-          session_id?: string | null
           user_id?: string
         }
         Relationships: [
@@ -401,130 +223,119 @@ export type Database = {
             referencedRelation: "scales"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "practice_log_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
         ]
       }
-      profiles: {
+      practice_routines: {
         Row: {
-          band: string | null
+          created_at: string
+          description: string | null
           id: string
-          is_premium: boolean | null
-          premium_until: string | null
-          settings: Json | null
-          stripe_customer_id: string | null
-          stripe_subscription_id: string | null
-          subscription_status: string | null
-          website: string | null
-          youtube: string | null
+          is_public: boolean | null
+          modules: Json
+          name: string
+          updated_at: string
+          user_id: string
         }
         Insert: {
-          band?: string | null
-          id: string
-          is_premium?: boolean | null
-          premium_until?: string | null
-          settings?: Json | null
-          stripe_customer_id?: string | null
-          stripe_subscription_id?: string | null
-          subscription_status?: string | null
-          website?: string | null
-          youtube?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_public?: boolean | null
+          modules?: Json
+          name: string
+          updated_at?: string
+          user_id: string
         }
         Update: {
-          band?: string | null
+          created_at?: string
+          description?: string | null
           id?: string
-          is_premium?: boolean | null
-          premium_until?: string | null
-          settings?: Json | null
-          stripe_customer_id?: string | null
-          stripe_subscription_id?: string | null
-          subscription_status?: string | null
-          website?: string | null
-          youtube?: string | null
+          is_public?: boolean | null
+          modules?: Json
+          name?: string
+          updated_at?: string
+          user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "practice_routines_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       scale_shapes: {
         Row: {
           created_at: string
           description: string | null
-          finger_positions: Json
+          fingering_pattern: string | null
           id: string
-          is_active: boolean | null
+          image_url: string | null
+          intervals: string
           name: string
-          scale_id: string
-          type: string
         }
         Insert: {
           created_at?: string
           description?: string | null
-          finger_positions: Json
+          fingering_pattern?: string | null
           id?: string
-          is_active?: boolean | null
+          image_url?: string | null
+          intervals: string
           name: string
-          scale_id: string
-          type: string
         }
         Update: {
           created_at?: string
           description?: string | null
-          finger_positions?: Json
+          fingering_pattern?: string | null
           id?: string
-          is_active?: boolean | null
+          image_url?: string | null
+          intervals?: string
           name?: string
-          scale_id?: string
-          type?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "scale_shapes_scale_id_fkey"
-            columns: ["scale_id"]
-            isOneToOne: false
-            referencedRelation: "scales"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       scales: {
         Row: {
           created_at: string
-          description: string | null
-          difficulty: string
           id: string
           major_key: string | null
           name: string
-          notes_json: Json | null
           Position: number | null
           root_note: string
           scale_shape: string | null
           tonality: string
-          Type: string | null
+          Type: string
         }
         Insert: {
           created_at?: string
-          description?: string | null
-          difficulty: string
           id?: string
           major_key?: string | null
           name: string
-          notes_json?: Json | null
           Position?: number | null
-          scale_shape?: string | null
           root_note: string
+          scale_shape?: string | null
           tonality: string
-          Type?: string | null
+          Type: string
         }
         Update: {
           created_at?: string
-          description?: string | null
-          difficulty?: string
           id?: string
           major_key?: string | null
           name?: string
-          notes_json?: Json | null
           Position?: number | null
           root_note?: string
           scale_shape?: string | null
           tonality?: string
-          Type?: string | null
+          Type?: string
         }
         Relationships: [
           {
@@ -533,232 +344,82 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "scale_shapes"
             referencedColumns: ["id"]
-          },
+          }
         ]
       }
-      sequences: {
+      suggestions: {
         Row: {
+          content: string
           created_at: string
-          description: string | null
           id: string
-          name: string
-          pattern_json: Json
+          status: string | null
+          user_id: string | null
         }
         Insert: {
+          content: string
           created_at?: string
-          description?: string | null
           id?: string
-          name: string
-          pattern_json: Json
+          status?: string | null
+          user_id?: string | null
         }
         Update: {
+          content?: string
           created_at?: string
-          description?: string | null
           id?: string
-          name?: string
-          pattern_json?: Json
+          status?: string | null
+          user_id?: string | null
         }
-        Relationships: []
-      }
-      user_priorities: {
-        Row: {
-          created_at: string | null
-          id: string
-          last_practiced: string | null
-          module_type: string | null
-          type: string
-          updated_at: string | null
-          user_id: string
-          weight: number
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          last_practiced?: string | null
-          module_type?: string | null
-          type?: string
-          updated_at?: string | null
-          user_id: string
-          weight?: number
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          last_practiced?: string | null
-          module_type?: string | null
-          type?: string
-          updated_at?: string | null
-          user_id?: string
-          weight?: number
-        }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "suggestions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       user_roles: {
         Row: {
-          created_at: string | null
-          id: number
-          role: Database["public"]["Enums"]["app_role"]
+          created_at: string
+          id: string
+          role: string
           user_id: string
         }
         Insert: {
-          created_at?: string | null
-          id?: number
-          role?: Database["public"]["Enums"]["app_role"]
+          created_at?: string
+          id?: string
+          role?: string
           user_id: string
         }
         Update: {
-          created_at?: string | null
-          id?: number
-          role?: Database["public"]["Enums"]["app_role"]
+          created_at?: string
+          id?: string
+          role?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "user_roles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
       }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      custom_access_token_hook: {
-        Args: {
-          event: Json
-        }
-        Returns: Json
-      }
-      handle_new_user_role: {
-        Args: {
-          user_id: string
-        }
-        Returns: undefined
-      }
-      is_admin: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
-      validate_exercise_notes: {
-        Args: {
-          p_scale_id: string
-          p_sequence_id: string
-        }
-        Returns: boolean
-      }
+      [_ in never]: never
     }
     Enums: {
-      app_role: "admin" | "user"
-      exercise_difficulty: "beginner" | "intermediate" | "advanced"
-      exercise_type: "riff" | "scale" | "arpeggio"
-      scale_type:
-      | "2 notes per string scale"
-      | "3 notes per string scale"
-      | "4 notes per string scale"
-      | "chord"
-      | "arpeggio"
+      [_ in never]: never
     }
     CompositeTypes: {
       [_ in never]: never
     }
   }
 }
-
-type PublicSchema = Database[extract<keyof Database, "public">]
-
-export type Tables<
-  PublicTableNameOrOptions extends
-  | keyof (PublicSchema["Tables"] & PublicSchema["Views"])
-  | { schema: keyof Database },
-  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-  ? keyof (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
-    Database[PublicTableNameOrOptions["schema"]]["Views"])
-  : never = never,
-> = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
-    Database[PublicTableNameOrOptions["schema"]]["Views"])[TableName] extends {
-      Row: infer R
-    }
-  ? R
-  : never
-  : PublicTableNameOrOptions extends keyof (PublicSchema["Tables"] &
-    PublicSchema["Views"])
-  ? (PublicSchema["Tables"] &
-    PublicSchema["Views"])[PublicTableNameOrOptions] extends {
-      Row: infer R
-    }
-  ? R
-  : never
-  : never
-
-export type TablesInsert<
-  PublicTableNameOrOptions extends
-  | keyof PublicSchema["Tables"]
-  | { schema: keyof Database },
-  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-  ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
-  : never = never,
-> = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-    Insert: infer I
-  }
-  ? I
-  : never
-  : PublicTableNameOrOptions extends keyof PublicSchema["Tables"]
-  ? PublicSchema["Tables"][PublicTableNameOrOptions] extends {
-    Insert: infer I
-  }
-  ? I
-  : never
-  : never
-
-export type TablesUpdate<
-  PublicTableNameOrOptions extends
-  | keyof PublicSchema["Tables"]
-  | { schema: keyof Database },
-  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-  ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
-  : never = never,
-> = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-    Update: infer U
-  }
-  ? U
-  : never
-  : PublicTableNameOrOptions extends keyof PublicSchema["Tables"]
-  ? PublicSchema["Tables"][PublicTableNameOrOptions] extends {
-    Update: infer U
-  }
-  ? U
-  : never
-  : never
-
-export type Enums<
-  DefaultSchemaEnumNameOrOptions extends
-  | keyof PublicSchema["Enums"]
-  | { schema: keyof Database },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
-    schema: keyof Database
-  }
-  ? keyof Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-  : never = never,
-> = DefaultSchemaEnumNameOrOptions extends {
-  schema: keyof Database
-}
-  ? Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
-  : DefaultSchemaEnumNameOrOptions extends keyof PublicSchema["Enums"]
-  ? PublicSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-  : never
-
-export type CompositeTypes<
-  PublicCompositeTypeNameOrOptions extends
-  | keyof PublicSchema["CompositeTypes"]
-  | { schema: keyof Database },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
-    schema: keyof Database
-  }
-  ? keyof Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-  : never = never,
-> = PublicCompositeTypeNameOrOptions extends {
-  schema: keyof Database
-}
-  ? Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
-  : PublicCompositeTypeNameOrOptions extends keyof PublicSchema["CompositeTypes"]
-  ? PublicSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-  : never

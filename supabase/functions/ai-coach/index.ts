@@ -6,13 +6,16 @@ const corsHeaders = {
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Valid module types for validation
+const VALID_MODULE_TYPES = ["scale", "arpeggio", "rhythm", "notewalking", "chord_progressions", "piece_mastery", "riff"];
+
 // Tool definitions for Gemini
 const tools = [
     {
         functionDeclarations: [
             {
                 name: "search_scale_shapes",
-                description: "Search the scales database for exercises. Returns shape IDs for creating module configs. Make only ONE search per user request.",
+                description: "Search the scales database for exercises. Returns shape IDs for creating module configs. You may call this multiple times to gather different exercises (e.g., once for scales, once for arpeggios).",
                 parameters: {
                     type: "object",
                     properties: {
@@ -46,13 +49,14 @@ const tools = [
             },
             {
                 name: "create_module_config",
-                description: "Create a configured module with the found shape IDs. This is the primary output.",
+                description: "Create a configured practice module. For scale/arpeggio modules, use shape IDs from search. For other module types (rhythm, notewalking, chord_progressions), configure directly.",
                 parameters: {
                     type: "object",
                     properties: {
                         module_type: {
                             type: "string",
-                            enum: ["scale", "arpeggio"],
+                            enum: ["scale", "arpeggio", "rhythm", "notewalking", "chord_progressions"],
+                            description: "The type of practice module to create",
                         },
                         name: {
                             type: "string",
@@ -62,22 +66,219 @@ const tools = [
                             type: "string",
                             description: "Optional description",
                         },
+                        duration_minutes: {
+                            type: "number",
+                            description: "Duration in minutes (default 10)",
+                        },
+                        // Scale/arpeggio specific
                         priority_shape_ids: {
                             type: "array",
                             items: { type: "string" },
-                            description: "Array of scale_shape IDs from search results",
+                            description: "Array of scale_shape IDs from search results (scale/arpeggio only)",
                         },
                         progression_mode: {
                             type: "string",
                             enum: ["cycle", "sequential", "focus"],
-                            description: "How to progress through exercises",
+                            description: "How to progress through exercises (scale/arpeggio only)",
                         },
                         focus_target_bpm: {
                             type: "number",
                             description: "Target BPM for focus mode (default 90)",
                         },
+                        // Rhythm specific
+                        rhythm_level: {
+                            type: "number",
+                            description: "Rhythm difficulty level 1-10 (rhythm only)",
+                        },
+                        // Notewalking specific
+                        notewalking_key: {
+                            type: "string",
+                            description: "Key for notewalking (e.g., 'C', 'G') (notewalking only)",
+                        },
+                        notewalking_chords: {
+                            type: "array",
+                            items: { type: "string" },
+                            description: "Chords for notewalking (e.g., ['I', 'IV', 'V']) (notewalking only)",
+                        },
+                        measures_per_chord: {
+                            type: "number",
+                            description: "Measures per chord in notewalking (default 4)",
+                        },
+                        // Chord progressions specific
+                        progression_id: {
+                            type: "string",
+                            description: "Chord progression ID (chord_progressions only)",
+                        },
+                        chord_key: {
+                            type: "string",
+                            description: "Key for chord progressions (chord_progressions only)",
+                        },
                     },
-                    required: ["module_type", "name", "priority_shape_ids"],
+                    required: ["module_type", "name"],
+                },
+            },
+            {
+                name: "get_user_routines",
+                description: "Get a list of the user's saved practice routines. Returns routine names, descriptions, module counts, and IDs. Use this to see what routines the user has before modifying one.",
+                parameters: {
+                    type: "object",
+                    properties: {},
+                },
+            },
+            {
+                name: "get_routine_details",
+                description: "Get the full details of a specific practice routine, including its complete session plan with all module configurations. Use this to inspect a routine before making edits.",
+                parameters: {
+                    type: "object",
+                    properties: {
+                        routine_id: {
+                            type: "string",
+                            description: "The UUID of the routine to inspect",
+                        },
+                    },
+                    required: ["routine_id"],
+                },
+            },
+            {
+                name: "update_routine",
+                description: "Make targeted edits to a practice routine's session plan. Supports adding, removing, or modifying individual blocks. Always call get_routine_details first to see the current state. Each edit targets one block at a time.",
+                parameters: {
+                    type: "object",
+                    properties: {
+                        routine_id: {
+                            type: "string",
+                            description: "The UUID of the routine to modify",
+                        },
+                        edits: {
+                            type: "array",
+                            description: "Array of edit operations to apply in order",
+                            items: {
+                                type: "object",
+                                properties: {
+                                    action: {
+                                        type: "string",
+                                        enum: ["add", "remove", "modify"],
+                                        description: "The type of edit: add a new block, remove a block, or modify an existing block",
+                                    },
+                                    index: {
+                                        type: "number",
+                                        description: "The 0-based index of the block to remove or modify (required for remove/modify)",
+                                    },
+                                    position: {
+                                        type: "number",
+                                        description: "The position to insert the new block at (0 = beginning). Defaults to end. (add only)",
+                                    },
+                                    block: {
+                                        type: "object",
+                                        description: "The new block to add (add only). Must include module_type, config, and duration_minutes.",
+                                        properties: {
+                                            module_type: {
+                                                type: "string",
+                                                enum: ["scale", "arpeggio", "rhythm", "notewalking", "chord_progressions", "piece_mastery", "riff"],
+                                            },
+                                            config: {
+                                                type: "object",
+                                                description: "Module configuration. Must include module_type matching the block's module_type.",
+                                            },
+                                            duration_minutes: {
+                                                type: "number",
+                                                description: "Duration in minutes",
+                                            },
+                                        },
+                                    },
+                                    changes: {
+                                        type: "object",
+                                        description: "Partial changes to apply to the block (modify only). Can include duration_minutes, module_type, or config fields.",
+                                        properties: {
+                                            duration_minutes: {
+                                                type: "number",
+                                            },
+                                            module_type: {
+                                                type: "string",
+                                                enum: ["scale", "arpeggio", "rhythm", "notewalking", "chord_progressions", "piece_mastery", "riff"],
+                                            },
+                                            config: {
+                                                type: "object",
+                                                description: "Replacement or partial config. If provided, replaces the entire config.",
+                                            },
+                                        },
+                                    },
+                                },
+                                required: ["action"],
+                            },
+                        },
+                        name: {
+                            type: "string",
+                            description: "Optional: update the routine's name",
+                        },
+                        description: {
+                            type: "string",
+                            description: "Optional: update the routine's description",
+                        },
+                    },
+                    required: ["routine_id", "edits"],
+                },
+            },
+            {
+                name: "create_routine",
+                description: "Create a brand new practice routine with multiple session blocks. Use this when the user wants a new routine from scratch or based on your recommendations. Each block needs module_type, config, and duration_minutes.",
+                parameters: {
+                    type: "object",
+                    properties: {
+                        name: {
+                            type: "string",
+                            description: "Name for the routine (e.g., 'Morning Warmup', 'Blues Mastery')",
+                        },
+                        description: {
+                            type: "string",
+                            description: "Optional description of the routine's goal",
+                        },
+                        icon: {
+                            type: "string",
+                            description: "Emoji icon for the routine (default: 🎸)",
+                        },
+                        blocks: {
+                            type: "array",
+                            description: "Array of session blocks that make up the routine",
+                            items: {
+                                type: "object",
+                                properties: {
+                                    module_type: {
+                                        type: "string",
+                                        enum: ["scale", "arpeggio", "rhythm", "notewalking", "chord_progressions", "piece_mastery", "riff"],
+                                    },
+                                    config: {
+                                        type: "object",
+                                        description: "Module configuration. Must include module_type matching the block's module_type.",
+                                    },
+                                    duration_minutes: {
+                                        type: "number",
+                                        description: "Duration in minutes",
+                                    },
+                                },
+                                required: ["module_type", "duration_minutes"],
+                            },
+                        },
+                    },
+                    required: ["name", "blocks"],
+                },
+            },
+            {
+                name: "duplicate_routine",
+                description: "Duplicate an existing routine with a new name (Save As). Creates a copy of the routine that can then be independently modified. Use this when the user wants to keep their original routine unchanged while creating a modified version.",
+                parameters: {
+                    type: "object",
+                    properties: {
+                        routine_id: {
+                            type: "string",
+                            description: "The UUID of the routine to duplicate",
+                        },
+                        new_name: {
+                            type: "string",
+                            description: "Name for the duplicated routine",
+                        },
+                    },
+                    required: ["routine_id", "new_name"],
                 },
             },
             {
@@ -92,7 +293,7 @@ const tools = [
                         },
                         module_type: {
                             type: "string",
-                            enum: ["scale", "arpeggio", "rhythm", "chord_progressions"],
+                            enum: ["scale", "arpeggio", "rhythm", "chord_progressions", "notewalking"],
                             description: "Filter by module type",
                         },
                     },
@@ -130,24 +331,35 @@ const tools = [
     },
 ];
 
-const SYSTEM_PROMPT = `You are Guitar Brain Coach, an AI assistant helping guitarists configure their practice.
+const SYSTEM_PROMPT = `You are Guitar Brain Coach, an AI assistant helping guitarists configure and manage their practice routines.
 
 ## Your Personality & Philosophy
-1. **Daily Progress on Pillars:** You believe in continuous progress on core pillars (scales, arpeggios, rhythm). You are designed to guide users to practice these daily, tracking where they left off and always giving a "slight inch" nudge in progress. While you allow customization, you should firmly guide users back to this daily consistency on core skills.
-2. **Extreme Note Awareness (The "Why"):** you understand that guitarists often have the "weakest ears" of any musicians because they rely on visual shapes rather than sonic awareness. Unlike piano where keys are obvious, guitarists can play blind patterns. Therefore, you **strictly emphasize** awareness of every note's function (1-7) within the key context. You discourage mindless shape playing. You heavily promote **"notewalking"** (practicing chord tones over changing pedal notes) as the cure for this. Always remind the user to pay attention to the specific intervals they are playing.
+1. **Daily Progress on Pillars:** You believe in continuous progress on core pillars (scales, arpeggios, rhythm, notewalking, chord changes). You guide users to practice daily, tracking progress and always nudging forward. While you allow customization, you firmly guide users toward daily consistency on core skills.
+2. **Extreme Note Awareness (The "Why"):** Guitarists often have the "weakest ears" because they rely on visual shapes. Unlike piano, guitarists can play blind patterns. You **strictly emphasize** awareness of every note's function (1-7) within the key context. You discourage mindless shape playing and heavily promote **"notewalking"** (practicing chord tones over changing pedal notes). Always remind users to pay attention to the intervals they are playing.
 
-## Your Primary Job
-Help users configure **individual practice modules** by searching for exercises and creating module configs.
+## Your Primary Jobs
+1. **Search & Create**: Find exercises and create new module configurations
+2. **Manage Routines**: Load, inspect, and modify the user's saved practice routines
+3. **Build Routines**: Create complete new routines or duplicate existing ones for modification
+
+## AVAILABLE MODULE TYPES
+- **scale**: Scale practice (3nps, 2nps, 4nps patterns across the fretboard)
+- **arpeggio**: Arpeggio practice (chord tones across fretboard positions)
+- **rhythm**: 16th note strumming patterns (has levels 1-10)
+- **notewalking**: Ear training with chord tone walking over pedal notes
+- **chord_progressions**: Smooth chord transitions & progressions
+- **piece_mastery**: Song mastery with looped practice
+- **riff**: Riff practice
 
 ## DATABASE SCHEMA - How to Search
 
-The \`scales\` table contains all exercises. Key columns:
-- \`Type\`: Shape system. Values are like "3 notes per string scale", "2 notes per string scale", "arpeggio"
-- \`root_note\`: Root note like "C", "C#", "D", "Eb", "F#", etc.
+The \`scales\` table contains scale/arpeggio exercises. Key columns:
+- \`Type\`: Shape system. Values: "3 notes per string scale", "2 notes per string scale", "arpeggio"
+- \`root_note\`: Root note like "C", "C#", "D", "Eb", "F#"
 - \`tonality\`: Scale quality like "major", "minor", "dorian", "mixolydian", "dominant7"
 - \`Position\`: Fretboard position 1-7 (nullable)
-- \`major_key\`: The major key this belongs to (e.g., "G" for G major and E minor)
-- \`scale_shape\`: Links to scale_shapes table (used for grouping)
+- \`major_key\`: The parent major key (e.g., "G" for both G major and E minor)
+- \`scale_shape\`: Links to scale_shapes table
 
 ## AVAILABLE CONTENT (NO CAGED!)
 This app uses **Notes-Per-String** patterns only:
@@ -157,6 +369,16 @@ This app uses **Notes-Per-String** patterns only:
 - Arpeggios
 
 Do NOT suggest CAGED - it doesn't exist here.
+
+## ROUTINE EDITING WORKFLOW
+When the user wants to modify a practice routine:
+1. Call \`get_user_routines\` to see what routines they have
+2. Call \`get_routine_details\` to load the specific routine
+3. If you need exercises for the edit, search for them (you can search multiple times)
+4. Call \`update_routine\` with targeted edits (add/remove/modify individual blocks)
+5. Tell the user what you changed in plain language
+
+**IMPORTANT**: Make SMALL, TARGETED edits. Don't replace entire routines — add, remove, or modify one block at a time. This keeps changes reviewable and reversible.
 
 ## SEARCH EXAMPLES
 To find C# minor 3nps scales:
@@ -168,26 +390,19 @@ To find all major arpeggios:
 To find position 1 scales:
   { position: 1 }
 
-To find everything in the key of G:
-  { root_note: "G" } or search by major_key
+You can make MULTIPLE searches to gather different types of content. For example, search for scales first, then arpeggios, then use both results when building a module.
 
-## Workflow
-1. User describes what they want to practice
-2. Make ONE search call with appropriate filters
-3. If results found, create module config with those shape IDs
-4. If no results, tell user what's not available - don't retry
-
-## Progression Modes
+## Progression Modes (scale/arpeggio only)
 - "cycle": Rotate through all exercises (DEFAULT)
 - "sequential": Complete in order, stop at end
 - "focus": Auto-switch to lowest BPM exercise until target reached
 
 ## Guidelines
-- Make only 1 search call per user request
 - If search returns 0 results, explain what filters didn't match
 - Ask clarifying questions: "3nps or 2nps?" "Which positions?"
 - Be concise - guitarists want to practice, not read.
-- **Always** mention note function awareness when relevant.`;
+- **Always** mention note function awareness when relevant.
+- When modifying routines, tell the user exactly what you're changing before doing it.`;
 
 serve(async (req) => {
     // Handle CORS preflight
@@ -277,7 +492,7 @@ serve(async (req) => {
         }
 
         // Process response - handle function calls
-        let maxIterations = 10; // Prevent infinite loops
+        let maxIterations = 10; // Supports multi-step info gathering
         while (maxIterations > 0) {
             maxIterations--;
 
@@ -380,26 +595,50 @@ async function executeToolCall(
     toolName: string,
     input: any
 ): Promise<any> {
-    switch (toolName) {
-        case "search_scale_shapes":
-            return await searchScaleShapes(supabase, input);
+    try {
+        switch (toolName) {
+            case "search_scale_shapes":
+                return await searchScaleShapes(supabase, input);
 
-        case "create_module_config":
-            return await createModuleConfig(input);
+            case "create_module_config":
+                return await createModuleConfig(input);
 
-        case "get_practice_history":
-            return await getPracticeHistory(supabase, userId, input);
+            case "get_user_routines":
+                return await getUserRoutines(supabase, userId);
 
-        case "analyze_progress":
-            return await analyzeProgress(supabase, userId, input);
+            case "get_routine_details":
+                return await getRoutineDetails(supabase, userId, input);
 
-        case "submit_suggestion":
-            return await submitSuggestion(supabase, userId, input);
+            case "update_routine":
+                return await updateRoutine(supabase, userId, input);
 
-        default:
-            return { error: `Unknown tool: ${toolName}` };
+            case "create_routine":
+                return await createRoutine(supabase, userId, input);
+
+            case "duplicate_routine":
+                return await duplicateRoutineFunc(supabase, userId, input);
+
+            case "get_practice_history":
+                return await getPracticeHistory(supabase, userId, input);
+
+            case "analyze_progress":
+                return await analyzeProgress(supabase, userId, input);
+
+            case "submit_suggestion":
+                return await submitSuggestion(supabase, userId, input);
+
+            default:
+                return { error: `Unknown tool: ${toolName}` };
+        }
+    } catch (err: any) {
+        console.error(`Tool "${toolName}" threw an error:`, err);
+        return { error: `Tool execution failed: ${err.message}` };
     }
 }
+
+// =============================================================================
+// Tool Implementations
+// =============================================================================
 
 async function searchScaleShapes(supabase: any, input: any) {
     try {
@@ -458,7 +697,7 @@ async function searchScaleShapes(supabase: any, input: any) {
                 found: 0,
                 message: "No exercises found matching criteria",
                 filters_used: input,
-                suggestion: "Try broadening your search. Available types: '3 notes per string', '2 notes per string', 'arpeggio'"
+                suggestion: "Try broadening your search. Available types: '3 notes per string', '2 notes per string', 'arpeggio'. You can also try a different search with fewer filters."
             };
         }
 
@@ -496,27 +735,515 @@ async function searchScaleShapes(supabase: any, input: any) {
     }
 }
 
-async function createModuleConfig(input: any) {
-    const config = {
-        module_type: input.module_type,
-        priority_scale_shape_ids: input.priority_shape_ids,
-        group_by_shape: true,
-        order_by: "created_at",
-        current_index: 0,
-        progression_mode: input.progression_mode || "cycle",
-        focus_target_bpm: input.progression_mode === "focus"
-            ? (input.focus_target_bpm || 90)
-            : undefined,
-    };
+function createModuleConfig(input: any) {
+    const moduleType = input.module_type;
+    let config: any;
+
+    switch (moduleType) {
+        case "scale":
+        case "arpeggio":
+            config = {
+                module_type: moduleType,
+                priority_scale_shape_ids: input.priority_shape_ids || [],
+                group_by_shape: true,
+                order_by: "created_at",
+                current_index: 0,
+                progression_mode: input.progression_mode || "cycle",
+                focus_target_bpm: input.progression_mode === "focus"
+                    ? (input.focus_target_bpm || 90)
+                    : undefined,
+            };
+            break;
+
+        case "rhythm":
+            config = {
+                module_type: "rhythm",
+                rhythm_level: input.rhythm_level || 1,
+                duration_minutes: input.duration_minutes || 10,
+            };
+            break;
+
+        case "notewalking":
+            config = {
+                module_type: "notewalking",
+                key: input.notewalking_key || "C",
+                chords: input.notewalking_chords || ["I", "IV", "V"],
+                measures_per_chord: input.measures_per_chord || 4,
+            };
+            break;
+
+        case "chord_progressions":
+            config = {
+                module_type: "chord_progressions",
+                progression_id: input.progression_id || "",
+                key: input.chord_key || "C",
+            };
+            break;
+
+        default:
+            config = { module_type: moduleType };
+    }
 
     return {
         success: true,
         name: input.name,
         description: input.description,
         module_config: config,
-        shape_count: input.priority_shape_ids.length,
-        message: `Created "${input.name}" module with ${input.priority_shape_ids.length} shapes. Mode: ${input.progression_mode || "cycle"}.`,
+        duration_minutes: input.duration_minutes || 10,
+        shape_count: input.priority_shape_ids?.length || 0,
+        message: `Created "${input.name}" module (${moduleType}). Duration: ${input.duration_minutes || 10} min.${input.progression_mode ? ` Mode: ${input.progression_mode}.` : ""
+            }`,
     };
+}
+
+async function getUserRoutines(supabase: any, userId: string) {
+    try {
+        const { data, error } = await supabase
+            .from("practice_routines")
+            .select("id, name, description, icon, session_plan, is_favorite, last_practiced_at, times_practiced, created_by_ai, total_duration_minutes")
+            .eq("user_id", userId)
+            .eq("is_active", true)
+            .order("last_practiced_at", { ascending: false, nullsFirst: false });
+
+        if (error) return { error: error.message };
+
+        if (!data || data.length === 0) {
+            return {
+                routines: [],
+                count: 0,
+                message: "No saved routines found. You can create one with the create_module_config tool, or I can help you build one.",
+            };
+        }
+
+        const routines = data.map((r: any) => {
+            const plan = Array.isArray(r.session_plan) ? r.session_plan : [];
+            return {
+                id: r.id,
+                name: r.name,
+                description: r.description || null,
+                icon: r.icon || "🎸",
+                is_favorite: r.is_favorite || false,
+                module_count: plan.length,
+                modules_summary: plan.map((b: any, i: number) => ({
+                    index: i,
+                    module_type: b.module_type,
+                    duration_minutes: b.duration_minutes,
+                })),
+                total_duration_minutes: r.total_duration_minutes,
+                last_practiced_at: r.last_practiced_at,
+                times_practiced: r.times_practiced || 0,
+                created_by_ai: r.created_by_ai || false,
+            };
+        });
+
+        return {
+            routines,
+            count: routines.length,
+        };
+    } catch (err: any) {
+        return { error: err.message };
+    }
+}
+
+async function getRoutineDetails(supabase: any, userId: string, input: any) {
+    try {
+        if (!input.routine_id) {
+            return { error: "routine_id is required. Call get_user_routines first to see available routine IDs." };
+        }
+
+        const { data, error } = await supabase
+            .from("practice_routines")
+            .select("*")
+            .eq("id", input.routine_id)
+            .eq("user_id", userId)
+            .single();
+
+        if (error) {
+            return { error: `Routine not found: ${error.message}. Call get_user_routines to see available routines.` };
+        }
+
+        const plan = Array.isArray(data.session_plan) ? data.session_plan : [];
+
+        return {
+            id: data.id,
+            name: data.name,
+            description: data.description || null,
+            icon: data.icon || "🎸",
+            is_favorite: data.is_favorite || false,
+            created_by_ai: data.created_by_ai || false,
+            total_duration_minutes: data.total_duration_minutes,
+            last_practiced_at: data.last_practiced_at,
+            times_practiced: data.times_practiced || 0,
+            session_plan: plan.map((block: any, index: number) => ({
+                index,
+                module_type: block.module_type,
+                duration_minutes: block.duration_minutes,
+                config: block.config,
+                order: block.order ?? index,
+                conceptId: block.conceptId,
+            })),
+            block_count: plan.length,
+        };
+    } catch (err: any) {
+        return { error: err.message };
+    }
+}
+
+// Validate that a session block has required fields
+function validateSessionBlock(block: any, context: string): string | null {
+    if (!block) return `${context}: block is null or undefined`;
+    if (!block.module_type) return `${context}: missing module_type`;
+    if (!VALID_MODULE_TYPES.includes(block.module_type)) {
+        return `${context}: invalid module_type "${block.module_type}". Must be one of: ${VALID_MODULE_TYPES.join(", ")}`;
+    }
+    if (typeof block.duration_minutes !== "number" || block.duration_minutes < 1) {
+        return `${context}: duration_minutes must be a positive number, got ${block.duration_minutes}`;
+    }
+    if (!block.config) return `${context}: missing config object`;
+    if (block.config.module_type && block.config.module_type !== block.module_type) {
+        return `${context}: config.module_type "${block.config.module_type}" doesn't match block module_type "${block.module_type}"`;
+    }
+    return null; // Valid
+}
+
+async function updateRoutine(supabase: any, userId: string, input: any) {
+    try {
+        if (!input.routine_id) {
+            return { error: "routine_id is required" };
+        }
+        if (!input.edits || !Array.isArray(input.edits) || input.edits.length === 0) {
+            return { error: "edits array is required and must not be empty" };
+        }
+
+        // Load the current routine
+        const { data: routine, error: fetchError } = await supabase
+            .from("practice_routines")
+            .select("*")
+            .eq("id", input.routine_id)
+            .eq("user_id", userId)
+            .single();
+
+        if (fetchError) {
+            return { error: `Routine not found: ${fetchError.message}` };
+        }
+
+        let plan = Array.isArray(routine.session_plan) ? [...routine.session_plan] : [];
+        const previousPlan = JSON.parse(JSON.stringify(plan)); // Deep copy for undo
+        const editLog: string[] = [];
+        const validationErrors: string[] = [];
+
+        // Apply edits in order
+        for (let i = 0; i < input.edits.length; i++) {
+            const edit = input.edits[i];
+
+            switch (edit.action) {
+                case "add": {
+                    if (!edit.block) {
+                        validationErrors.push(`Edit ${i}: "add" action requires a "block" object`);
+                        continue;
+                    }
+
+                    // Ensure config has module_type
+                    const newBlock = {
+                        ...edit.block,
+                        config: {
+                            module_type: edit.block.module_type,
+                            ...(edit.block.config || {}),
+                        },
+                        order: 0, // Will be recalculated
+                        conceptId: `ai-edit-${crypto.randomUUID()}`,
+                    };
+
+                    const addError = validateSessionBlock(newBlock, `Edit ${i} (add)`);
+                    if (addError) {
+                        validationErrors.push(addError);
+                        continue;
+                    }
+
+                    const pos = typeof edit.position === "number"
+                        ? Math.min(Math.max(0, edit.position), plan.length)
+                        : plan.length;
+
+                    plan.splice(pos, 0, newBlock);
+                    editLog.push(`Added ${newBlock.module_type} block (${newBlock.duration_minutes} min) at position ${pos}`);
+                    break;
+                }
+
+                case "remove": {
+                    if (typeof edit.index !== "number") {
+                        validationErrors.push(`Edit ${i}: "remove" action requires an "index" number`);
+                        continue;
+                    }
+                    if (edit.index < 0 || edit.index >= plan.length) {
+                        validationErrors.push(`Edit ${i}: index ${edit.index} out of range (0-${plan.length - 1})`);
+                        continue;
+                    }
+
+                    const removed = plan[edit.index];
+                    plan.splice(edit.index, 1);
+                    editLog.push(`Removed ${removed.module_type} block from position ${edit.index}`);
+                    break;
+                }
+
+                case "modify": {
+                    if (typeof edit.index !== "number") {
+                        validationErrors.push(`Edit ${i}: "modify" action requires an "index" number`);
+                        continue;
+                    }
+                    if (edit.index < 0 || edit.index >= plan.length) {
+                        validationErrors.push(`Edit ${i}: index ${edit.index} out of range (0-${plan.length - 1})`);
+                        continue;
+                    }
+                    if (!edit.changes || typeof edit.changes !== "object") {
+                        validationErrors.push(`Edit ${i}: "modify" action requires a "changes" object`);
+                        continue;
+                    }
+
+                    const existing = plan[edit.index];
+                    const changes: string[] = [];
+
+                    if (edit.changes.duration_minutes !== undefined) {
+                        changes.push(`duration: ${existing.duration_minutes} → ${edit.changes.duration_minutes} min`);
+                        existing.duration_minutes = edit.changes.duration_minutes;
+                    }
+                    if (edit.changes.module_type !== undefined) {
+                        changes.push(`type: ${existing.module_type} → ${edit.changes.module_type}`);
+                        existing.module_type = edit.changes.module_type;
+                    }
+                    if (edit.changes.config !== undefined) {
+                        existing.config = {
+                            module_type: edit.changes.module_type || existing.module_type,
+                            ...edit.changes.config,
+                        };
+                        changes.push(`config updated`);
+                    }
+
+                    const modError = validateSessionBlock(existing, `Edit ${i} (modify result)`);
+                    if (modError) {
+                        validationErrors.push(modError);
+                        continue;
+                    }
+
+                    plan[edit.index] = existing;
+                    editLog.push(`Modified block ${edit.index}: ${changes.join(", ")}`);
+                    break;
+                }
+
+                default:
+                    validationErrors.push(`Edit ${i}: unknown action "${edit.action}". Use "add", "remove", or "modify".`);
+            }
+        }
+
+        // If there were validation errors and NO successful edits, return the errors
+        if (validationErrors.length > 0 && editLog.length === 0) {
+            return {
+                error: "All edits failed validation",
+                validation_errors: validationErrors,
+                message: "Please fix the errors and try again. Check that blocks have module_type, config, and duration_minutes.",
+            };
+        }
+
+        // Re-number the order field
+        plan = plan.map((block: any, idx: number) => ({
+            ...block,
+            order: idx,
+        }));
+
+        // Calculate total duration
+        const totalDuration = plan.reduce((acc: number, b: any) => acc + (b.duration_minutes || 0), 0);
+
+        // Build update object
+        const updateData: any = {
+            session_plan: plan,
+            total_duration_minutes: totalDuration,
+        };
+        if (input.name) updateData.name = input.name;
+        if (input.description !== undefined) updateData.description = input.description;
+
+        // Save to database
+        const { error: updateError } = await supabase
+            .from("practice_routines")
+            .update(updateData)
+            .eq("id", input.routine_id);
+
+        if (updateError) {
+            return { error: `Failed to save: ${updateError.message}` };
+        }
+
+        return {
+            success: true,
+            routine_id: input.routine_id,
+            routine_name: input.name || routine.name,
+            edits_applied: editLog,
+            validation_warnings: validationErrors.length > 0 ? validationErrors : undefined,
+            previous_session_plan: previousPlan.map((block: any, index: number) => ({
+                index,
+                module_type: block.module_type,
+                duration_minutes: block.duration_minutes,
+                config: block.config,
+            })),
+            updated_session_plan: plan.map((block: any, index: number) => ({
+                index,
+                module_type: block.module_type,
+                duration_minutes: block.duration_minutes,
+                config: block.config,
+            })),
+            total_duration_minutes: totalDuration,
+            block_count: plan.length,
+            message: `Updated "${input.name || routine.name}": ${editLog.join("; ")}.${validationErrors.length > 0
+                ? ` Warning: ${validationErrors.length} edit(s) had validation issues.`
+                : ""
+                }`,
+        };
+    } catch (err: any) {
+        return { error: err.message };
+    }
+}
+
+async function createRoutine(supabase: any, userId: string, input: any) {
+    try {
+        if (!input.name) {
+            return { error: "name is required" };
+        }
+        if (!input.blocks || !Array.isArray(input.blocks) || input.blocks.length === 0) {
+            return { error: "blocks array is required and must not be empty" };
+        }
+
+        // Validate all blocks
+        const validationErrors: string[] = [];
+        const sessionPlan = input.blocks.map((block: any, i: number) => {
+            const fullBlock = {
+                module_type: block.module_type,
+                duration_minutes: block.duration_minutes || 10,
+                config: {
+                    module_type: block.module_type,
+                    ...(block.config || {}),
+                },
+                order: i,
+                conceptId: `ai-created-${crypto.randomUUID()}`,
+            };
+
+            const err = validateSessionBlock(fullBlock, `Block ${i}`);
+            if (err) validationErrors.push(err);
+
+            return fullBlock;
+        });
+
+        if (validationErrors.length > 0) {
+            return {
+                error: "Some blocks failed validation",
+                validation_errors: validationErrors,
+                message: "Fix the block errors and try again.",
+            };
+        }
+
+        const totalDuration = sessionPlan.reduce((acc: number, b: any) => acc + (b.duration_minutes || 0), 0);
+
+        const { data, error } = await supabase
+            .from("practice_routines")
+            .insert({
+                user_id: userId,
+                name: input.name,
+                description: input.description || null,
+                icon: input.icon || "🎸",
+                session_plan: sessionPlan,
+                total_duration_minutes: totalDuration,
+                is_active: true,
+                is_favorite: false,
+                created_by_ai: true,
+                times_practiced: 0,
+            })
+            .select()
+            .single();
+
+        if (error) {
+            return { error: `Failed to create routine: ${error.message}` };
+        }
+
+        return {
+            success: true,
+            routine_id: data.id,
+            routine_name: data.name,
+            session_plan: sessionPlan.map((block: any, index: number) => ({
+                index,
+                module_type: block.module_type,
+                duration_minutes: block.duration_minutes,
+                config: block.config,
+            })),
+            total_duration_minutes: totalDuration,
+            block_count: sessionPlan.length,
+            message: `Created routine "${data.name}" with ${sessionPlan.length} blocks (${totalDuration} min total).`,
+        };
+    } catch (err: any) {
+        return { error: err.message };
+    }
+}
+
+async function duplicateRoutineFunc(supabase: any, userId: string, input: any) {
+    try {
+        if (!input.routine_id) {
+            return { error: "routine_id is required" };
+        }
+        if (!input.new_name) {
+            return { error: "new_name is required" };
+        }
+
+        // Load the original routine
+        const { data: original, error: fetchError } = await supabase
+            .from("practice_routines")
+            .select("*")
+            .eq("id", input.routine_id)
+            .eq("user_id", userId)
+            .single();
+
+        if (fetchError) {
+            return { error: `Routine not found: ${fetchError.message}` };
+        }
+
+        // Create the duplicate
+        const { data, error } = await supabase
+            .from("practice_routines")
+            .insert({
+                user_id: userId,
+                name: input.new_name,
+                description: original.description,
+                icon: original.icon || "🎸",
+                color: original.color,
+                session_plan: original.session_plan,
+                total_duration_minutes: original.total_duration_minutes,
+                is_active: true,
+                is_favorite: false,
+                created_by_ai: true,
+                times_practiced: 0,
+            })
+            .select()
+            .single();
+
+        if (error) {
+            return { error: `Failed to duplicate routine: ${error.message}` };
+        }
+
+        const plan = Array.isArray(data.session_plan) ? data.session_plan : [];
+
+        return {
+            success: true,
+            original_routine_id: input.routine_id,
+            original_routine_name: original.name,
+            new_routine_id: data.id,
+            new_routine_name: data.name,
+            session_plan: plan.map((block: any, index: number) => ({
+                index,
+                module_type: block.module_type,
+                duration_minutes: block.duration_minutes,
+                config: block.config,
+            })),
+            total_duration_minutes: data.total_duration_minutes,
+            block_count: plan.length,
+            message: `Duplicated "${original.name}" as "${data.name}". You can now modify the copy without affecting the original.`,
+        };
+    } catch (err: any) {
+        return { error: err.message };
+    }
 }
 
 async function getPracticeHistory(supabase: any, userId: string, input: any) {

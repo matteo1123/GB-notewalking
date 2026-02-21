@@ -1,14 +1,12 @@
 import { MetronomeScreen } from "@/components/MetronomeScreen";
 import Header from "@/components/Header";
+import { RecitalSchedule } from "@/components/RecitalSchedule";
 
 const Index = () => {
   return (
     <div className="h-screen w-screen flex flex-col overflow-hidden bg-background text-foreground">
       <Header />
       <main className="flex-grow flex flex-col items-center justify-center bpm-control-area relative">
-        <h1 className="text-xl sm:text-3xl font-bold text-center px-4 mb-2 text-primary absolute top-4 w-full opacity-90">
-          The Latency-Free Online Metronome That Actually Stays on Time
-        </h1>
         <MetronomeScreen initialMode="regular" />
       </main>
       <footer className="flex-shrink-0 p-4 bg-card/50 border-t border-border/50 text-center">
@@ -40,6 +38,9 @@ const Index = () => {
             Whether you want to learn guitar, master scales, or improve your timing,
             our tools are designed to help you become a better musician.
           </p>
+        </div>
+        <div className="mt-6 max-w-2xl mx-auto w-full pb-16">
+          <RecitalSchedule />
         </div>
       </footer>
     </div>

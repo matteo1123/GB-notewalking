@@ -71,13 +71,16 @@ const Fretboard: React.FC<FretboardProps> = ({
         const degree = degreeMap ? degreeMap.get(noteName) : null;
         const chromaticDegree = chromaticDegreeMap ? chromaticDegreeMap.get(noteName) : null;
 
-        let color = '#fff';
-        if (showDegreeNumbers && chromaticDegree) {
-          color = CHROMATIC_DEGREE_COLORS[chromaticDegree as keyof typeof CHROMATIC_DEGREE_COLORS] || '#fff';
-        } else if (degree) {
-          color = DEGREE_COLORS[degree as keyof typeof DEGREE_COLORS] || '#fff';
-        } else if (chromaticDegree) {
-          color = CHROMATIC_DEGREE_COLORS[chromaticDegree as keyof typeof CHROMATIC_DEGREE_COLORS] || '#fff';
+        let color = (selectedNote as any)?.color;
+        if (!color) {
+          color = '#fff';
+          if (showDegreeNumbers && chromaticDegree) {
+            color = CHROMATIC_DEGREE_COLORS[chromaticDegree as keyof typeof CHROMATIC_DEGREE_COLORS] || '#fff';
+          } else if (degree) {
+            color = DEGREE_COLORS[degree as keyof typeof DEGREE_COLORS] || '#fff';
+          } else if (chromaticDegree) {
+            color = CHROMATIC_DEGREE_COLORS[chromaticDegree as keyof typeof CHROMATIC_DEGREE_COLORS] || '#fff';
+          }
         }
 
         notesToRender.push(

@@ -92,7 +92,7 @@ export function usePracticeSession() {
                 (concepts || []) as any,
                 {
                     availableTimeMinutes,
-                    blockDurationMinutes: 5,
+                    blockDurationMinutes: 2,
                     maintenanceSplit: 0.2
                 }
             );
@@ -107,7 +107,7 @@ export function usePracticeSession() {
                     {
                         module_type: 'rhythm',
                         config: { module_type: 'rhythm', rhythm_level: 1 },
-                        duration_minutes: 5,
+                        duration_minutes: 2,
                         order: 0,
                         conceptId: 'fallback-rhythm'
                     },
@@ -119,7 +119,7 @@ export function usePracticeSession() {
                             type_filter: 'Major',
                             group_by_shape: true
                         },
-                        duration_minutes: 5,
+                        duration_minutes: 2,
                         order: 1,
                         conceptId: 'fallback-scale'
                     },
@@ -130,7 +130,7 @@ export function usePracticeSession() {
                             key: 'C',
                             progression_id: '' // Component will default to first available
                         },
-                        duration_minutes: 5,
+                        duration_minutes: 2,
                         order: 2,
                         conceptId: 'fallback-chords'
                     }
@@ -143,7 +143,7 @@ export function usePracticeSession() {
                 blocks.push({
                     module_type: 'rhythm',
                     config: { module_type: 'rhythm', rhythm_level: 0 },
-                    duration_minutes: 5,
+                    duration_minutes: 2,
                     order: 0,
                     conceptId: 'emergency-fallback'
                 });

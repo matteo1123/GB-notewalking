@@ -2,12 +2,15 @@ import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
+import { useRecital } from '@/contexts/RecitalContext';
 import { Button } from '@/components/ui/button';
-import { Music, Crown, LogIn, LogOut, Home, Menu, X } from 'lucide-react';
+import { Music, Crown, LogIn, LogOut, Home, Menu, X, Radio } from 'lucide-react';
+import { SuggestionBox } from '@/components/SuggestionBox';
 
 const Header = () => {
   const { user, signOut } = useAuth();
   const userRole = useUserRole();
+  const { activeRecital } = useRecital();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -38,6 +41,14 @@ const Header = () => {
 
           {/* Right: Desktop nav buttons */}
           <div className="flex-1 hidden sm:flex justify-end gap-2">
+            {activeRecital && (
+              <Link to="/recital">
+                <Button variant="outline" className="flex items-center gap-2 text-red-500 border-red-500">
+                  <Radio className="h-4 w-4 animate-pulse" />
+                  Live
+                </Button>
+              </Link>
+            )}
             {userRole === 'admin' && (
               <Link to="/admin" state={{ reset: location.pathname.startsWith('/admin') }}>
                 <Button variant="outline" className="flex items-center gap-2">
@@ -75,6 +86,7 @@ const Header = () => {
                 </Button>
               </Link>
             )}
+            <SuggestionBox />
           </div>
 
           {/* Mobile: Hamburger button */}
@@ -101,6 +113,16 @@ const Header = () => {
               >
                 Home
               </Link>
+              {activeRecital && (
+                <Link
+                  to="/recital"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="px-3 py-2 hover:bg-muted rounded-md text-sm flex items-center gap-2 text-red-500"
+                >
+                  <Radio className="h-4 w-4 animate-pulse" />
+                  Live Recital
+                </Link>
+              )}
               {userRole === 'admin' && (
                 <Link
                   to="/admin"

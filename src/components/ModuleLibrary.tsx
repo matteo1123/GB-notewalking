@@ -5,6 +5,8 @@ import { Input } from './ui/input';
 import { Search, X, Settings, Star, StarOff } from 'lucide-react';
 import { RhythmTraining } from './RhythmTraining';
 import { ChordProgressionExercise } from './ChordProgressionExercise';
+import { ChordProgressionPractice } from './ChordProgressionPractice';
+import { EarTrainingPractice } from './EarTrainingPractice';
 import ExerciseList from './ExerciseList';
 import { supabase } from '@/integrations/supabase/client';
 import { MODULE_REGISTRY } from '@/types/modules';
@@ -239,6 +241,10 @@ export function ModuleLibrary() {
                 type: 'piece_mastery',
                 progress: { current_level: 1, mastery_percentage: 0, time_practiced_minutes: 0 },
             },
+            {
+                type: 'ear_training',
+                progress: { current_level: 1, mastery_percentage: 0, time_practiced_minutes: 0 },
+            },
         ];
 
     const handleTryNow = (moduleType: ModuleType) => {
@@ -334,13 +340,7 @@ export function ModuleLibrary() {
                         />
                     )}
                     {activeModule === 'chord_progressions' && (
-                        <div className="flex items-center justify-center h-full">
-                            <div className="text-center p-8">
-                                <span className="text-6xl mb-4 block">🎼</span>
-                                <h3 className="text-2xl font-bold mb-2">Chord Changes</h3>
-                                <p className="text-muted-foreground">Coming soon!</p>
-                            </div>
-                        </div>
+                        <ChordProgressionPractice />
                     )}
                     {activeModule === 'piece_mastery' && (
                         selectedPiece ? (
@@ -352,6 +352,9 @@ export function ModuleLibrary() {
                                 <PieceList onSelectPiece={setSelectedPiece} onExit={handleCloseModule} />
                             </div>
                         )
+                    )}
+                    {activeModule === 'ear_training' && (
+                        <EarTrainingPractice config={{ module_type: 'ear_training', root_note: 'C' }} />
                     )}
                 </div>
             </div>

@@ -17,7 +17,11 @@
       "Bash(wmic diskdrive get Model,Size,InterfaceType /format:list)",
       "Bash(wmic baseboard get Manufacturer,Product,Version /format:list)",
       "Bash(dir \"C:\\\\Users\\\\matth\\\\Documents\\\\coding projects\\\\August 25\\\\tempo-trekker\" /B)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(npx supabase functions deploy:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm install:*)",
+      "Bash(node -e:*)"
     ]
   }
 }

@@ -5,11 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Plus, Trash2, GripVertical, Play, Clock, Settings, Ear, X, Check } from 'lucide-react';
 import { useModuleConfig, SavedModuleInstance } from '@/hooks/useModuleConfig';
 import { MODULE_REGISTRY } from '@/types/modules';
-import type { SessionBlock, ModuleType, ModuleConfig, ScaleModuleConfig, ArpeggioModuleConfig, EarTrainingModuleOptions } from '@/types/practice';
+import type { PracticeRoutineSummary, SessionBlock, ModuleType, ModuleConfig, ScaleModuleConfig, ArpeggioModuleConfig, EarTrainingModuleOptions } from '@/types/practice';
 import type { RepertoireItem } from '@/types/repertoire';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
+import { useRoutines } from '@/hooks/useRoutines';
 import { ExercisePracticeModule } from './ExercisePracticeModule';
 import {
     Dialog,
@@ -25,11 +27,16 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import { toast } from 'sonner';
 
 interface SessionBuilderProps {
-    onStartSession: (blocks: SessionBlock[]) => void;
+    onStartSession: (blocks: SessionBlock[], routineName?: string) => void;
     onCancel: () => void;
+    initialRoutine?: PracticeRoutineSummary | null;
+    initialBlocks?: SessionBlock[];
 }
+
+const ICONS = ['🎸', '🎵', '🎶', '🔥', '⚡', '🎯', '💪', '🌟', '🚀', '🎹'];
 
 /**
  * SessionBuilder - UI for composing practice lessons with configured modules
@@ -40,11 +47,18 @@ interface SessionBuilderProps {
  * - Reorder blocks (drag or arrows)
  * - Start lesson to practice all blocks in sequence
  */
-export function SessionBuilder({ onStartSession, onCancel }: SessionBuilderProps) {
-    const [blocks, setBlocks] = useState<SessionBlock[]>([]);
+export function SessionBuilder({ onStartSession, onCancel, initialRoutine, initialBlocks }: SessionBuilderProps) {
+    const { createRoutine, updateRoutine } = useRoutines();
+    const [blocks, setBlocks] = useState<SessionBlock[]>(initialBlocks || []);
     const [addDialogOpen, setAddDialogOpen] = useState(false);
     const [selectedModuleType, setSelectedModuleType] = useState<ModuleType | null>(null);
-    const [selectedDuration, setSelectedDuration] = useState(5);
+    const [selectedDuration, setSelectedDuration] = useState(2);
+
+    // Routine Meta State
+    const [name, setName] = useState(initialRoutine?.name || '');
+    const [description, setDescription] = useState(initialRoutine?.description || '');
+    const [icon, setIcon] = useState(initialRoutine?.icon || '🎸');
+    const [isSaving, setIsSaving] = useState(false);
 
     // Edit block state
     const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -87,7 +101,7 @@ export function SessionBuilder({ onStartSession, onCancel }: SessionBuilderProps
                 setExercises(mapped as any);
             }
 
-            const { data: sequencesData } = await supabase
+            const { data: sequencesData } = await (supabase as any)
                 .from('sequences')
                 .select('*');
 
@@ -97,6 +111,35 @@ export function SessionBuilder({ onStartSession, onCancel }: SessionBuilderProps
         }
         loadData();
     }, []);
+
+    // Load full routine data if initialRoutine is provided and we don't have initialBlocks
+    useEffect(() => {
+        if (initialRoutine && !initialBlocks?.length) {
+            if (initialRoutine.id === 'default-daily-practice') {
+                setBlocks([
+                    { module_type: 'scale', duration_minutes: 3, order: 0, config: { module_type: 'scale' } },
+                    { module_type: 'arpeggio', duration_minutes: 2, order: 1, config: { module_type: 'arpeggio' } },
+                    { module_type: 'rhythm', duration_minutes: 3, order: 2, config: { module_type: 'rhythm', rhythm_level: 1 } },
+                    { module_type: 'ear_training', duration_minutes: 2, order: 3, config: { module_type: 'ear_training', root_note: 'C' } }
+                ] as SessionBlock[]);
+                return;
+            }
+
+            const fetchFullRoutine = async () => {
+                const table = initialRoutine.is_history ? 'practice_sessions' : 'practice_routines';
+                const { data, error } = await (supabase as any)
+                    .from(table)
+                    .select('session_plan')
+                    .eq('id', initialRoutine.id)
+                    .single();
+
+                if (!error && data?.session_plan) {
+                    setBlocks(data.session_plan as SessionBlock[]);
+                }
+            };
+            fetchFullRoutine();
+        }
+    }, [initialRoutine, initialBlocks]);
 
     // Get unique Type values for filter dropdown
     const availableTypes = useMemo(() => {
@@ -145,7 +188,10 @@ export function SessionBuilder({ onStartSession, onCancel }: SessionBuilderProps
                     config = { module_type: 'piece_mastery', piece_id: '', segment_seconds: 30 } as any;
                     break;
                 case 'chord_progressions':
-                    config = { module_type: 'chord_progressions', progression: ['I', 'IV', 'V', 'I'] } as any;
+                    config = { module_type: 'chord_progressions', progression_id: 'maj_1', key: 'C' } as any;
+                    break;
+                case 'ear_training':
+                    config = { module_type: 'ear_training', root_note: 'C' } as any;
                     break;
                 default:
                     config = { module_type: moduleType } as any;
@@ -343,33 +389,98 @@ export function SessionBuilder({ onStartSession, onCancel }: SessionBuilderProps
         );
     }
 
+    // Save routine
+    const handleSaveRoutine = async () => {
+        if (!name.trim()) {
+            toast.error("Please provide a name for your routine before saving.");
+            return;
+        }
+        if (blocks.length === 0) {
+            toast.error("Add at least one module to save the routine.");
+            return;
+        }
+
+        setIsSaving(true);
+        try {
+            if (initialRoutine && !initialRoutine.is_history) {
+                await updateRoutine(initialRoutine.id, {
+                    name: name.trim(),
+                    description: description.trim() || undefined,
+                    icon,
+                    session_plan: blocks,
+                });
+                toast.success("Routine updated successfully!");
+            } else {
+                await createRoutine({
+                    name: name.trim(),
+                    description: description.trim() || undefined,
+                    icon,
+                    session_plan: blocks,
+                });
+                toast.success("New routine created!");
+            }
+            onCancel(); // exit builder
+        } catch (err) {
+            console.error(err);
+            toast.error("Failed to save routine");
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
     return (
-        <div className="flex flex-col h-full">
-            {/* Header */}
-            <div className="flex-shrink-0 p-4 border-b flex items-center justify-between bg-card">
-                <div>
-                    <h2 className="text-xl font-bold">Lesson Builder</h2>
-                    <p className="text-sm text-muted-foreground">
-                        Compose your practice session with configured modules
-                    </p>
-                </div>
-                <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Clock className="w-4 h-4" />
-                        {totalMinutes} min
+        <div className="h-full flex flex-col bg-background">
+            <div className="flex-shrink-0 border-b p-4">
+                <div className="flex items-center justify-between mb-4">
+                    <div className="flex-1 max-w-2xl">
+                        <div className="flex gap-3 mb-4">
+                            <div className="flex-shrink-0">
+                                <Label className="text-xs text-muted-foreground">Icon</Label>
+                                <Select value={icon} onValueChange={setIcon}>
+                                    <SelectTrigger className="w-16 h-10 text-xl border-none shadow-sm dark:bg-card">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {ICONS.map(i => (
+                                            <SelectItem key={i} value={i} className="text-xl">
+                                                {i}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="flex-1">
+                                <Label htmlFor="routine-name" className="text-xs text-muted-foreground">Routine Name</Label>
+                                <Input
+                                    id="routine-name"
+                                    value={name}
+                                    onChange={e => setName(e.target.value)}
+                                    placeholder="e.g., C# Minor Mastery (Optional if just starting a session)"
+                                    className="text-lg font-semibold bg-transparent border-0 border-b rounded-none px-0 focus-visible:ring-0"
+                                />
+                            </div>
+                        </div>
+                        <div>
+                            <Input
+                                value={description}
+                                onChange={e => setDescription(e.target.value)}
+                                placeholder="Add a description..."
+                                className="text-sm text-muted-foreground bg-transparent border-0 border-b rounded-none px-0 focus-visible:ring-0 h-8"
+                            />
+                        </div>
                     </div>
-                    <Button variant="outline" onClick={onCancel}>Cancel</Button>
-                    <Button
-                        onClick={() => onStartSession(blocks)}
-                        disabled={blocks.length === 0}
-                        className="gap-2"
-                    >
-                        <Play className="w-4 h-4" />
-                        Start Lesson
+                </div>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h2 className="text-2xl font-bold">Session Builder</h2>
+                        <p className="text-muted-foreground">Compose your ideal practice session</p>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={onCancel} className="gap-2">
+                        <X className="w-4 h-4" />
+                        Cancel
                     </Button>
                 </div>
             </div>
-
             {/* Blocks List */}
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
                 {blocks.length === 0 ? (
@@ -428,7 +539,7 @@ export function SessionBuilder({ onStartSession, onCancel }: SessionBuilderProps
                                     </div>
 
                                     {/* Duration */}
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                                         <Input
                                             type="number"
                                             value={block.duration_minutes}
@@ -462,6 +573,29 @@ export function SessionBuilder({ onStartSession, onCancel }: SessionBuilderProps
                             <Plus className="w-4 h-4 mr-2" />
                             Add Module
                         </Button>
+
+                        {/* Action Buttons */}
+                        <div className="flex gap-2 mt-4">
+                            <Button
+                                onClick={() => onStartSession(blocks, name)}
+                                disabled={blocks.length === 0}
+                                className="flex-1 gap-2"
+                                size="lg"
+                            >
+                                <Play className="w-4 h-4" />
+                                Start Session ({totalMinutes} min)
+                            </Button>
+                            <Button
+                                className="flex-1 gap-2"
+                                size="lg"
+                                variant="outline"
+                                onClick={handleSaveRoutine}
+                                disabled={isSaving || blocks.length === 0}
+                            >
+                                <Check className="w-4 h-4" />
+                                {isSaving ? "Saving..." : (initialRoutine && !initialRoutine.is_history ? "Save Changes" : "Save as New Routine")}
+                            </Button>
+                        </div>
                     </>
                 )}
             </div>
@@ -501,7 +635,7 @@ export function SessionBuilder({ onStartSession, onCancel }: SessionBuilderProps
                         <div className="space-y-2">
                             <label className="text-sm font-medium">Duration (minutes)</label>
                             <div className="flex gap-2">
-                                {[3, 5, 10, 15].map(min => (
+                                {[2, 5, 10, 15].map(min => (
                                     <Button
                                         key={min}
                                         variant={selectedDuration === min ? "default" : "outline"}

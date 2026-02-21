@@ -68,17 +68,29 @@ export function useRoutines(): UseRoutinesReturn {
             setLoading(true);
             setError(null);
 
-            const { data, error: fetchError } = await (supabase as any)
-                .from('practice_routines')
-                .select('*')
-                .eq('user_id', user.id)
-                .eq('is_active', true)
-                .order('last_practiced_at', { ascending: false, nullsFirst: false });
+            const [
+                { data: routinesData, error: routinesError },
+                { data: sessionsData, error: sessionsError }
+            ] = await Promise.all([
+                (supabase as any)
+                    .from('practice_routines')
+                    .select('*')
+                    .eq('user_id', user.id)
+                    .eq('is_active', true)
+                    .order('last_practiced_at', { ascending: false, nullsFirst: false }),
+                (supabase as any)
+                    .from('practice_sessions')
+                    .select('*')
+                    .eq('user_id', user.id)
+                    .order('started_at', { ascending: false })
+                    .limit(10)
+            ]);
 
-            if (fetchError) throw fetchError;
+            if (routinesError) throw routinesError;
+            if (sessionsError) console.error("Could not fetch sessions", sessionsError);
 
-            // Transform to summary format
-            const summaries: PracticeRoutineSummary[] = (data || []).map((row: any) => ({
+            // Transform routines to summary format
+            const routineSummaries: PracticeRoutineSummary[] = (routinesData || []).map((row: any) => ({
                 id: row.id,
                 name: row.name,
                 description: row.description,
@@ -90,9 +102,57 @@ export function useRoutines(): UseRoutinesReturn {
                 module_count: Array.isArray(row.session_plan) ? row.session_plan.length : 0,
                 total_duration_minutes: row.total_duration_minutes,
                 created_by_ai: row.created_by_ai || false,
+                is_history: false
             }));
 
-            setRoutines(summaries);
+            // Transform recent sessions to summary format
+            const sessionSummaries: PracticeRoutineSummary[] = (sessionsData || [])
+                .filter((s: any) => Array.isArray(s.session_plan) && s.session_plan.length > 0)
+                .map((row: any) => {
+                    const moduleTypes = Array.from(new Set(row.session_plan.map((b: any) => b.module_type)));
+                    const generatedName = `${moduleTypes.map(t => typeof t === 'string' ? t.replace('_', ' ') : 'Module').join(', ')} Practice`;
+
+                    return {
+                        id: row.id,
+                        name: `Recent: ${generatedName} (${new Date(row.started_at).toLocaleDateString()})`,
+                        description: `Practice session from ${new Date(row.started_at).toLocaleString()}`,
+                        icon: '🕒',
+                        color: 'gray',
+                        is_favorite: false,
+                        last_practiced_at: row.started_at,
+                        times_practiced: 1,
+                        module_count: row.session_plan.length,
+                        total_duration_minutes: Math.ceil((row.total_duration_seconds || 0) / 60) || row.session_plan.reduce((acc: number, b: any) => acc + (b.duration_minutes || 0), 0),
+                        created_by_ai: false,
+                        is_history: true
+                    };
+                });
+
+            // Make sure we have a default routine if none exist
+            if (routineSummaries.length === 0) {
+                routineSummaries.push({
+                    id: 'default-daily-practice',
+                    name: "Default Daily Practice",
+                    description: "A balanced 10-minute daily guitar workout.",
+                    icon: '🎸',
+                    color: 'blue',
+                    is_favorite: true,
+                    times_practiced: 0,
+                    module_count: 4,
+                    total_duration_minutes: 10,
+                    created_by_ai: false,
+                    is_history: false
+                });
+            }
+
+            // Merge and sort
+            const unified = [...routineSummaries, ...sessionSummaries].sort((a, b) => {
+                const dateA = a.last_practiced_at ? new Date(a.last_practiced_at).getTime() : 0;
+                const dateB = b.last_practiced_at ? new Date(b.last_practiced_at).getTime() : 0;
+                return dateB - dateA; // Descending
+            });
+
+            setRoutines(unified);
         } catch (err: any) {
             console.error('Failed to load routines:', err);
             setError(err.message || 'Failed to load routines');

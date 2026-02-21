@@ -39,7 +39,7 @@ const PremiumContent = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   // Lift session state check to here
-  const { activeSession, endSession, startSessionWithPlan } = useSession();
+  const { activeSession, completedSession, clearCompletedSession, startSessionWithPlan } = useSession();
   const { getRoutine, recordPractice } = useRoutines();
 
   const [selectedRiff, setSelectedRiff] = useState<RepertoireItem | null>(null);
@@ -59,12 +59,8 @@ const PremiumContent = () => {
   // Track previous session state to detect completion
   const prevActiveSessionRef = useRef(activeSession);
 
-  // Redirect to progress tab when session completes
+  // Redirect to progress tab when wrapping up (handled by SessionWrapUp now)
   useEffect(() => {
-    // If we had an active session before but now it's null, session completed
-    if (prevActiveSessionRef.current && !activeSession) {
-      setActiveTab("progress");
-    }
     prevActiveSessionRef.current = activeSession;
   }, [activeSession]);
 
@@ -76,6 +72,13 @@ const PremiumContent = () => {
       // Start session with the routine's saved session plan
       await startSessionWithPlan(routine.name, routine.session_plan);
       // The component will re-render to show SessionExecutor when activeSession is set
+    }
+  };
+
+  // Handle starting a custom session directly from blocks
+  const handleStartSession = async (blocks: any[], name?: string) => {
+    if (blocks && blocks.length > 0) {
+      await startSessionWithPlan(name || "Custom Practice", blocks);
     }
   };
 
@@ -258,11 +261,26 @@ const PremiumContent = () => {
 
   // 1. Check for Active Session
   if (activeSession) {
-    // If session is complete (but still in state?) - SessionWrapUp might be better handled by Executor return value or state
-    // But let's assume activeSession remains true until explicit close.
-    // If we need a WrapUp screen, the Executor probably handles it or we have a flag.
-    // For now, if active, show executor.
+    // If active, show executor.
     return <SessionExecutor />;
+  }
+
+  // 1.5. Check for Completed Session
+  if (completedSession) {
+    return (
+      <div className="bg-background min-h-screen p-4 flex flex-col pt-12">
+        <SessionWrapUp
+          sessionBlocks={completedSession.session.session_plan}
+          recordings={[]}
+          totalDurationMinutes={Math.round(completedSession.timeElapsed / 60)}
+          onRestart={() => clearCompletedSession()}
+          onNewSession={() => {
+            clearCompletedSession();
+            setActiveTab("practice");
+          }}
+        />
+      </div>
+    );
   }
 
   // 2. Check active Riff
@@ -334,9 +352,8 @@ const PremiumContent = () => {
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden p-2 sm:p-4">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0 overflow-hidden">
           <div className="overflow-x-auto flex-shrink-0 mb-2 sm:mb-4 -mx-2 px-2">
-            <TabsList className="inline-flex w-auto min-w-full sm:grid sm:grid-cols-5 gap-1">
+            <TabsList className="inline-flex w-auto min-w-full sm:grid sm:grid-cols-4 gap-1">
               <TabsTrigger value="practice" className="text-xs sm:text-sm px-2 sm:px-4 whitespace-nowrap">🎸 Practice</TabsTrigger>
-              <TabsTrigger value="routines" className="text-xs sm:text-sm px-2 sm:px-4 whitespace-nowrap">📋 Routines</TabsTrigger>
               <TabsTrigger value="library" className="text-xs sm:text-sm px-2 sm:px-4 whitespace-nowrap">🎯 Library</TabsTrigger>
               <TabsTrigger value="coach" className="text-xs sm:text-sm px-2 sm:px-4 whitespace-nowrap">🤖 Coach</TabsTrigger>
               <TabsTrigger value="progress" className="text-xs sm:text-sm px-2 sm:px-4 whitespace-nowrap">📊 Progress</TabsTrigger>
@@ -344,14 +361,13 @@ const PremiumContent = () => {
           </div>
 
           {/* Practice - Quick start or pick a routine */}
-          <TabsContent value="practice" className="flex-1 min-h-0 overflow-y-auto data-[state=active]:block p-6">
-            <PressStart />
-          </TabsContent>
-
-          {/* Routines - Named, saved practice configurations */}
-          <TabsContent value="routines" className="flex-1 min-h-0 overflow-y-auto data-[state=active]:block p-6">
-            <MyRoutines onStartRoutine={handleStartRoutine} />
-          </TabsContent>
+          <TabsContent value="practice" className="flex-1 min-h-0 overflow-y-auto data-[state=active]:block p-6 space-y-8">
+            <div className="py-6 min-h-[50vh]">
+              <MyRoutines
+                onStartRoutine={handleStartRoutine}
+                onStartSession={handleStartSession}
+              />
+            </div></TabsContent>
 
           {/* Library - Browse all exercises and modules */}
           <TabsContent value="library" className="flex-1 min-h-0 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col">

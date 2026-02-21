@@ -36,6 +36,7 @@ const Profile = () => {
   const [practiceLog, setPracticeLog] = useState<PracticeLogWithExercise[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSubscribing, setIsSubscribing] = useState(false); // State for sub button
+  const [isManagingSub, setIsManagingSub] = useState(false); // State for portal button
   const { settings: practiceSettings, updateSettings: updatePracticeSettings, isLoading: practiceLoading } = usePracticeSettings();
 
   // Helper to check if premium based on date
@@ -144,6 +145,31 @@ const Profile = () => {
     }
   }
 
+  const handleManageSubscription = async () => {
+    try {
+      setIsManagingSub(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast({ title: "Please log in to manage subscription", variant: "destructive" });
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke('create-portal-session', {});
+
+      if (error) throw error;
+      if (data?.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error('No portal URL returned');
+      }
+    } catch (err: any) {
+      console.error("Portal error:", err);
+      toast({ title: "Failed to open billing portal: " + err.message, variant: "destructive" });
+    } finally {
+      setIsManagingSub(false);
+    }
+  }
+
   if (loading || practiceLoading) {
     return <div>Loading...</div>;
   }
@@ -156,6 +182,7 @@ const Profile = () => {
           <TabsTrigger value="subscription">Subscription</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
           <TabsTrigger value="history">Practice History</TabsTrigger>
+          <TabsTrigger value="recitals">Recital History</TabsTrigger>
         </TabsList>
         <TabsContent value="profile">
           <div className="space-y-4">
@@ -165,6 +192,16 @@ const Profile = () => {
                 value={user?.email || ''}
                 disabled
                 className="bg-muted"
+              />
+            </div>
+            <div>
+              <Label htmlFor="display_name">Display Name <span className="text-muted-foreground text-xs">(shown in recital chat & queue)</span></Label>
+              <Input
+                id="display_name"
+                type="text"
+                value={(profile as any)?.display_name || ''}
+                onChange={(e) => setProfile(prev => ({ ...prev, id: user!.id, display_name: e.target.value } as any))}
+                placeholder={user?.email?.split('@')[0]}
               />
             </div>
             <div>
@@ -238,10 +275,16 @@ const Profile = () => {
 
               {isPremium && (
                 <div className="pt-4">
-                  <p className="text-muted-foreground">
-                    To manage or cancel your subscription, please use the Stripe Customer Portal (link coming soon, or contact support).
+                  <p className="text-muted-foreground mb-4">
+                    To manage or cancel your subscription, please use the Stripe Customer Portal.
                   </p>
-                  {/* Future: Add button to call create-portal-session */}
+                  <Button
+                    onClick={handleManageSubscription}
+                    disabled={isManagingSub}
+                    variant="outline"
+                  >
+                    {isManagingSub ? 'Opening Portal...' : 'Manage Subscription'}
+                  </Button>
                 </div>
               )}
             </CardContent>
@@ -477,7 +520,106 @@ const Profile = () => {
             </div>
           </div>
         </TabsContent>
+        <TabsContent value="recitals">
+          <RecitalHistoryTab userId={user?.id ?? ''} />
+        </TabsContent>
       </Tabs>
+    </div>
+  );
+};
+
+// ── Recital History ────────────────────────────────────────────────────────
+interface RecitalHistoryTabProps { userId: string }
+
+const RecitalHistoryTab = ({ userId }: RecitalHistoryTabProps) => {
+  const [entries, setEntries] = React.useState<any[]>([]);
+  const [chatByEntry, setChatByEntry] = React.useState<Record<string, any[]>>({});
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    if (!userId) return;
+    const load = async () => {
+      const { supabase } = await import('@/integrations/supabase/client');
+      const { data: queueData } = await supabase
+        .from('recital_queue')
+        .select('*, recitals(started_at, status)')
+        .eq('user_id', userId)
+        .not('performed_at', 'is', null)
+        .order('performed_at', { ascending: false });
+
+      setEntries(queueData ?? []);
+
+      // Fetch chat transcripts for each slot (messages in the window [performed_at - slot, performed_at + 2 min])
+      // We approximate: performed_at is when the slot ENDED; slot started ~3 min before
+      if (queueData && queueData.length > 0) {
+        const chatMap: Record<string, any[]> = {};
+        await Promise.all(queueData.map(async (entry: any) => {
+          const slotEnd = new Date(entry.performed_at);
+          const slotStart = new Date(slotEnd.getTime() - 5 * 60 * 1000); // 3 min slot + 2 min buffer
+          const windowEnd = new Date(slotEnd.getTime() + 2 * 60 * 1000);
+
+          const { data: messages } = await supabase
+            .from('recital_chat')
+            .select('*')
+            .eq('recital_id', entry.recital_id)
+            .gte('created_at', slotStart.toISOString())
+            .lte('created_at', windowEnd.toISOString())
+            .eq('deleted_by_admin', false)
+            .order('created_at', { ascending: true });
+
+          chatMap[entry.id] = messages ?? [];
+        }));
+        setChatByEntry(chatMap);
+      }
+      setLoading(false);
+    };
+    load();
+  }, [userId]);
+
+  if (loading) return <div className="text-muted-foreground py-8 text-center">Loading recital history...</div>;
+
+  if (entries.length === 0) {
+    return (
+      <div className="text-center py-12 text-muted-foreground">
+        <p>You haven't performed in any recitals yet.</p>
+        <p className="text-sm mt-1">Join a recital and mark yourself ready to perform!</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {entries.map((entry: any) => {
+        const messages = chatByEntry[entry.id] ?? [];
+        return (
+          <Card key={entry.id}>
+            <CardHeader>
+              <CardTitle className="text-base">
+                Performance on {new Date(entry.performed_at).toLocaleDateString([], {
+                  weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+                })}
+              </CardTitle>
+              <CardDescription>
+                {new Date(entry.performed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {messages.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No chat messages during your slot.</p>
+              ) : (
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {messages.map((msg: any) => (
+                    <div key={msg.id} className="text-sm">
+                      <span className="font-semibold text-primary">{msg.display_name}: </span>
+                      <span>{msg.body}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })}
     </div>
   );
 };

@@ -6,6 +6,7 @@ import { useRoutines } from '@/hooks/useRoutines';
 import { RoutineCard } from './RoutineCard';
 import { RoutineRow } from './RoutineRow';
 import { SessionBuilder } from '../SessionBuilder';
+import { ActiveSprintsWidget } from './ActiveSprintsWidget';
 import type { PracticeRoutineSummary, SessionBlock } from '@/types/practice';
 import {
     Table,
@@ -99,6 +100,7 @@ export function MyRoutines({ onStartRoutine, onStartSession }: MyRoutinesProps) 
 
     return (
         <div className="space-y-6">
+            <ActiveSprintsWidget />
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>

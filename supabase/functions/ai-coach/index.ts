@@ -332,6 +332,32 @@ const tools = [
                     required: ["suggestion"],
                 },
             },
+            {
+                name: "create_sprint",
+                description: "Prescribe a 3 to 5 day Sprint challenge for the user. Sprints are short (2-minute) intense daily practices focusing on one specific module. Use this when a user is struggling to get over a specific hump or plateau.",
+                parameters: {
+                    type: "object",
+                    properties: {
+                        module_type: {
+                            type: "string",
+                            enum: ["scale", "arpeggio", "rhythm", "notewalking", "chord_progressions", "piece_mastery", "riff", "ear_training"],
+                        },
+                        config: {
+                            type: "object",
+                            description: "Module configuration for the sprint. Must include module_type matching the sprint's module_type.",
+                        },
+                        duration_days: {
+                            type: "number",
+                            description: "Number of days for the sprint (usually 3 or 5)",
+                        },
+                        sessions_per_day: {
+                            type: "number",
+                            description: "Target number of 2-minute sessions per day (e.g., 3)",
+                        },
+                    },
+                    required: ["module_type", "config", "duration_days", "sessions_per_day"],
+                },
+            },
         ],
     },
 ];
@@ -346,6 +372,7 @@ const SYSTEM_PROMPT = `You are Guitar Brain Coach, an AI assistant helping guita
 1. **Search & Create**: Find exercises and create new module configurations
 2. **Manage Routines**: Load, inspect, and modify the user's saved practice routines
 3. **Build Routines**: Create complete new routines or duplicate existing ones for modification
+4. **Prescribe Sprints**: When a user plateaues or asks for a challenge, prescribe a 3-5 day Sprint using the \`create_sprint\` tool (intense 2-min focused sessions).
 
 ## AVAILABLE MODULE TYPES
 - **scale**: Scale practice (3nps, 2nps, 4nps patterns across the fretboard)
@@ -658,6 +685,9 @@ async function executeToolCall(
 
             case "submit_suggestion":
                 return await submitSuggestion(supabase, userId, input);
+
+            case "create_sprint":
+                return await createSprint(supabase, userId, input);
 
             default:
                 return { error: `Unknown tool: ${toolName}` };
@@ -1416,5 +1446,37 @@ async function submitSuggestion(supabase: any, userId: string, input: any) {
         };
     } catch (error: any) {
         return { error: `Failed to submit suggestion: ${error.message}` };
+    }
+}
+
+async function createSprint(supabase: any, userId: string, input: any) {
+    try {
+        const { module_type, config, duration_days, sessions_per_day } = input;
+
+        if (!module_type || !config || !duration_days || !sessions_per_day) {
+            return { error: "module_type, config, duration_days, and sessions_per_day are required" };
+        }
+
+        const { data, error } = await supabase.from('sprints').insert({
+            user_id: userId,
+            module_type,
+            module_config: {
+                module_type,
+                ...config
+            },
+            duration_days,
+            sessions_per_day,
+            status: "active",
+        }).select().single();
+
+        if (error) throw error;
+
+        return {
+            success: true,
+            sprint_id: data.id,
+            message: `Successfully created a ${duration_days}-day ${module_type} sprint challenge! Tell the user they can access their new Sprint from the Dashbord.`,
+        };
+    } catch (error: any) {
+        return { error: `Failed to create sprint: ${error.message}` };
     }
 }

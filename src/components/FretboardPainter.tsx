@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Slider } from '@/components/ui/slider';
 import { Save, SkipForward } from 'lucide-react';
 import Fretboard from './Fretboard';
 import { useToast } from '@/hooks/use-toast';
@@ -15,7 +14,7 @@ interface FretboardPainterProps {
 }
 
 export function FretboardPainter({ sessionKey, chordPair, onSave, onSkip }: FretboardPainterProps) {
-    const [comfortLevel, setComfortLevel] = useState<number>(5);
+    const [comfortLevel, setComfortLevel] = useState<number>(2);
     const [paintedFrets, setPaintedFrets] = useState<Record<string, number>>({});
     const [isSaving, setIsSaving] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
@@ -88,6 +87,16 @@ export function FretboardPainter({ sessionKey, chordPair, onSave, onSkip }: Fret
 
     const degreeMap = useMemo(() => createDegreeMap(sessionKey), [sessionKey]);
 
+    const getComfortColor = (level: number) => {
+        switch (level) {
+            case 1: return 'hsl(210, 100%, 75%)'; // Lightest
+            case 2: return 'hsl(210, 100%, 60%)'; // Light
+            case 3: return 'hsl(210, 100%, 45%)'; // Medium
+            case 4: return 'hsl(210, 100%, 30%)'; // Darkest
+            default: return 'hsl(210, 100%, 60%)';
+        }
+    };
+
     // Generate the selectedNotes overlay for the fretboard.
     // We want to show notes that are in the key.
     const fretboardNotes = useMemo(() => {
@@ -98,7 +107,7 @@ export function FretboardPainter({ sessionKey, chordPair, onSave, onSkip }: Fret
                 const key = `${pos.string}-${pos.fret}`;
                 const hasComfortData = paintedFrets.hasOwnProperty(key);
 
-                let color = hasComfortData ? `hsl(${paintedFrets[key] * 12}, 100%, 45%)` : '#333333';
+                let color = hasComfortData ? getComfortColor(paintedFrets[key]) : '#333333';
 
                 notes.push({
                     string: pos.string,
@@ -158,29 +167,62 @@ export function FretboardPainter({ sessionKey, chordPair, onSave, onSkip }: Fret
 
             <div className="p-4 border-b bg-muted/30 flex-shrink-0 flex flex-col items-center justify-center gap-4">
                 <div className="max-w-md w-full text-center space-y-4">
-                    <h3 className="font-semibold text-lg flex items-center justify-center gap-2">
-                        Comfort Level: {comfortLevel}
-                        <span className="inline-block w-4 h-4 rounded-full shadow-lg" style={{ backgroundColor: `hsl(${comfortLevel * 12}, 100%, 45%)` }}></span>
-                    </h3>
-                    <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+                    <p className="text-sm text-muted-foreground mx-auto">
                         Select a comfort level and tap frets to paint them. Left click to paint, right click to erase.
                     </p>
-                    <Slider
-                        value={[comfortLevel]}
-                        min={0}
-                        max={10}
-                        step={1}
-                        onValueChange={([val]) => setComfortLevel(val)}
-                        className="mt-4"
-                    />
+
+                    <div className="flex flex-col gap-2 mt-4">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                            <Button
+                                variant={comfortLevel === 1 ? 'default' : 'outline'}
+                                onClick={() => setComfortLevel(1)}
+                                className="h-auto w-full flex-col p-2 text-xs text-white"
+                                style={{ backgroundColor: comfortLevel === 1 ? getComfortColor(1) : undefined, borderColor: getComfortColor(1) }}
+                            >
+                                <span className={comfortLevel === 1 ? 'font-bold' : 'text-foreground'}>Level 1</span>
+                                <span className={`text-[10px] ${comfortLevel === 1 ? 'text-white/80' : 'text-muted-foreground'}`}>Scale / Root</span>
+                            </Button>
+
+                            <Button
+                                variant={comfortLevel === 2 ? 'default' : 'outline'}
+                                onClick={() => setComfortLevel(2)}
+                                className="h-auto w-full flex-col p-2 text-xs text-white"
+                                style={{ backgroundColor: comfortLevel === 2 ? getComfortColor(2) : undefined, borderColor: getComfortColor(2) }}
+                            >
+                                <span className={comfortLevel === 2 ? 'font-bold' : 'text-foreground'}>Level 2</span>
+                                <span className={`text-[10px] ${comfortLevel === 2 ? 'text-white/80' : 'text-muted-foreground'}`}>Chord Tones</span>
+                            </Button>
+
+                            <Button
+                                variant={comfortLevel === 3 ? 'default' : 'outline'}
+                                onClick={() => setComfortLevel(3)}
+                                className="h-auto w-full flex-col p-2 text-xs text-white"
+                                style={{ backgroundColor: comfortLevel === 3 ? getComfortColor(3) : undefined, borderColor: getComfortColor(3) }}
+                            >
+                                <span className={comfortLevel === 3 ? 'font-bold' : 'text-foreground'}>Level 3</span>
+                                <span className={`text-[10px] ${comfortLevel === 3 ? 'text-white/80' : 'text-muted-foreground'}`}>Scale Degrees</span>
+                            </Button>
+
+                            <Button
+                                variant={comfortLevel === 4 ? 'default' : 'outline'}
+                                onClick={() => setComfortLevel(4)}
+                                className="h-auto w-full flex-col p-2 text-xs text-white"
+                                style={{ backgroundColor: comfortLevel === 4 ? getComfortColor(4) : undefined, borderColor: getComfortColor(4) }}
+                            >
+                                <span className={comfortLevel === 4 ? 'font-bold' : 'text-foreground'}>Level 4</span>
+                                <span className={`text-[10px] ${comfortLevel === 4 ? 'text-white/80' : 'text-muted-foreground'}`}>Total Mastery</span>
+                            </Button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
             <div className="flex-1 overflow-auto bg-black flex items-center justify-center relative">
                 <div className="absolute top-4 left-4 sm:top-auto sm:bottom-4 sm:left-4 bg-black/80 p-3 rounded-lg text-xs leading-5 text-start z-10 border pointer-events-none">
-                    <div className="flex items-center gap-2"><div className="w-3 h-3 rounded" style={{ backgroundColor: `hsl(0, 100%, 45%)` }}></div> 0: Total Guess</div>
-                    <div className="flex items-center gap-2"><div className="w-3 h-3 rounded" style={{ backgroundColor: `hsl(60, 100%, 45%)` }}></div> 5: Kinda Know It</div>
-                    <div className="flex items-center gap-2"><div className="w-3 h-3 rounded" style={{ backgroundColor: `hsl(120, 100%, 45%)` }}></div> 10: Instant Recall</div>
+                    <div className="flex items-center gap-2"><div className="w-3 h-3 rounded" style={{ backgroundColor: getComfortColor(1) }}></div> Level 1: Scale/Root</div>
+                    <div className="flex items-center gap-2"><div className="w-3 h-3 rounded" style={{ backgroundColor: getComfortColor(2) }}></div> Level 2: Chord Tones</div>
+                    <div className="flex items-center gap-2"><div className="w-3 h-3 rounded" style={{ backgroundColor: getComfortColor(3) }}></div> Level 3: Scale Degrees</div>
+                    <div className="flex items-center gap-2"><div className="w-3 h-3 rounded" style={{ backgroundColor: getComfortColor(4) }}></div> Level 4: Mastery</div>
                 </div>
 
                 <div

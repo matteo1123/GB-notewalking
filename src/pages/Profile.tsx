@@ -36,6 +36,7 @@ const Profile = () => {
   const [practiceLog, setPracticeLog] = useState<PracticeLogWithExercise[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSubscribing, setIsSubscribing] = useState(false); // State for sub button
+  const [isManagingSub, setIsManagingSub] = useState(false); // State for portal button
   const { settings: practiceSettings, updateSettings: updatePracticeSettings, isLoading: practiceLoading } = usePracticeSettings();
 
   // Helper to check if premium based on date
@@ -144,6 +145,31 @@ const Profile = () => {
     }
   }
 
+  const handleManageSubscription = async () => {
+    try {
+      setIsManagingSub(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast({ title: "Please log in to manage subscription", variant: "destructive" });
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke('create-portal-session', {});
+
+      if (error) throw error;
+      if (data?.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error('No portal URL returned');
+      }
+    } catch (err: any) {
+      console.error("Portal error:", err);
+      toast({ title: "Failed to open billing portal: " + err.message, variant: "destructive" });
+    } finally {
+      setIsManagingSub(false);
+    }
+  }
+
   if (loading || practiceLoading) {
     return <div>Loading...</div>;
   }
@@ -249,10 +275,16 @@ const Profile = () => {
 
               {isPremium && (
                 <div className="pt-4">
-                  <p className="text-muted-foreground">
-                    To manage or cancel your subscription, please use the Stripe Customer Portal (link coming soon, or contact support).
+                  <p className="text-muted-foreground mb-4">
+                    To manage or cancel your subscription, please use the Stripe Customer Portal.
                   </p>
-                  {/* Future: Add button to call create-portal-session */}
+                  <Button
+                    onClick={handleManageSubscription}
+                    disabled={isManagingSub}
+                    variant="outline"
+                  >
+                    {isManagingSub ? 'Opening Portal...' : 'Manage Subscription'}
+                  </Button>
                 </div>
               )}
             </CardContent>

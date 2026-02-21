@@ -10,6 +10,7 @@ import { useProgressStats } from '@/hooks/useProgressStats';
 import { BreadthChart } from './progress/BreadthChart';
 import { FrequencyChart } from './progress/FrequencyChart';
 import ProgressGraphs from './ProgressGraphs';
+import { NotewalkingProgressMap } from './progress/NotewalkingProgressMap';
 
 /**
  * Progress Dashboard - Shows ranked exercises
@@ -60,10 +61,11 @@ export function ProgressDashboard() {
     return (
         <div className="space-y-6 pb-20">
             <Tabs defaultValue="overview" className="w-full">
-                <TabsList className="grid w-full grid-cols-3 mb-6">
+                <TabsList className="grid w-full grid-cols-4 mb-6">
                     <TabsTrigger value="overview">Overview</TabsTrigger>
                     <TabsTrigger value="priorities">Priorities</TabsTrigger>
                     <TabsTrigger value="speed">Speed Track</TabsTrigger>
+                    <TabsTrigger value="notewalking">Notewalking</TabsTrigger>
                 </TabsList>
 
                 {/* OVERVIEW TAB */}
@@ -320,6 +322,11 @@ export function ProgressDashboard() {
                             <ProgressGraphs />
                         </CardContent>
                     </Card>
+                </TabsContent>
+
+                {/* NOTEWALKING TAB */}
+                <TabsContent value="notewalking" className="space-y-6">
+                    {user && <NotewalkingProgressMap userId={user.id} />}
                 </TabsContent>
             </Tabs>
         </div>

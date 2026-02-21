@@ -539,7 +539,7 @@ export function SessionBuilder({ onStartSession, onCancel, initialRoutine, initi
                                     </div>
 
                                     {/* Duration */}
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                                         <Input
                                             type="number"
                                             value={block.duration_minutes}

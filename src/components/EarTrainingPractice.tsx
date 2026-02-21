@@ -3,7 +3,11 @@ import * as Tone from 'tone';
 import { Button } from './ui/button';
 import { Progress } from './ui/progress';
 import { Card, CardContent } from './ui/card';
-import { Play, Square, Headphones, RefreshCw } from 'lucide-react';
+import { Play, Square, Headphones, RefreshCw, Settings } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import { Label } from './ui/label';
+import { Slider } from './ui/slider';
+import { Switch } from './ui/switch';
 import { useNotePlayer } from '@/hooks/useNotePlayer';
 import { EarTrainingPracticeModuleConfig } from '@/types/practice';
 import { useSession } from '@/contexts/SessionContext';
@@ -34,15 +38,20 @@ type Degree = keyof typeof DEGREE_OFFSETS;
 
 // Define progression levels
 const LEVELS: Degree[][] = [
-    ['1', '3'],                   // Level 1
-    ['1', '3', '5'],              // Level 2
-    ['1', '2', '4'],              // Level 3 (Testing other non-chord tones)
-    ['1', '2', '3', '4', '5'],    // Level 4
-    ['1', '2', '3', '4', '5', '6'], // Level 5
-    ['1', '2', '3', '4', '5', '6', '7'], // Level 6 - full major scale
-    ['1', 'b3', '5'],             // Level 7 - minor intro
-    ['1', '2', 'b3', '4', '5'],   // Level 8 - minor pentatonic (ish)
-    ['1', '2', 'b3', '4', '5', 'b6', 'b7'] // Level 9 - full minor scale
+    ['1', '3'],                   // Level 1: Major 3rd
+    ['1', '3', '5'],              // Level 2: Major triad
+    ['1', '2', '4'],              // Level 3: Steps and 4ths
+    ['1', '2', '3', '4', '5'],    // Level 4: Major pentachord
+    ['1', '2', '3', '4', '5', '6'], // Level 5: Major hexachord
+    ['1', '2', '3', '4', '5', '6', '7'], // Level 6: Full major scale
+    ['1', 'b3', '5'],             // Level 7: Minor triad
+    ['1', '2', 'b3', '4', '5'],   // Level 8: Minor pentachord
+    ['1', '2', 'b3', '4', '5', 'b6', 'b7'], // Level 9: Full minor (Aeolian)
+    ['1', '3', '5', 'b7'],        // Level 10: Dominant 7 chord tones
+    ['1', '2', 'b3', '4', '5', '6', 'b7'], // Level 11: Dorian
+    ['1', '2', '3', '4', '5', '6', 'b7'],  // Level 12: Mixolydian
+    ['1', 'b2', 'b3', '4', 'b5', 'b6', 'b7'], // Level 13: Locrian
+    ['1', 'b2', '2', 'b3', '3', '4', 'b5', '5', 'b6', '6', 'b7', '7'] // Level 14: Chromatic
 ];
 
 const NOTES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
@@ -81,8 +90,15 @@ export function EarTrainingPractice({ config, autoStart = false, sessionId }: Ea
     const isPaused = activeSession?.isPaused || false;
 
     const [isPlaying, setIsPlaying] = useState(false);
-    const [currentLevel, setCurrentLevel] = useState(0);
+    const [currentLevel, setCurrentLevel] = useState(config.level || 0);
+    const [autoLevel, setAutoLevel] = useState(true);
     const [attempts, setAttempts] = useState<boolean[]>([]);
+
+    // New Settings State
+    const [currentRootNote, setCurrentRootNote] = useState(config.root_note);
+    const [droneOctave, setDroneOctave] = useState(config.drone_octave || 3);
+    const [keyChangeInterval, setKeyChangeInterval] = useState(config.key_change_interval || 0);
+    const [correctGuessesSinceKeyChange, setCorrectGuessesSinceKeyChange] = useState(0);
 
     const [currentTargetDegree, setCurrentTargetDegree] = useState<Degree | null>(null);
     const [feedback, setFeedback] = useState<'correct' | 'incorrect' | null>(null);
@@ -131,14 +147,14 @@ export function EarTrainingPractice({ config, autoStart = false, sessionId }: Ea
 
             // Play root note drone in a low octave (e.g., octave 2 or 3)
             // Normalize flat to sharp for Tone.js
-            let toneRoot = config.root_note;
+            let toneRoot = currentRootNote;
             if (toneRoot === 'Db') toneRoot = 'C#';
             else if (toneRoot === 'Eb') toneRoot = 'D#';
             else if (toneRoot === 'Gb') toneRoot = 'F#';
             else if (toneRoot === 'Ab') toneRoot = 'G#';
             else if (toneRoot === 'Bb') toneRoot = 'A#';
 
-            synthRef.current.triggerAttack([`${toneRoot}2`, `${toneRoot}3`]);
+            synthRef.current.triggerAttack([`${toneRoot}${droneOctave}`, `${toneRoot}${droneOctave + 1}`]);
         };
 
         startDrone();
@@ -148,7 +164,7 @@ export function EarTrainingPractice({ config, autoStart = false, sessionId }: Ea
                 synthRef.current.releaseAll();
             }
         };
-    }, [isPlaying, isPaused, config.root_note]);
+    }, [isPlaying, isPaused, currentRootNote, droneOctave]);
 
     // Play next note function
     const playNextChallenge = useCallback(() => {
@@ -166,14 +182,14 @@ export function EarTrainingPractice({ config, autoStart = false, sessionId }: Ea
         const targetOctave = Math.floor(Math.random() * 3) + 3;
         const offset = DEGREE_OFFSETS[randomDegree];
 
-        const noteToPlay = getNoteFromOffset(config.root_note, offset, targetOctave);
+        const noteToPlay = getNoteFromOffset(currentRootNote, offset, targetOctave);
 
         // Slight delay before playing the note to separate it from drone start/UI interaction
         setTimeout(() => {
             playNote(noteToPlay);
         }, 800);
 
-    }, [isPlaying, isPaused, currentLevel, config.root_note, playNote]);
+    }, [isPlaying, isPaused, currentLevel, currentRootNote, playNote]);
 
     // Auto-start logic
     useEffect(() => {
@@ -197,6 +213,24 @@ export function EarTrainingPractice({ config, autoStart = false, sessionId }: Ea
         setFeedback(isCorrect ? 'correct' : 'incorrect');
         setShowDegrees(true); // Show the correct answer
 
+        if (isCorrect && keyChangeInterval > 0) {
+            const newCount = correctGuessesSinceKeyChange + 1;
+            if (newCount >= keyChangeInterval) {
+                // Time to change key
+                setCorrectGuessesSinceKeyChange(0);
+                const currentNoteIndex = NOTES.indexOf(currentRootNote);
+                let nextNoteIndex = currentNoteIndex;
+                while (nextNoteIndex === currentNoteIndex) {
+                    nextNoteIndex = Math.floor(Math.random() * NOTES.length);
+                }
+                setCurrentRootNote(NOTES[nextNoteIndex]);
+            } else {
+                setCorrectGuessesSinceKeyChange(newCount);
+            }
+        } else if (!isCorrect) {
+            // Reset streak on incorrect guess? Depends on design, we'll just not increment for now
+        }
+
         // Update attempts history
         setAttempts(prev => {
             const newAttempts = [...prev, isCorrect];
@@ -215,7 +249,7 @@ export function EarTrainingPractice({ config, autoStart = false, sessionId }: Ea
 
     // Check progression
     useEffect(() => {
-        if (attempts.length >= 10) { // Require at least 10 attempts to evaluate
+        if (attempts.length >= 10 && autoLevel) { // Require at least 10 attempts to evaluate
             const correctCount = attempts.filter(a => a).length;
             const accuracy = correctCount / attempts.length;
 
@@ -242,7 +276,7 @@ export function EarTrainingPractice({ config, autoStart = false, sessionId }: Ea
         if (currentTargetDegree) {
             const targetOctave = 4; // Or keep track of previous random octave
             const offset = DEGREE_OFFSETS[currentTargetDegree];
-            const noteToPlay = getNoteFromOffset(config.root_note, offset, targetOctave);
+            const noteToPlay = getNoteFromOffset(currentRootNote, offset, targetOctave);
             playNote(noteToPlay);
         }
     };
@@ -259,7 +293,7 @@ export function EarTrainingPractice({ config, autoStart = false, sessionId }: Ea
             <div className="max-w-3xl mx-auto w-full space-y-8 flex-1 flex flex-col">
 
                 {/* Header info */}
-                <div className="flex justify-between items-center">
+                <div className="flex justify-between items-start">
                     <div>
                         <h2 className="text-2xl font-bold flex items-center gap-2">
                             <Headphones className="w-6 h-6" />
@@ -267,9 +301,88 @@ export function EarTrainingPractice({ config, autoStart = false, sessionId }: Ea
                         </h2>
                         <p className="text-muted-foreground">Identify the scale degree over the drone</p>
                     </div>
-                    <div className="text-right">
-                        <div className="text-xl font-bold">{config.root_note} Drone</div>
-                        <div className="text-sm text-muted-foreground">Level {currentLevel + 1} of {LEVELS.length}</div>
+                    <div className="flex gap-4 text-right">
+                        <div>
+                            <div className="flex items-center justify-end gap-2 text-xl font-bold mt-1">
+                                {currentRootNote} Drone
+                                {correctGuessesSinceKeyChange > 0 && keyChangeInterval > 0 && (
+                                    <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full font-normal">
+                                        Shift in {keyChangeInterval - correctGuessesSinceKeyChange}
+                                    </span>
+                                )}
+                            </div>
+                            <div className="text-sm text-muted-foreground">Level {currentLevel + 1} of {LEVELS.length}</div>
+                        </div>
+
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button variant="outline" size="icon" className="h-10 w-10 shrink-0">
+                                    <Settings className="w-5 h-5" />
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-80" align="end">
+                                <div className="space-y-4">
+                                    <h4 className="font-medium leading-none mb-4">Training Settings</h4>
+
+                                    <div className="space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <Label htmlFor="auto-level">Auto-Progress Level</Label>
+                                            <Switch
+                                                id="auto-level"
+                                                checked={autoLevel}
+                                                onCheckedChange={setAutoLevel}
+                                            />
+                                        </div>
+
+                                        <div className="space-y-1.5 pt-2">
+                                            <div className="flex justify-between items-center">
+                                                <Label>Difficulty Level</Label>
+                                                <span className="text-xs text-muted-foreground">{currentLevel + 1} / {LEVELS.length}</span>
+                                            </div>
+                                            <Slider
+                                                value={[currentLevel]}
+                                                min={0}
+                                                max={LEVELS.length - 1}
+                                                step={1}
+                                                onValueChange={([val]) => setCurrentLevel(val)}
+                                                disabled={autoLevel}
+                                            />
+                                        </div>
+
+                                        <div className="space-y-1.5 pt-2">
+                                            <div className="flex justify-between items-center">
+                                                <Label>Drone Octave</Label>
+                                                <span className="text-xs text-muted-foreground">{droneOctave}</span>
+                                            </div>
+                                            <Slider
+                                                value={[droneOctave]}
+                                                min={1}
+                                                max={5}
+                                                step={1}
+                                                onValueChange={([val]) => setDroneOctave(val)}
+                                            />
+                                        </div>
+
+                                        <div className="space-y-1.5 pt-2">
+                                            <div className="flex justify-between items-center">
+                                                <Label>Key Change Interval</Label>
+                                                <span className="text-xs text-muted-foreground">
+                                                    {keyChangeInterval === 0 ? 'Never' : `Every ${keyChangeInterval} guesses`}
+                                                </span>
+                                            </div>
+                                            <Slider
+                                                value={[keyChangeInterval]}
+                                                min={0}
+                                                max={20}
+                                                step={1}
+                                                onValueChange={([val]) => setKeyChangeInterval(val)}
+                                            />
+                                        </div>
+
+                                    </div>
+                                </div>
+                            </PopoverContent>
+                        </Popover>
                     </div>
                 </div>
 
@@ -285,7 +398,7 @@ export function EarTrainingPractice({ config, autoStart = false, sessionId }: Ea
                                 <div
                                     key={i}
                                     className={`flex-1 rounded-sm ${i >= attempts.length ? 'bg-secondary' :
-                                            attempts[i] ? 'bg-green-500' : 'bg-destructive'
+                                        attempts[i] ? 'bg-green-500' : 'bg-destructive'
                                         }`}
                                 />
                             ))}

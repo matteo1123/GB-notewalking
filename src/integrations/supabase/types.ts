@@ -178,6 +178,44 @@ export interface Database {
         }
         Relationships: []
       }
+      notewalking_comfort: {
+        Row: {
+          chord_pair: string
+          comfort_data: Json
+          created_at: string
+          id: string
+          session_key: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          chord_pair: string
+          comfort_data?: Json
+          created_at?: string
+          id?: string
+          session_key: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          chord_pair?: string
+          comfort_data?: Json
+          created_at?: string
+          id?: string
+          session_key?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notewalking_comfort_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       practice_log: {
         Row: {
           created_at: string

@@ -26,13 +26,7 @@ interface SessionPlanData {
     blocks: SessionBlock[];
 }
 
-interface SavedSession {
-    id: string;
-    name: string;
-    duration: number;
-    planData: SessionPlanData; // Full plan data including name
-    last_used: string;
-}
+
 
 /**
  * Press Start - Daily Practice Launcher
@@ -41,13 +35,12 @@ interface SavedSession {
 export function PressStart() {
     const { user } = useAuth();
     const { toast } = useToast();
-    const { startSession } = useSession(); // Use context
+    const { startSessionWithPlan } = useSession(); // Use context
 
     const [priorities, setPriorities] = useState<UserPriority[]>([]);
     const [selectedDuration, setSelectedDuration] = useState(30);
     const [sessionPlan, setSessionPlan] = useState<SessionPlanData | null>(null);
     const [sessionName, setSessionName] = useState('');
-    const [recentSessions, setRecentSessions] = useState<SavedSession[]>([]);
 
     // We strictly use context for execution state now. 
     // If context.isActive is true, Premium.tsx handles the view switch.
@@ -62,7 +55,6 @@ export function PressStart() {
     useEffect(() => {
         if (user) {
             loadPriorities();
-            loadRecentSessions();
             loadWarmupSuggestions();
         }
     }, [user]);
@@ -159,35 +151,6 @@ export function PressStart() {
         setLoading(false);
     };
 
-    const loadRecentSessions = async () => {
-        if (!user) return;
-
-        const { data, error } = await supabase
-            .from('practice_sessions' as any)
-            .select('*')
-            .eq('user_id', user.id)
-            .not('started_at', 'is', null)
-            .order('started_at', { ascending: false })
-            .limit(3);
-
-        if (!error && data) {
-            const sessions: SavedSession[] = data.map((s: any) => {
-                // Handle both old format (array) and new format (object with name)
-                const planData: SessionPlanData = Array.isArray(s.session_plan)
-                    ? { blocks: s.session_plan }
-                    : s.session_plan;
-
-                return {
-                    id: s.id,
-                    name: planData.name || `${s.total_duration_seconds / 60} min practice`,
-                    duration: s.total_duration_seconds / 60,
-                    planData,
-                    last_used: s.started_at
-                };
-            });
-            setRecentSessions(sessions);
-        }
-    };
 
     const handleGenerateSession = () => {
         if (!user || priorities.length === 0) {
@@ -231,57 +194,13 @@ export function PressStart() {
         if (!planToUse || !user) return;
 
         // Use global context to start session
-        // Pass the calculated duration and the generated blocks
-        await startSession(selectedDuration, undefined, planToUse.blocks);
+        // Pass the generated blocks
+        const blocksWithOrder = planToUse.blocks.map((b, i) => ({ ...b, order: i }));
+        await startSessionWithPlan(planToUse.name || "Generated Practice", blocksWithOrder as any);
 
         // Context update will trigger Premium.tsx to change view
     };
 
-    const handleUseRecentSession = (session: SavedSession) => {
-        // Inherit the full plan data (including name) from the old session
-        setSessionPlan(session.planData);
-        setSessionName(session.planData.name || '');
-        // Start immediately
-        handleStartSession(session.planData);
-    };
-
-    const handleRenameSession = async (sessionId: string, newName: string) => {
-        // Find the session in our local state
-        const session = recentSessions.find(s => s.id === sessionId);
-        if (!session) return;
-
-        // Update the session_plan JSON with the new name
-        const updatedPlanData: SessionPlanData = {
-            ...session.planData,
-            name: newName || undefined,
-        };
-
-        const { error } = await supabase
-            .from('practice_sessions' as any)
-            .update({ session_plan: updatedPlanData })
-            .eq('id', sessionId);
-
-        if (error) {
-            toast({
-                title: 'Error renaming session',
-                description: error.message,
-                variant: 'destructive',
-            });
-        } else {
-            // Update local state
-            setRecentSessions(prev =>
-                prev.map(s =>
-                    s.id === sessionId
-                        ? { ...s, name: newName || `${s.duration} min practice`, planData: updatedPlanData }
-                        : s
-                )
-            );
-            toast({
-                title: 'Session renamed',
-                description: `Session renamed to "${newName || 'Unnamed'}"`,
-            });
-        }
-    };
 
     if (loading) {
         return <div className="p-4">Loading...</div>;
@@ -314,60 +233,6 @@ export function PressStart() {
                 </p>
             </div>
 
-            {/* Recent Sessions */}
-            {recentSessions.length > 0 && !sessionPlan && (
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <History className="w-5 h-5" />
-                            Recent Practices
-                        </CardTitle>
-                        <CardDescription>
-                            Quick start with a session you've used before
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-2">
-                        {recentSessions.map((session) => (
-                            <div
-                                key={session.id}
-                                className="flex items-center gap-2 w-full border rounded-lg p-3 hover:bg-accent/50 transition-colors"
-                            >
-                                {/* Edit button */}
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="flex-shrink-0 h-8 w-8"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        const newName = prompt('Enter session name:', session.name);
-                                        if (newName !== null && newName.trim() !== session.name) {
-                                            handleRenameSession(session.id, newName.trim());
-                                        }
-                                    }}
-                                >
-                                    <Pencil className="w-4 h-4" />
-                                </Button>
-
-                                {/* Session info + play button */}
-                                <Button
-                                    variant="ghost"
-                                    className="flex-1 justify-between text-left h-auto py-1 px-2"
-                                    onClick={() => handleUseRecentSession(session)}
-                                >
-                                    <div>
-                                        <div className="font-semibold">{session.name}</div>
-                                        <div className="text-sm text-muted-foreground">
-                                            {session.planData.blocks.length} exercises •{' '}
-                                            Last used {new Date(session.last_used).toLocaleDateString()}
-                                        </div>
-                                    </div>
-                                    <Play className="w-5 h-5 flex-shrink-0" />
-                                </Button>
-                            </div>
-                        ))}
-                    </CardContent>
-                </Card>
-            )}
 
             {/* Time Selection */}
             {!sessionPlan && (

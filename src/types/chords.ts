@@ -22,6 +22,7 @@ export interface ChordProgressionSettings {
     measuresPerChord: number;
     droneEnabled: boolean;
     droneVolume: number;
+    promptFretboardPainter: boolean;
 }
 
 export interface ChordProgressionState {

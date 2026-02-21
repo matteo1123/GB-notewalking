@@ -26,6 +26,7 @@ export interface SessionTimerState {
 
 interface SessionContextType {
     activeSession: ActiveSession | null;
+    completedSession: ActiveSession | null;
     timer: SessionTimerState;
     startSession: (availableTimeMinutes?: number, lessonId?: string) => Promise<void>;
     startSessionWithPlan: (name: string, blocks: SessionBlock[]) => Promise<void>;
@@ -34,8 +35,11 @@ interface SessionContextType {
     nextBlock: () => Promise<void>;
     skipBlock: () => void;
     endSession: (completed?: boolean) => Promise<void>;
+    clearCompletedSession: () => void;
     isActive: boolean;
     isPaused: boolean;
+    autoAdvanceEnabled: boolean;
+    setAutoAdvanceEnabled: (enabled: boolean) => void;
 }
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
@@ -43,6 +47,8 @@ const SessionContext = createContext<SessionContextType | undefined>(undefined);
 export function SessionProvider({ children }: { children: ReactNode }) {
     const { toast } = useToast();
     const [activeSession, setActiveSession] = useState<ActiveSession | null>(null);
+    const [completedSession, setCompletedSession] = useState<ActiveSession | null>(null);
+    const [autoAdvanceEnabled, setAutoAdvanceEnabled] = useState(true);
     const [timer, setTimer] = useState<SessionTimerState>({
         timeRemaining: 0,
         totalTimeRemaining: 0,
@@ -123,6 +129,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
                 timerIntervalRef.current = null;
             }
 
+            if (completed) {
+                setCompletedSession(activeSession);
+            }
+
             setActiveSession(null);
             setTimer({ timeRemaining: 0, totalTimeRemaining: 0 });
 
@@ -137,6 +147,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             console.error('Failed to end session:', error);
         }
     }, [activeSession, toast]);
+
+    const clearCompletedSession = useCallback(() => {
+        setCompletedSession(null);
+    }, []);
 
     /**
      * Move to next block
@@ -388,14 +402,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
      * Auto-advance when block timer reaches zero
      */
     useEffect(() => {
-        if (timer.timeRemaining === 0 && activeSession && !activeSession.isPaused) {
+        if (timer.timeRemaining === 0 && activeSession && !activeSession.isPaused && autoAdvanceEnabled) {
             nextBlock();
         }
-    }, [timer.timeRemaining, activeSession, nextBlock]);
+    }, [timer.timeRemaining, activeSession, nextBlock, autoAdvanceEnabled]);
 
     return (
         <SessionContext.Provider value={{
             activeSession,
+            completedSession,
             timer,
             startSession,
             startSessionWithPlan,
@@ -404,8 +419,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             nextBlock,
             skipBlock,
             endSession,
+            clearCompletedSession,
             isActive: activeSession !== null,
             isPaused: activeSession?.isPaused || false,
+            autoAdvanceEnabled,
+            setAutoAdvanceEnabled,
         }}>
             {children}
         </SessionContext.Provider>

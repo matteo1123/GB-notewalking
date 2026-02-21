@@ -114,8 +114,8 @@ export function ChordProgressionControls({
                     {/* Slot A */}
                     <div
                         className={`flex-1 p-3 rounded-lg border-2 cursor-pointer transition-all text-center ${activeSlot === 0
-                                ? "border-primary bg-primary/10 ring-1 ring-primary/50"
-                                : "border-border hover:border-primary/50"
+                            ? "border-primary bg-primary/10 ring-1 ring-primary/50"
+                            : "border-border hover:border-primary/50"
                             }`}
                         onClick={() => setActiveSlot(0)}
                     >
@@ -128,8 +128,8 @@ export function ChordProgressionControls({
                     {/* Slot B */}
                     <div
                         className={`flex-1 p-3 rounded-lg border-2 cursor-pointer transition-all text-center ${activeSlot === 1
-                                ? "border-primary bg-primary/10 ring-1 ring-primary/50"
-                                : "border-border hover:border-primary/50"
+                            ? "border-primary bg-primary/10 ring-1 ring-primary/50"
+                            : "border-border hover:border-primary/50"
                             }`}
                         onClick={() => setActiveSlot(1)}
                     >
@@ -220,6 +220,20 @@ export function ChordProgressionControls({
                 />
                 <Label htmlFor="drone-enabled" className="cursor-pointer flex-1 text-xs">
                     Enable drone note
+                </Label>
+            </div>
+
+            {/* Fretboard Painter Enable/Disable */}
+            <div className="flex items-center space-x-2 bg-muted/50 rounded p-2">
+                <Checkbox
+                    id="painter-enabled"
+                    checked={settings.promptFretboardPainter}
+                    onCheckedChange={(checked) =>
+                        onSettingsChange({ promptFretboardPainter: checked as boolean })
+                    }
+                />
+                <Label htmlFor="painter-enabled" className="cursor-pointer flex-1 text-xs">
+                    Prompt Fretboard Painter at End
                 </Label>
             </div>
 

@@ -154,6 +154,7 @@ export interface NotewalkingModuleConfig {
   key: string;
   chords: string[];
   measures_per_chord: number;
+  prompt_fretboard_painter?: boolean;
 }
 
 export interface ChordProgressionsModuleConfig {
@@ -204,6 +205,9 @@ export interface EarTrainingPracticeModuleConfig {
   module_type: 'ear_training';
   metronome?: MetronomeConfig;
   root_note: string; // e.g. 'C', 'G#'
+  drone_octave?: number; // e.g. 2, 3, 4
+  key_change_interval?: number; // 0 = never, >0 = every N correct guesses
+  level?: number; // starting level, 0-indexed internally
 }
 
 export type ModuleConfig =
@@ -383,6 +387,7 @@ export interface PracticeRoutineSummary {
   module_count: number;
   total_duration_minutes?: number;
   created_by_ai: boolean;
+  is_history?: boolean; // True if this summary came from a practice_session instead of a saved routine
 }
 
 /**

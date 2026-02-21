@@ -13,6 +13,7 @@ import { PieceList } from './piece-mastery/PieceList';
 import type { Piece } from './piece-mastery/types';
 import { useSession } from '@/contexts/SessionContext';
 import { EarTrainingPractice } from './EarTrainingPractice';
+import { ChordProgressionPractice } from './ChordProgressionPractice';
 
 // Helper to get display info from module type
 function getModuleDisplayInfo(moduleType: ModuleType): { icon: string; title: string; description: string } {
@@ -157,6 +158,13 @@ function renderModuleContent(
             return (
                 <div className="h-full flex flex-col overflow-hidden">
                     <ChordProgressionExercise autoStart={true} sessionId={sessionId} />
+                </div>
+            );
+
+        case 'chord_progressions':
+            return (
+                <div className="h-full flex flex-col overflow-hidden">
+                    <ChordProgressionPractice config={block.config as any} sessionId={sessionId} />
                 </div>
             );
 

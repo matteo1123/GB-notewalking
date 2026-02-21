@@ -39,7 +39,7 @@ const PremiumContent = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   // Lift session state check to here
-  const { activeSession, endSession, startSessionWithPlan } = useSession();
+  const { activeSession, completedSession, clearCompletedSession, startSessionWithPlan } = useSession();
   const { getRoutine, recordPractice } = useRoutines();
 
   const [selectedRiff, setSelectedRiff] = useState<RepertoireItem | null>(null);
@@ -59,12 +59,8 @@ const PremiumContent = () => {
   // Track previous session state to detect completion
   const prevActiveSessionRef = useRef(activeSession);
 
-  // Redirect to progress tab when session completes
+  // Redirect to progress tab when wrapping up (handled by SessionWrapUp now)
   useEffect(() => {
-    // If we had an active session before but now it's null, session completed
-    if (prevActiveSessionRef.current && !activeSession) {
-      setActiveTab("progress");
-    }
     prevActiveSessionRef.current = activeSession;
   }, [activeSession]);
 
@@ -76,6 +72,13 @@ const PremiumContent = () => {
       // Start session with the routine's saved session plan
       await startSessionWithPlan(routine.name, routine.session_plan);
       // The component will re-render to show SessionExecutor when activeSession is set
+    }
+  };
+
+  // Handle starting a custom session directly from blocks
+  const handleStartSession = async (blocks: any[], name?: string) => {
+    if (blocks && blocks.length > 0) {
+      await startSessionWithPlan(name || "Custom Practice", blocks);
     }
   };
 
@@ -258,11 +261,26 @@ const PremiumContent = () => {
 
   // 1. Check for Active Session
   if (activeSession) {
-    // If session is complete (but still in state?) - SessionWrapUp might be better handled by Executor return value or state
-    // But let's assume activeSession remains true until explicit close.
-    // If we need a WrapUp screen, the Executor probably handles it or we have a flag.
-    // For now, if active, show executor.
+    // If active, show executor.
     return <SessionExecutor />;
+  }
+
+  // 1.5. Check for Completed Session
+  if (completedSession) {
+    return (
+      <div className="bg-background min-h-screen p-4 flex flex-col pt-12">
+        <SessionWrapUp
+          sessionBlocks={completedSession.session.session_plan}
+          recordings={[]}
+          totalDurationMinutes={Math.round(completedSession.timeElapsed / 60)}
+          onRestart={() => clearCompletedSession()}
+          onNewSession={() => {
+            clearCompletedSession();
+            setActiveTab("practice");
+          }}
+        />
+      </div>
+    );
   }
 
   // 2. Check active Riff
@@ -344,9 +362,12 @@ const PremiumContent = () => {
 
           {/* Practice - Quick start or pick a routine */}
           <TabsContent value="practice" className="flex-1 min-h-0 overflow-y-auto data-[state=active]:block p-6 space-y-8">
-            <PressStart />
-            <MyRoutines onStartRoutine={handleStartRoutine} />
-          </TabsContent>
+            <div className="py-6 min-h-[50vh]">
+              <MyRoutines
+                onStartRoutine={handleStartRoutine}
+                onStartSession={handleStartSession}
+              />
+            </div></TabsContent>
 
           {/* Library - Browse all exercises and modules */}
           <TabsContent value="library" className="flex-1 min-h-0 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col">

@@ -227,7 +227,26 @@ export const MODULE_REGISTRY: Record<ModuleType, Omit<ModuleMetadata, 'progress'
             supportsRoutines: true,
             requiresAudio: true,
             hasAutoRecord: true,
-            hasLevels: false,
+        },
+    },
+
+    ear_training: {
+        id: 'ear_training',
+        name: 'Ear Training',
+        shortDescription: 'Identify scale degrees over a drone',
+        fullDescription: 'Develop your ear by identifying intervals and scale degrees in an interactive environment over a continuous drone tone.',
+        icon: '🎧',
+        emoji: '🎧',
+        difficulty: { min: 1, max: 10 },
+        estimatedTime: { min: 5, max: 20, recommended: 10 },
+        skills: ['ear-training', 'pitch-recognition', 'harmony'],
+        capabilities: {
+            supportsFreeplay: true,
+            supportsGoals: true,
+            supportsRoutines: true,
+            requiresAudio: true,
+            hasAutoRecord: true,
+            hasLevels: true,
         },
     },
 };

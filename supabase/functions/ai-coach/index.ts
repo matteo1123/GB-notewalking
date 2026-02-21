@@ -403,6 +403,13 @@ You can make MULTIPLE searches to gather different types of content. For example
 - "sequential": Complete in order, stop at end
 - "focus": Auto-switch to lowest BPM exercise until target reached
 
+## Chord Progressions Module
+When configuring \`chord_progressions\`, the \`progression_id\` can be:
+- Major: "maj_1" (I-IV-V), "maj_2" (I-vi-IV-V), "maj_3" (I-ii-IV-V), "maj_4" (I-IV-I-V), "maj_5" (I-V-vi-iii), "maj_6" (I-vi-ii-V)
+- Minor: "min_1" (i-VI-VII), "min_2" (i-iv-VII), "min_3" (i-iv-v), "min_4" (i-VI-III-VII), "min_5" (ii°-v-i), "min_6" (i-iv-v-i), "min_7" (VI-VII-i), "min_8" (i-VII-VI-VII), "min_9" (i-iv-i)
+The \`chord_key\` should be a valid root note (e.g., "C", "Am").
+If you omit \`progression_id\` and \`chord_key\`, a random progression and key will be automatically selected.
+
 ## Guidelines
 - If search returns 0 results, explain what filters didn't match
 - Ask clarifying questions: "3nps or 2nps?" "Which positions?"

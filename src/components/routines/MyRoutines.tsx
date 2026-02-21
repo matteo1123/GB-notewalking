@@ -5,8 +5,8 @@ import { formatDistanceToNow } from 'date-fns';
 import { useRoutines } from '@/hooks/useRoutines';
 import { RoutineCard } from './RoutineCard';
 import { RoutineRow } from './RoutineRow';
-import { CreateRoutineModal } from './CreateRoutineModal';
-import type { PracticeRoutine, PracticeRoutineSummary } from '@/types/practice';
+import { SessionBuilder } from '../SessionBuilder';
+import type { PracticeRoutineSummary, SessionBlock } from '@/types/practice';
 import {
     Table,
     TableBody,
@@ -28,9 +28,10 @@ import {
 
 interface MyRoutinesProps {
     onStartRoutine: (routineId: string) => void;
+    onStartSession: (blocks: SessionBlock[], name?: string) => void;
 }
 
-export function MyRoutines({ onStartRoutine }: MyRoutinesProps) {
+export function MyRoutines({ onStartRoutine, onStartSession }: MyRoutinesProps) {
     const {
         routines,
         loading,
@@ -80,6 +81,18 @@ export function MyRoutines({ onStartRoutine }: MyRoutinesProps) {
                 <Button variant="outline" onClick={refresh}>
                     Try Again
                 </Button>
+            </div>
+        );
+    }
+
+    if (creating || editingRoutine) {
+        return (
+            <div className="h-[80vh]">
+                <SessionBuilder
+                    initialRoutine={editingRoutine}
+                    onStartSession={onStartSession}
+                    onCancel={() => handleOpenCreateEditModal(false)}
+                />
             </div>
         );
     }
@@ -237,14 +250,6 @@ export function MyRoutines({ onStartRoutine }: MyRoutinesProps) {
                     )}
                 </>
             )}
-
-            {/* Create/Edit Modal */}
-            <CreateRoutineModal
-                open={creating || !!editingRoutine}
-                onOpenChange={handleOpenCreateEditModal}
-                onCreated={refresh}
-                routineToEdit={editingRoutine}
-            />
 
             {/* Delete Confirmation */}
             <AlertDialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>

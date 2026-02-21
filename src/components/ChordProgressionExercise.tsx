@@ -19,6 +19,8 @@ import { Label } from "./ui/label";
 import { Button } from "./ui/button";
 import { Check, Guitar, Play, Pause, Volume2, VolumeX, Clock, SkipForward, X } from "lucide-react";
 import Fretboard from "./Fretboard";
+import { FretboardPainter } from "./FretboardPainter";
+import { useSession } from "@/contexts/SessionContext";
 import { createDegreeMap, findAllNoteOccurrences } from "@/lib/musicTheory";
 import { getChordTones, calculateDegreeFromRoot } from "@/lib/chordProgression";
 import { ChordNumeral } from "@/types/chords";
@@ -37,6 +39,7 @@ const DEFAULT_SETTINGS: ChordProgressionSettings = {
     measuresPerChord: 4,
     droneEnabled: true,
     droneVolume: 0.5,
+    promptFretboardPainter: true,
 };
 
 const KEYS = [
@@ -73,6 +76,7 @@ export function ChordProgressionExercise({ autoStart = false, sessionId, onExit,
         selectedChords: (moduleConfig?.chords as any) || DEFAULT_SETTINGS.selectedChords,
         measuresPerChord: moduleConfig?.measures_per_chord || DEFAULT_SETTINGS.measuresPerChord,
         droneEnabled: DEFAULT_SETTINGS.droneEnabled,
+        promptFretboardPainter: moduleConfig?.prompt_fretboard_painter ?? DEFAULT_SETTINGS.promptFretboardPainter,
     }));
     const [isPlaying, setIsPlaying] = useState(autoStart);
     const [bpm, setBpm] = useState(moduleConfig?.metronome?.bpm ?? 80);
@@ -87,6 +91,7 @@ export function ChordProgressionExercise({ autoStart = false, sessionId, onExit,
                 key: moduleConfig.key || prev.key,
                 selectedChords: (moduleConfig.chords as any) || prev.selectedChords,
                 measuresPerChord: moduleConfig.measures_per_chord || prev.measuresPerChord,
+                promptFretboardPainter: moduleConfig.prompt_fretboard_painter ?? prev.promptFretboardPainter,
                 // droneEnabled not in config
             }));
 
@@ -104,6 +109,43 @@ export function ChordProgressionExercise({ autoStart = false, sessionId, onExit,
     const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
     const [tickCount, setTickCount] = useState(0);
     const [activeSlot, setActiveSlot] = useState<0 | 1>(0);
+
+    let sessionContext: any = null;
+    try {
+        sessionContext = useSession();
+    } catch (e) {
+        // Not wrapped in SessionProvider (e.g., Freeplay mode)
+    }
+
+    const { timer, nextBlock, pauseSession, setAutoAdvanceEnabled } = sessionContext || {};
+    const [showPainter, setShowPainter] = useState(false);
+
+    useEffect(() => {
+        if (moduleConfig?.prompt_fretboard_painter) {
+            setAutoAdvanceEnabled?.(false);
+        } else {
+            setAutoAdvanceEnabled?.(true);
+        }
+
+        // Cleanup - ensure we don't permanently break auto-advance if they exit early
+        return () => {
+            setAutoAdvanceEnabled?.(true);
+        }
+    }, [moduleConfig?.prompt_fretboard_painter, setAutoAdvanceEnabled]);
+
+    useEffect(() => {
+        // When timer hits zero, if the painter is enabled, pause and show it
+        if (timer?.timeRemaining === 0 && moduleConfig?.prompt_fretboard_painter && !showPainter) {
+            pauseSession?.();
+            setShowPainter(true);
+        }
+    }, [timer?.timeRemaining, moduleConfig?.prompt_fretboard_painter, showPainter, pauseSession]);
+
+    const handlePainterDone = () => {
+        setShowPainter(false);
+        setAutoAdvanceEnabled?.(true);
+        nextBlock?.();
+    };
 
     const { autoRecordEnabled } = useAutoRecord();
 
@@ -291,7 +333,8 @@ export function ChordProgressionExercise({ autoStart = false, sessionId, onExit,
                         ...moduleConfig,
                         key: updated.key,
                         chords: updated.selectedChords as string[],
-                        measures_per_chord: updated.measuresPerChord
+                        measures_per_chord: updated.measuresPerChord,
+                        prompt_fretboard_painter: updated.promptFretboardPainter
                     });
                 }
 
@@ -602,6 +645,15 @@ export function ChordProgressionExercise({ autoStart = false, sessionId, onExit,
                     </div>
                 )
             }
+
+            {showPainter && (
+                <FretboardPainter
+                    sessionKey={settings.key}
+                    chordPair={settings.selectedChords}
+                    onSave={handlePainterDone}
+                    onSkip={handlePainterDone}
+                />
+            )}
         </>
     );
 }

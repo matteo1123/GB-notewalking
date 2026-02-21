@@ -1,5 +1,6 @@
 import { MetronomeScreen } from "@/components/MetronomeScreen";
 import Header from "@/components/Header";
+import { RecitalSchedule } from "@/components/RecitalSchedule";
 
 const Index = () => {
   return (
@@ -40,6 +41,9 @@ const Index = () => {
             Whether you want to learn guitar, master scales, or improve your timing,
             our tools are designed to help you become a better musician.
           </p>
+        </div>
+        <div className="mt-6 max-w-2xl mx-auto w-full pb-16">
+          <RecitalSchedule />
         </div>
       </footer>
     </div>

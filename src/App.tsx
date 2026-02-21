@@ -6,7 +6,10 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { AutoRecordProvider } from "@/contexts/AutoRecordContext";
 import { PracticeSettingsProvider } from "@/contexts/PracticeSettingsContext";
+import { RecitalProvider } from "@/contexts/RecitalContext";
+import { RecitalBanner } from "@/components/RecitalBanner";
 import Index from "./pages/Index";
+import RecitalPage from "./pages/Recital";
 import Premium from "./pages/Premium";
 import Auth from "./pages/Auth";
 import AdminIndex from "./pages/Admin/Index";
@@ -30,14 +33,17 @@ const App = () => (
     <AuthProvider>
       <AutoRecordProvider>
         <PracticeSettingsProvider>
+          <RecitalProvider>
           <TooltipProvider>
             <Toaster />
             <Sonner />
             <BrowserRouter>
+              <RecitalBanner />
               <Routes>
                 <Route path="/" element={<Index />} />
                 <Route element={<MainLayout />}>
                   <Route path="/premium" element={<Premium />} />
+                  <Route path="/recital" element={<RecitalPage />} />
                   <Route path="/profile" element={<Profile />} />
                   <Route path="/admin" element={<AdminRoute><AdminIndex /></AdminRoute>} />
                   <Route path="/admin/shape-library" element={<AdminRoute><ShapeLibrary /></AdminRoute>} />
@@ -58,6 +64,7 @@ const App = () => (
               </Routes>
             </BrowserRouter>
           </TooltipProvider>
+          </RecitalProvider>
         </PracticeSettingsProvider>
       </AutoRecordProvider>
     </AuthProvider>

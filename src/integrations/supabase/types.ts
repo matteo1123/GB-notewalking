@@ -446,6 +446,194 @@ export interface Database {
           }
         ]
       }
+      recital_schedule: {
+        Row: {
+          id: string
+          title: string
+          scheduled_for: string
+          notes: string | null
+          created_by: string
+          auto_started: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          title: string
+          scheduled_for: string
+          notes?: string | null
+          created_by: string
+          auto_started?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          title?: string
+          scheduled_for?: string
+          notes?: string | null
+          created_by?: string
+          auto_started?: boolean
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recital_schedule_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      recitals: {
+        Row: {
+          id: string
+          created_by: string
+          schedule_id: string | null
+          status: 'active' | 'ended'
+          daily_room_url: string | null
+          daily_room_name: string | null
+          current_performer_id: string | null
+          performer_slot_started_at: string | null
+          started_at: string
+          ended_at: string | null
+        }
+        Insert: {
+          id?: string
+          created_by: string
+          schedule_id?: string | null
+          status?: 'active' | 'ended'
+          daily_room_url?: string | null
+          daily_room_name?: string | null
+          current_performer_id?: string | null
+          performer_slot_started_at?: string | null
+          started_at?: string
+          ended_at?: string | null
+        }
+        Update: {
+          id?: string
+          created_by?: string
+          schedule_id?: string | null
+          status?: 'active' | 'ended'
+          daily_room_url?: string | null
+          daily_room_name?: string | null
+          current_performer_id?: string | null
+          performer_slot_started_at?: string | null
+          started_at?: string
+          ended_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recitals_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recitals_schedule_id_fkey"
+            columns: ["schedule_id"]
+            isOneToOne: false
+            referencedRelation: "recital_schedule"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      recital_queue: {
+        Row: {
+          id: string
+          recital_id: string
+          user_id: string
+          display_name: string
+          ready: boolean
+          chat_banned_this_session: boolean
+          video_banned: boolean
+          joined_at: string
+          performed_at: string | null
+        }
+        Insert: {
+          id?: string
+          recital_id: string
+          user_id: string
+          display_name: string
+          ready?: boolean
+          chat_banned_this_session?: boolean
+          video_banned?: boolean
+          joined_at?: string
+          performed_at?: string | null
+        }
+        Update: {
+          id?: string
+          recital_id?: string
+          user_id?: string
+          display_name?: string
+          ready?: boolean
+          chat_banned_this_session?: boolean
+          video_banned?: boolean
+          joined_at?: string
+          performed_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recital_queue_recital_id_fkey"
+            columns: ["recital_id"]
+            isOneToOne: false
+            referencedRelation: "recitals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recital_queue_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      recital_chat: {
+        Row: {
+          id: string
+          recital_id: string
+          user_id: string
+          display_name: string
+          body: string
+          deleted_by_admin: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          recital_id: string
+          user_id: string
+          display_name: string
+          body: string
+          deleted_by_admin?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          recital_id?: string
+          user_id?: string
+          display_name?: string
+          body?: string
+          deleted_by_admin?: boolean
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recital_chat_recital_id_fkey"
+            columns: ["recital_id"]
+            isOneToOne: false
+            referencedRelation: "recitals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recital_chat_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
     }
     Views: {
       [_ in never]: never

@@ -12,6 +12,7 @@ import { PieceMastery } from './piece-mastery/PieceMastery';
 import { PieceList } from './piece-mastery/PieceList';
 import type { Piece } from './piece-mastery/types';
 import { useSession } from '@/contexts/SessionContext';
+import { EarTrainingPractice } from './EarTrainingPractice';
 
 // Helper to get display info from module type
 function getModuleDisplayInfo(moduleType: ModuleType): { icon: string; title: string; description: string } {
@@ -30,6 +31,8 @@ function getModuleDisplayInfo(moduleType: ModuleType): { icon: string; title: st
             return { icon: '🎸', title: 'Piece Mastery', description: 'Master your repertoire' };
         case 'riff':
             return { icon: '🔥', title: 'Riff Practice', description: 'Learn and practice riffs' };
+        case 'ear_training':
+            return { icon: '🎧', title: 'Ear Training', description: 'Identify scale degrees over a drone' };
         default:
             return { icon: '🎯', title: 'Practice', description: 'Focus on your skills' };
     }
@@ -154,6 +157,13 @@ function renderModuleContent(
             return (
                 <div className="h-full flex flex-col overflow-hidden">
                     <ChordProgressionExercise autoStart={true} sessionId={sessionId} />
+                </div>
+            );
+
+        case 'ear_training':
+            return (
+                <div className="h-full flex flex-col overflow-hidden items-stretch">
+                    <EarTrainingPractice autoStart={true} sessionId={sessionId} config={block.config as any} />
                 </div>
             );
 

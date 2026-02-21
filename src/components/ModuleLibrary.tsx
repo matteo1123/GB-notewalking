@@ -239,6 +239,10 @@ export function ModuleLibrary() {
                 type: 'piece_mastery',
                 progress: { current_level: 1, mastery_percentage: 0, time_practiced_minutes: 0 },
             },
+            {
+                type: 'ear_training',
+                progress: { current_level: 1, mastery_percentage: 0, time_practiced_minutes: 0 },
+            },
         ];
 
     const handleTryNow = (moduleType: ModuleType) => {

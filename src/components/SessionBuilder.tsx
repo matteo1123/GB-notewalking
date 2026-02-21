@@ -44,7 +44,7 @@ export function SessionBuilder({ onStartSession, onCancel }: SessionBuilderProps
     const [blocks, setBlocks] = useState<SessionBlock[]>([]);
     const [addDialogOpen, setAddDialogOpen] = useState(false);
     const [selectedModuleType, setSelectedModuleType] = useState<ModuleType | null>(null);
-    const [selectedDuration, setSelectedDuration] = useState(5);
+    const [selectedDuration, setSelectedDuration] = useState(2);
 
     // Edit block state
     const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -146,6 +146,9 @@ export function SessionBuilder({ onStartSession, onCancel }: SessionBuilderProps
                     break;
                 case 'chord_progressions':
                     config = { module_type: 'chord_progressions', progression: ['I', 'IV', 'V', 'I'] } as any;
+                    break;
+                case 'ear_training':
+                    config = { module_type: 'ear_training', root_note: 'C' } as any;
                     break;
                 default:
                     config = { module_type: moduleType } as any;
@@ -501,7 +504,7 @@ export function SessionBuilder({ onStartSession, onCancel }: SessionBuilderProps
                         <div className="space-y-2">
                             <label className="text-sm font-medium">Duration (minutes)</label>
                             <div className="flex gap-2">
-                                {[3, 5, 10, 15].map(min => (
+                                {[2, 5, 10, 15].map(min => (
                                     <Button
                                         key={min}
                                         variant={selectedDuration === min ? "default" : "outline"}

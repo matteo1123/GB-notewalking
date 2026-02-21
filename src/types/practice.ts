@@ -106,7 +106,8 @@ export type ModuleType =
   | 'arpeggio'
   | 'piece_mastery'
   | 'chord_progressions'
-  | 'riff';
+  | 'riff'
+  | 'ear_training';
 
 // Ear Training Options for module configs
 export interface EarTrainingModuleOptions {
@@ -199,6 +200,12 @@ export interface RiffModuleConfig {
   riff_name?: string;
 }
 
+export interface EarTrainingPracticeModuleConfig {
+  module_type: 'ear_training';
+  metronome?: MetronomeConfig;
+  root_note: string; // e.g. 'C', 'G#'
+}
+
 export type ModuleConfig =
   | ScaleModuleConfig
   | RhythmModuleConfig
@@ -206,7 +213,8 @@ export type ModuleConfig =
   | ChordProgressionsModuleConfig
   | ArpeggioModuleConfig
   | PieceMasteryModuleConfig
-  | RiffModuleConfig;
+  | RiffModuleConfig
+  | EarTrainingPracticeModuleConfig;
 
 // Practice Sessions
 export interface SessionBlock {

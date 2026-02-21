@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
     Dialog,
     DialogContent,
@@ -20,12 +20,13 @@ import {
 } from '@/components/ui/select';
 import { Plus, Trash2, GripVertical } from 'lucide-react';
 import { useRoutines } from '@/hooks/useRoutines';
-import type { SessionBlock, ModuleType, ProgressionMode } from '@/types/practice';
+import type { SessionBlock, ModuleType, ProgressionMode, PracticeRoutineSummary } from '@/types/practice';
 
 interface CreateRoutineModalProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     onCreated?: () => void;
+    routineToEdit?: PracticeRoutineSummary | null;
 }
 
 const ICONS = ['🎸', '🎵', '🎶', '🔥', '⚡', '🎯', '💪', '🌟', '🚀', '🎹'];
@@ -44,6 +45,7 @@ interface ModuleBlock {
     duration_minutes: number;
     progression_mode?: ProgressionMode;
     focus_target_bpm?: number;
+    original_config?: any;
 }
 
 const PROGRESSION_OPTIONS: { value: ProgressionMode; label: string; description: string }[] = [
@@ -56,8 +58,9 @@ export function CreateRoutineModal({
     open,
     onOpenChange,
     onCreated,
+    routineToEdit,
 }: CreateRoutineModalProps) {
-    const { createRoutine } = useRoutines();
+    const { createRoutine, updateRoutine, getRoutine } = useRoutines();
 
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
@@ -66,6 +69,37 @@ export function CreateRoutineModal({
         { id: crypto.randomUUID(), module_type: 'scale', duration_minutes: 5 },
     ]);
     const [saving, setSaving] = useState(false);
+
+    // Load routine data if editing
+    useEffect(() => {
+        if (open) {
+            if (routineToEdit) {
+                getRoutine(routineToEdit.id).then(fullRoutine => {
+                    if (fullRoutine) {
+                        setName(fullRoutine.name);
+                        setDescription(fullRoutine.description || '');
+                        setIcon(fullRoutine.icon || '🎸');
+
+                        if (fullRoutine.session_plan) {
+                            setModules(fullRoutine.session_plan.map(block => ({
+                                id: crypto.randomUUID(),
+                                module_type: block.module_type,
+                                duration_minutes: block.duration_minutes || 5,
+                                progression_mode: (block.config as any)?.progression_mode as ProgressionMode,
+                                focus_target_bpm: (block.config as any)?.focus_target_bpm,
+                                original_config: block.config
+                            })));
+                        }
+                    }
+                });
+            } else {
+                setName('');
+                setDescription('');
+                setIcon('🎸');
+                setModules([{ id: crypto.randomUUID(), module_type: 'scale', duration_minutes: 5 }]);
+            }
+        }
+    }, [open, routineToEdit, getRoutine]);
 
     const addModule = () => {
         setModules(prev => [
@@ -94,6 +128,7 @@ export function CreateRoutineModal({
             const session_plan: SessionBlock[] = modules.map((m, i) => ({
                 module_type: m.module_type,
                 config: {
+                    ...m.original_config,
                     module_type: m.module_type,
                     ...(m.progression_mode && { progression_mode: m.progression_mode }),
                     ...(m.progression_mode === 'focus' && m.focus_target_bpm && { focus_target_bpm: m.focus_target_bpm }),
@@ -102,21 +137,24 @@ export function CreateRoutineModal({
                 order: i,
             }));
 
-            await createRoutine({
-                name: name.trim(),
-                description: description.trim() || undefined,
-                icon,
-                session_plan,
-            });
+            if (routineToEdit) {
+                await updateRoutine(routineToEdit.id, {
+                    name: name.trim(),
+                    description: description.trim() || undefined,
+                    icon,
+                    session_plan,
+                });
+            } else {
+                await createRoutine({
+                    name: name.trim(),
+                    description: description.trim() || undefined,
+                    icon,
+                    session_plan,
+                });
+            }
 
             onOpenChange(false);
             onCreated?.();
-
-            // Reset form
-            setName('');
-            setDescription('');
-            setIcon('🎸');
-            setModules([{ id: crypto.randomUUID(), module_type: 'scale', duration_minutes: 5 }]);
         } finally {
             setSaving(false);
         }
@@ -126,9 +164,9 @@ export function CreateRoutineModal({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
                 <DialogHeader>
-                    <DialogTitle>Create Practice Routine</DialogTitle>
+                    <DialogTitle>{routineToEdit ? 'Edit Practice Routine' : 'Create Practice Routine'}</DialogTitle>
                     <DialogDescription>
-                        Build a reusable practice routine with multiple modules.
+                        {routineToEdit ? 'Modify your practice routine configuration.' : 'Build a reusable practice routine with multiple modules.'}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -292,7 +330,7 @@ export function CreateRoutineModal({
                         onClick={handleSave}
                         disabled={!name.trim() || modules.length === 0 || saving}
                     >
-                        {saving ? 'Creating...' : 'Create Routine'}
+                        {saving ? 'Saving...' : (routineToEdit ? 'Save Changes' : 'Create Routine')}
                     </Button>
                 </DialogFooter>
             </DialogContent>

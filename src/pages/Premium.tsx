@@ -334,9 +334,8 @@ const PremiumContent = () => {
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden p-2 sm:p-4">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0 overflow-hidden">
           <div className="overflow-x-auto flex-shrink-0 mb-2 sm:mb-4 -mx-2 px-2">
-            <TabsList className="inline-flex w-auto min-w-full sm:grid sm:grid-cols-5 gap-1">
+            <TabsList className="inline-flex w-auto min-w-full sm:grid sm:grid-cols-4 gap-1">
               <TabsTrigger value="practice" className="text-xs sm:text-sm px-2 sm:px-4 whitespace-nowrap">🎸 Practice</TabsTrigger>
-              <TabsTrigger value="routines" className="text-xs sm:text-sm px-2 sm:px-4 whitespace-nowrap">📋 Routines</TabsTrigger>
               <TabsTrigger value="library" className="text-xs sm:text-sm px-2 sm:px-4 whitespace-nowrap">🎯 Library</TabsTrigger>
               <TabsTrigger value="coach" className="text-xs sm:text-sm px-2 sm:px-4 whitespace-nowrap">🤖 Coach</TabsTrigger>
               <TabsTrigger value="progress" className="text-xs sm:text-sm px-2 sm:px-4 whitespace-nowrap">📊 Progress</TabsTrigger>
@@ -344,12 +343,8 @@ const PremiumContent = () => {
           </div>
 
           {/* Practice - Quick start or pick a routine */}
-          <TabsContent value="practice" className="flex-1 min-h-0 overflow-y-auto data-[state=active]:block p-6">
+          <TabsContent value="practice" className="flex-1 min-h-0 overflow-y-auto data-[state=active]:block p-6 space-y-8">
             <PressStart />
-          </TabsContent>
-
-          {/* Routines - Named, saved practice configurations */}
-          <TabsContent value="routines" className="flex-1 min-h-0 overflow-y-auto data-[state=active]:block p-6">
             <MyRoutines onStartRoutine={handleStartRoutine} />
           </TabsContent>
 

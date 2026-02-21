@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 // Valid module types for validation
-const VALID_MODULE_TYPES = ["scale", "arpeggio", "rhythm", "notewalking", "chord_progressions", "piece_mastery", "riff"];
+const VALID_MODULE_TYPES = ["scale", "arpeggio", "rhythm", "notewalking", "chord_progressions", "piece_mastery", "riff", "ear_training"];
 
 // Tool definitions for Gemini
 const tools = [
@@ -55,7 +55,7 @@ const tools = [
                     properties: {
                         module_type: {
                             type: "string",
-                            enum: ["scale", "arpeggio", "rhythm", "notewalking", "chord_progressions"],
+                            enum: ["scale", "arpeggio", "rhythm", "notewalking", "chord_progressions", "ear_training"],
                             description: "The type of practice module to create",
                         },
                         name: {
@@ -68,7 +68,7 @@ const tools = [
                         },
                         duration_minutes: {
                             type: "number",
-                            description: "Duration in minutes (default 10)",
+                            description: "Duration in minutes (default 2)",
                         },
                         // Scale/arpeggio specific
                         priority_shape_ids: {
@@ -112,6 +112,11 @@ const tools = [
                         chord_key: {
                             type: "string",
                             description: "Key for chord progressions (chord_progressions only)",
+                        },
+                        // Ear Training specific
+                        root_note: {
+                            type: "string",
+                            description: "Root note for drone (e.g., 'C', 'G', 'F#') (ear_training only)",
                         },
                     },
                     required: ["module_type", "name"],
@@ -174,7 +179,7 @@ const tools = [
                                         properties: {
                                             module_type: {
                                                 type: "string",
-                                                enum: ["scale", "arpeggio", "rhythm", "notewalking", "chord_progressions", "piece_mastery", "riff"],
+                                                enum: ["scale", "arpeggio", "rhythm", "notewalking", "chord_progressions", "piece_mastery", "riff", "ear_training"],
                                             },
                                             config: {
                                                 type: "object",
@@ -195,7 +200,7 @@ const tools = [
                                             },
                                             module_type: {
                                                 type: "string",
-                                                enum: ["scale", "arpeggio", "rhythm", "notewalking", "chord_progressions", "piece_mastery", "riff"],
+                                                enum: ["scale", "arpeggio", "rhythm", "notewalking", "chord_progressions", "piece_mastery", "riff", "ear_training"],
                                             },
                                             config: {
                                                 type: "object",
@@ -245,7 +250,7 @@ const tools = [
                                 properties: {
                                     module_type: {
                                         type: "string",
-                                        enum: ["scale", "arpeggio", "rhythm", "notewalking", "chord_progressions", "piece_mastery", "riff"],
+                                        enum: ["scale", "arpeggio", "rhythm", "notewalking", "chord_progressions", "piece_mastery", "riff", "ear_training"],
                                     },
                                     config: {
                                         type: "object",
@@ -350,6 +355,7 @@ const SYSTEM_PROMPT = `You are Guitar Brain Coach, an AI assistant helping guita
 - **chord_progressions**: Smooth chord transitions & progressions
 - **piece_mastery**: Song mastery with looped practice
 - **riff**: Riff practice
+- **ear_training**: Dedicated ear training to identify scale degrees 1-7 over a drone
 
 ## DATABASE SCHEMA - How to Search
 
@@ -438,6 +444,15 @@ serve(async (req) => {
 
         // Parse request
         const { message, conversationHistory = [] } = await req.json();
+
+        // Log user message asynchronously
+        supabase.from('ai_coach_chats').insert({
+            user_id: user.id,
+            role: 'user',
+            content: message
+        }).then(({ error }: any) => {
+            if (error) console.error("Error logging user chat:", error);
+        });
 
         // Build Gemini message format
         const contents = [
@@ -571,6 +586,16 @@ serve(async (req) => {
                 break;
             }
         }
+
+        // Log assistant response asynchronously
+        supabase.from('ai_coach_chats').insert({
+            user_id: user.id,
+            role: 'assistant',
+            content: responseText,
+            tool_calls: toolCalls.length > 0 ? toolCalls : null
+        }).then(({ error }: any) => {
+            if (error) console.error("Error logging assistant chat:", error);
+        });
 
         return new Response(
             JSON.stringify({
@@ -759,7 +784,7 @@ function createModuleConfig(input: any) {
             config = {
                 module_type: "rhythm",
                 rhythm_level: input.rhythm_level || 1,
-                duration_minutes: input.duration_minutes || 10,
+                duration_minutes: input.duration_minutes || 2,
             };
             break;
 
@@ -789,9 +814,9 @@ function createModuleConfig(input: any) {
         name: input.name,
         description: input.description,
         module_config: config,
-        duration_minutes: input.duration_minutes || 10,
+        duration_minutes: input.duration_minutes || 2,
         shape_count: input.priority_shape_ids?.length || 0,
-        message: `Created "${input.name}" module (${moduleType}). Duration: ${input.duration_minutes || 10} min.${input.progression_mode ? ` Mode: ${input.progression_mode}.` : ""
+        message: `Created "${input.name}" module (${moduleType}). Duration: ${input.duration_minutes || 2} min.${input.progression_mode ? ` Mode: ${input.progression_mode}.` : ""
             }`,
     };
 }

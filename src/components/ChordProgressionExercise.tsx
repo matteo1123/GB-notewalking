@@ -70,14 +70,22 @@ interface ChordProgressionExerciseProps {
 }
 
 export function ChordProgressionExercise({ autoStart = false, sessionId, onExit, moduleConfig, onConfigChange }: ChordProgressionExerciseProps) {
-    const [settings, setSettings] = useState<ChordProgressionSettings>(() => ({
-        ...DEFAULT_SETTINGS,
-        key: moduleConfig?.key || DEFAULT_SETTINGS.key,
-        selectedChords: (moduleConfig?.chords as any) || DEFAULT_SETTINGS.selectedChords,
-        measuresPerChord: moduleConfig?.measures_per_chord || DEFAULT_SETTINGS.measuresPerChord,
-        droneEnabled: DEFAULT_SETTINGS.droneEnabled,
-        promptFretboardPainter: moduleConfig?.prompt_fretboard_painter ?? DEFAULT_SETTINGS.promptFretboardPainter,
-    }));
+    const [settings, setSettings] = useState<ChordProgressionSettings>(() => {
+        let initChords = (moduleConfig?.chords as any) || DEFAULT_SETTINGS.selectedChords;
+        if (Array.isArray(initChords)) {
+            initChords = initChords.slice(0, 2);
+            if (initChords.length === 0) initChords = ["I", "IV"];
+            if (initChords.length === 1) initChords = [initChords[0], "IV"];
+        }
+        return {
+            ...DEFAULT_SETTINGS,
+            key: moduleConfig?.key || DEFAULT_SETTINGS.key,
+            selectedChords: initChords,
+            measuresPerChord: moduleConfig?.measures_per_chord || DEFAULT_SETTINGS.measuresPerChord,
+            droneEnabled: DEFAULT_SETTINGS.droneEnabled,
+            promptFretboardPainter: moduleConfig?.prompt_fretboard_painter ?? DEFAULT_SETTINGS.promptFretboardPainter,
+        };
+    });
     const [isPlaying, setIsPlaying] = useState(autoStart);
     const [bpm, setBpm] = useState(moduleConfig?.metronome?.bpm ?? 80);
     const [mode, setMode] = useState<MetronomeMode>((moduleConfig?.metronome?.mode as MetronomeMode) || "regular");
@@ -86,14 +94,41 @@ export function ChordProgressionExercise({ autoStart = false, sessionId, onExit,
     // Sync from config props
     useEffect(() => {
         if (moduleConfig) {
-            setSettings(prev => ({
-                ...prev,
-                key: moduleConfig.key || prev.key,
-                selectedChords: (moduleConfig.chords as any) || prev.selectedChords,
-                measuresPerChord: moduleConfig.measures_per_chord || prev.measuresPerChord,
-                promptFretboardPainter: moduleConfig.prompt_fretboard_painter ?? prev.promptFretboardPainter,
-                // droneEnabled not in config
-            }));
+            setSettings(prev => {
+                let syncedChords = prev.selectedChords;
+                if (Array.isArray(moduleConfig.chords)) {
+                    const newChords = moduleConfig.chords.slice(0, 2) as ChordNumeral[];
+                    if (newChords.length === 0) newChords.push("I", "IV");
+                    if (newChords.length === 1) newChords.push(newChords[0], "IV");
+
+                    if (newChords[0] !== prev.selectedChords[0] || newChords[1] !== prev.selectedChords[1]) {
+                        syncedChords = newChords;
+                    }
+                }
+
+                const newKey = moduleConfig.key || prev.key;
+                const newMeasures = moduleConfig.measures_per_chord || prev.measuresPerChord;
+                const newPainter = moduleConfig.prompt_fretboard_painter ?? prev.promptFretboardPainter;
+
+                // Stop the Infinite Loop: Bail out if nothing actually changed
+                if (
+                    syncedChords === prev.selectedChords &&
+                    newKey === prev.key &&
+                    newMeasures === prev.measuresPerChord &&
+                    newPainter === prev.promptFretboardPainter
+                ) {
+                    return prev;
+                }
+
+                return {
+                    ...prev,
+                    key: newKey,
+                    selectedChords: syncedChords,
+                    measuresPerChord: newMeasures,
+                    promptFretboardPainter: newPainter,
+                    // droneEnabled not in config
+                };
+            });
 
             if (moduleConfig.metronome) {
                 if (moduleConfig.metronome.bpm !== undefined && moduleConfig.metronome.bpm !== bpm) setBpm(moduleConfig.metronome.bpm);
@@ -121,7 +156,7 @@ export function ChordProgressionExercise({ autoStart = false, sessionId, onExit,
     const [showPainter, setShowPainter] = useState(false);
 
     useEffect(() => {
-        if (moduleConfig?.prompt_fretboard_painter) {
+        if (settings.promptFretboardPainter) {
             setAutoAdvanceEnabled?.(false);
         } else {
             setAutoAdvanceEnabled?.(true);
@@ -131,20 +166,36 @@ export function ChordProgressionExercise({ autoStart = false, sessionId, onExit,
         return () => {
             setAutoAdvanceEnabled?.(true);
         }
-    }, [moduleConfig?.prompt_fretboard_painter, setAutoAdvanceEnabled]);
+    }, [settings.promptFretboardPainter, setAutoAdvanceEnabled]);
 
     useEffect(() => {
         // When timer hits zero, if the painter is enabled, pause and show it
-        if (timer?.timeRemaining === 0 && moduleConfig?.prompt_fretboard_painter && !showPainter) {
+        // BUG FIX: Only trigger this if we are in an ACTIVE Session (not Freeplay)
+        if (sessionContext?.isActive && timer?.timeRemaining === 0 && settings.promptFretboardPainter && !showPainter) {
             pauseSession?.();
             setShowPainter(true);
         }
-    }, [timer?.timeRemaining, moduleConfig?.prompt_fretboard_painter, showPainter, pauseSession]);
+    }, [timer?.timeRemaining, settings.promptFretboardPainter, showPainter, pauseSession, sessionContext?.isActive]);
 
     const handlePainterDone = () => {
         setShowPainter(false);
         setAutoAdvanceEnabled?.(true);
-        nextBlock?.();
+
+        if (sessionContext?.isActive) {
+            nextBlock?.();
+        } else if (onExit) {
+            // If we're in Freeplay mode, the painter fires on exit, so now we actually exit.
+            onExit();
+        }
+    };
+
+    // Freeplay Exit Interception
+    const handleFreeplayExit = () => {
+        if (!sessionContext?.isActive && settings.promptFretboardPainter) {
+            setShowPainter(true);
+        } else if (onExit) {
+            onExit();
+        }
     };
 
     const { autoRecordEnabled } = useAutoRecord();
@@ -167,10 +218,36 @@ export function ChordProgressionExercise({ autoStart = false, sessionId, onExit,
         onChordChange: (idx, rootNote) => { }
     });
 
-    const [showFretboard, setShowFretboard] = useState(false);
+    const [detectedPitch, setDetectedPitch] = useState<string | null>(null);
     const [fretboardNotes, setFretboardNotes] = useState<any[]>([]);
     const [degreeMap, setDegreeMap] = useState<Map<string, number>>(new Map());
     const [scale, setScale] = useState(1);
+    const [revealedFrets, setRevealedFrets] = useState<Set<string>>(() => {
+        const initial = new Set<string>();
+        // Default fog focus: Frets 2-5 on strings 3-5 (center of fretboard)
+        for (let s = 3; s <= 5; s++) {
+            for (let f = 2; f <= 5; f++) {
+                initial.add(`${s}-${f}`);
+            }
+        }
+        return initial;
+    });
+
+    const getGuitarPitch = useCallback((stringNum: number, fret: number): string => {
+        const stringMidiNotes: Record<number, number> = {
+            1: 64, // High E (E4)
+            2: 59, // B3
+            3: 55, // G3
+            4: 50, // D3
+            5: 45, // A2
+            6: 40  // Low E (E2)
+        };
+        const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+        const midiNote = stringMidiNotes[stringNum] + fret;
+        const octave = Math.floor(midiNote / 12) - 1;
+        const noteName = noteNames[midiNote % 12];
+        return `${noteName}${octave}`;
+    }, []);
 
     useEffect(() => {
         const handleResize = () => {
@@ -211,41 +288,29 @@ export function ChordProgressionExercise({ autoStart = false, sessionId, onExit,
             });
         }
 
-        let micNotePlotted = false;
-
         noteNames.forEach(noteName => {
             const positions = findAllNoteOccurrences(noteName);
             positions.forEach(pos => {
-                // Check if this note matches the currently detected note
-                const isCurrentlyPlaying = detectedNote && noteName.toUpperCase() === detectedNote.toUpperCase();
-                if (isCurrentlyPlaying) micNotePlotted = true;
+                // Determine if this is the EXACT pitch played within the revealed frets
+                const pitch = getGuitarPitch(pos.string, pos.fret);
+                const isCurrentlyPlaying = detectedPitch === pitch && revealedFrets.has(`${pos.string}-${pos.fret}`);
 
                 notes.push({
                     string: pos.string,
                     fret: pos.fret,
                     isStructure: structureNotes.has(noteName),
                     isActive: activeNotes.has(noteName),
-                    isPlaying: isCurrentlyPlaying
+                    isPlaying: isCurrentlyPlaying,
+                    color: '#3f3f46'
                 });
             });
         });
 
-        // Always plot the mic note even if it's out of the current scale!
-        if (detectedNote && !micNotePlotted) {
-            const positions = findAllNoteOccurrences(detectedNote);
-            positions.forEach(pos => {
-                notes.push({
-                    string: pos.string,
-                    fret: pos.fret,
-                    isStructure: false,
-                    isActive: false,
-                    isPlaying: true
-                });
-            });
-        }
+        // Fog of War is permanently ON
+        const filteredNotes = notes.filter(n => n.isPlaying || revealedFrets.has(`${n.string}-${n.fret}`));
 
-        setFretboardNotes(notes);
-    }, [settings.key, settings.selectedChords, currentChordIndex, detectedNote]);
+        setFretboardNotes(filteredNotes);
+    }, [settings.key, settings.selectedChords, currentChordIndex, detectedPitch, revealedFrets, getGuitarPitch]);
 
     const metronomeSettings: MetronomeSettings = {
         mode,
@@ -311,7 +376,7 @@ export function ChordProgressionExercise({ autoStart = false, sessionId, onExit,
     useBpmControls({
         currentBpm: bpm,
         onBpmChange: handleBpmChange,
-        isEnabled: !showFretboard,
+        isEnabled: true, // Always enabled
     });
 
     const handlePitchDetected = useCallback(
@@ -469,66 +534,92 @@ export function ChordProgressionExercise({ autoStart = false, sessionId, onExit,
                                 Drone
                             </button>
 
-                            {/* Fretboard Button */}
-                            <Button variant="outline" size="sm" className="h-6 text-[10px]" onClick={() => setShowFretboard(true)}>
-                                <Guitar className="w-3 h-3 mr-1" /> Fretboard
-                            </Button>
+                            {/* Fretboard Button - Removed */}
                         </div>
 
-                        {/* CENTER: Tuner (MOST IMPORTANT - ~55%) */}
-                        <div className="flex-1 flex flex-col gap-1 min-w-0 overflow-hidden">
-                            {/* Top Bar - Split: Chord Info | Session Controls */}
-                            <div className="flex-shrink-0 flex gap-1">
-                                {/* Left Half: Current Chord Display */}
-                                <div className="flex-1 bg-card border rounded px-2 py-1 flex items-center justify-between">
-                                    <span className="text-xs text-muted-foreground">Playing:</span>
-                                    <span className="text-lg font-bold">{settings.selectedChords[currentChordIndex]} ({currentChord.rootNote})</span>
-                                    <span className="text-xs text-muted-foreground">Key of {settings.key}</span>
-                                </div>
-
-                                {/* Exit (freeplay mode — session nav is handled by parent LessonNavWrapper) */}
-                                {onExit && (
-                                    <div className="bg-card border rounded px-2 py-1 flex items-center">
-                                        <Button size="sm" variant="ghost" className="h-6 px-2 text-xs gap-1" onClick={onExit}>
-                                            <X className="w-3 h-3" /> Exit
-                                        </Button>
+                        {/* CENTER: Contextual Fretboard Area */}
+                        <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-[#0a0a0a] border rounded relative">
+                            {/* Inner Top Header: Chord A | Mic Tuner | Chord B */}
+                            <div className="h-[40px] md:h-auto flex flex-row shrink-0 border-b border-gray-800">
+                                {/* Chord A */}
+                                <div className={`flex-1 flex justify-center items-center py-1 transition-colors duration-300 gap-2 border-r border-gray-800 ${activeSlot === 0 ? 'bg-blue-900/20' : ''}`}>
+                                    <div className="flex flex-col items-end mr-2">
+                                        <h4 className="text-[10px] md:text-xs font-bold text-gray-400">Chord A</h4>
+                                        <div className="text-[8px] md:text-[10px] font-mono text-gray-400">{settings.key} {currentChordA}</div>
                                     </div>
-                                )}
-                            </div>
-
-                            {/* DEGREE TUNER - Main Visual */}
-                            <div className="flex-1 bg-card border rounded flex items-center justify-center gap-4 min-h-0">
-                                {/* Large Degree Circle */}
-                                <div
-                                    className="w-24 h-24 rounded-full flex items-center justify-center text-5xl font-black shadow-lg border-4"
-                                    style={{
-                                        backgroundColor: scaleDegree ? degreeColor : "#333",
-                                        borderColor: scaleDegree ? degreeColor : "#555",
-                                        color: scaleDegree ? "#fff" : "#888"
-                                    }}
-                                >
-                                    {scaleDegree || "?"}
+                                    <div className={`text-xl md:text-3xl font-black ${activeSlot === 0 ? 'text-blue-400 drop-shadow-[0_0_8px_rgba(96,165,250,0.5)]' : 'text-gray-500'}`}>
+                                        {currentChordA}
+                                    </div>
                                 </div>
 
-                                {/* Note Info */}
-                                <div className="text-center">
-                                    <p className="text-2xl font-bold">{detectedNote || "---"}</p>
-                                    <p className="text-xs text-muted-foreground">
-                                        {pitchConfidence > 0 ? `${Math.round(pitchConfidence * 100)}%` : "Play a note"}
-                                    </p>
-                                </div>
-                            </div>
-
-                            {/* Chord Progression Visual - Compact */}
-                            <div className="flex-shrink-0 flex gap-1 justify-center">
-                                {settings.selectedChords.map((chord, idx) => (
+                                {/* Floating Tiny Tuner */}
+                                <div className="w-[120px] shrink-0 border-l border-r border-gray-800 bg-black flex flex-col relative justify-center items-center z-10 shadow-xl">
                                     <div
-                                        key={idx}
-                                        className={`px-3 py-1 rounded text-sm font-bold ${idx === currentChordIndex ? "bg-primary text-white scale-110" : "bg-muted"}`}
+                                        className="w-12 h-12 rounded-full flex items-center justify-center text-xl font-black shadow-lg border-2 z-10 bg-[#222]"
+                                        style={{
+                                            borderColor: scaleDegree ? degreeColor : "#555",
+                                            color: scaleDegree ? "#fff" : "#888",
+                                            boxShadow: scaleDegree ? `0 0 10px ${degreeColor}40` : 'none'
+                                        }}
                                     >
-                                        {chord}
+                                        {scaleDegree || "?"}
                                     </div>
-                                ))}
+                                    <div className="text-[12px] font-bold text-gray-300 mt-1 whitespace-nowrap overflow-hidden text-clip w-full text-center">
+                                        {detectedPitch || "---"}
+                                    </div>
+
+                                    {/* Exit Freeplay */}
+                                    {onExit && (
+                                        <Button size="icon" variant="ghost" className="absolute top-0 right-0 h-4 w-4 bg-red-900/40 hover:bg-red-900 z-20 m-1 rounded-sm border border-red-500/50" onClick={handleFreeplayExit} title="Exit">
+                                            <X className="w-3 h-3 text-red-100" />
+                                        </Button>
+                                    )}
+                                </div>
+
+                                {/* Chord B */}
+                                <div className={`flex-1 flex justify-center items-center py-1 transition-colors duration-300 gap-2 ${activeSlot === 1 ? 'bg-orange-900/20' : ''}`}>
+                                    <div className={`text-xl md:text-3xl font-black ${activeSlot === 1 ? 'text-orange-400 drop-shadow-[0_0_8px_rgba(251,146,60,0.5)]' : 'text-gray-500'}`}>
+                                        {currentChordB}
+                                    </div>
+                                    <div className="flex flex-col items-start ml-2">
+                                        <h4 className="text-[10px] md:text-xs font-bold text-gray-400">Chord B</h4>
+                                        <div className="text-[8px] md:text-[10px] font-mono text-gray-400">{settings.key} {currentChordB}</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* The Fretboard */}
+                            <div className="flex-1 overflow-auto flex items-center justify-center p-2 relative min-h-0">
+                                {/* We inject the active-chord-* CSS class dynamically to colorize the notes! */}
+                                <div className={`w-full h-full max-w-[1200px] flex items-center justify-center notewalking-fretboard-override ${activeSlot === 0 ? 'active-chord-a' : 'active-chord-b'}`}>
+                                    <Fretboard
+                                        selectedNotes={fretboardNotes}
+                                        degreeMap={degreeMap}
+                                        showDegreeNumbers
+                                        isEditable={true}
+                                        onNoteClick={(string, fret) => {
+                                            setRevealedFrets(prev => {
+                                                const next = new Set(prev);
+                                                const clickedKey = `${string}-${fret}`;
+                                                // If the center is hidden, we reveal the area. If center is revealed, we hide the area.
+                                                const isRevealing = !next.has(clickedKey);
+
+                                                // Wide brush: +/- 1 string, +/- 2 frets
+                                                for (let s = Math.max(1, string - 1); s <= Math.min(6, string + 1); s++) {
+                                                    for (let f = Math.max(0, fret - 2); f <= Math.min(24, fret + 2); f++) {
+                                                        const key = `${s}-${f}`;
+                                                        if (isRevealing) {
+                                                            next.add(key);
+                                                        } else {
+                                                            next.delete(key);
+                                                        }
+                                                    }
+                                                }
+                                                return next;
+                                            });
+                                        }}
+                                    />
+                                </div>
                             </div>
                         </div>
 
@@ -618,88 +709,11 @@ export function ChordProgressionExercise({ autoStart = false, sessionId, onExit,
                 </div>
             </ForceLandscapeWrapper>
 
-            {/* Fretboard Overlay - Inside ForceLandscapeWrapper to natively support phones */}
-            {showFretboard && (
-                <ForceLandscapeWrapper>
-                    <div className="fixed inset-0 z-[9999] bg-black flex flex-col font-sans">
-                        {/* Header */}
-                        <div className="flex-shrink-0 flex items-center justify-between px-4 py-2 bg-gradient-to-b from-gray-900 to-black border-b border-gray-800">
-                            <div className="flex items-center gap-4">
-                                <h3 className="font-bold text-lg text-white">Notewalking: {settings.key}</h3>
-                                {/* Mic Status Indicator */}
-                                <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-gray-900 border border-gray-700">
-                                    <div className={`w-2 h-2 rounded-full ${detectedNote ? 'bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.8)] animate-pulse' : 'bg-gray-600'}`} />
-                                    <span className="text-xs font-mono text-gray-300">
-                                        Mic: {detectedNote ? <span className="text-cyan-400 font-bold">{detectedNote}</span> : 'Awaiting Pitch...'}
-                                    </span>
-                                </div>
-                            </div>
-                            <Button variant="destructive" size="sm" onClick={() => setShowFretboard(false)}>
-                                <X className="w-4 h-4 mr-1" /> Close
-                            </Button>
-                        </div>
-
-                        {/* Main Contextual Fretboard Area - 3 Columns Mobile/Desktop Responsive */}
-                        <div className="flex-1 flex flex-col md:flex-row overflow-hidden bg-[#0a0a0a]">
-
-                            {/* TOP PANEL (Mobile) / LEFT PANEL (Desktop): Chord A */}
-                            <div className={`w-full md:w-[180px] h-[40px] md:h-auto flex flex-row md:flex-col justify-center items-center border-b md:border-b-0 md:border-r border-gray-800 transition-colors duration-300 gap-3 md:gap-0 flex-shrink-0 ${activeSlot === 0 ? 'bg-blue-900/20' : ''}`}>
-                                <div className="flex items-center gap-2">
-                                    <h4 className="text-[10px] md:text-sm font-bold text-gray-400 hidden md:block">Chord A</h4>
-                                    <div className={`text-xl md:text-4xl font-black ${activeSlot === 0 ? 'text-blue-400 drop-shadow-[0_0_10px_rgba(96,165,250,0.5)]' : 'text-gray-500'}`}>
-                                        {currentChordA}
-                                    </div>
-                                    <div className="text-[10px] md:text-sm font-mono text-gray-400 hidden sm:block">{settings.key} {currentChordA}</div>
-                                </div>
-                                <div className="flex gap-1 md:gap-2 md:mt-4">
-                                    {getChordTones(currentChordA as ChordNumeral).map((t, i) => (
-                                        <div key={i} className={`w-6 h-6 md:w-8 md:h-8 rounded-full flex items-center justify-center font-bold text-[10px] md:text-sm ${activeSlot === 0 ? 'bg-blue-500 text-white shadow-[0_0_8px_rgba(59,130,246,0.5)]' : 'bg-gray-800 text-gray-400'}`}>
-                                            {t}
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* CENTER: The Fretboard */}
-                            <div className="flex-1 overflow-auto flex items-center justify-center p-2 relative min-h-0">
-                                {/* We wrap the Fretboard in a specific class to override the color scheme */}
-                                <div className="w-full h-full max-w-[1200px] flex items-center justify-center notewalking-fretboard-override">
-                                    <Fretboard
-                                        selectedNotes={fretboardNotes}
-                                        degreeMap={degreeMap}
-                                        showDegreeNumbers
-                                        isEditable={false}
-                                    />
-                                </div>
-                            </div>
-
-                            {/* BOTTOM PANEL (Mobile) / RIGHT PANEL (Desktop): Chord B */}
-                            <div className={`w-full md:w-[180px] h-[40px] md:h-auto flex flex-row md:flex-col justify-center items-center border-t md:border-t-0 md:border-l border-gray-800 transition-colors duration-300 gap-3 md:gap-0 flex-shrink-0 ${activeSlot === 1 ? 'bg-orange-900/20' : ''}`}>
-                                <div className="flex items-center gap-2">
-                                    <h4 className="text-[10px] md:text-sm font-bold text-gray-400 hidden md:block">Chord B</h4>
-                                    <div className={`text-xl md:text-4xl font-black ${activeSlot === 1 ? 'text-orange-400 drop-shadow-[0_0_10px_rgba(251,146,60,0.5)]' : 'text-gray-500'}`}>
-                                        {currentChordB}
-                                    </div>
-                                    <div className="text-[10px] md:text-sm font-mono text-gray-400 hidden sm:block">{settings.key} {currentChordB}</div>
-                                </div>
-                                <div className="flex gap-1 md:gap-2 md:mt-4">
-                                    {getChordTones(currentChordB as ChordNumeral).map((t, i) => (
-                                        <div key={i} className={`w-6 h-6 md:w-8 md:h-8 rounded-full flex items-center justify-center font-bold text-[10px] md:text-sm ${activeSlot === 1 ? 'bg-orange-500 text-white shadow-[0_0_8px_rgba(249,115,22,0.5)]' : 'bg-gray-800 text-gray-400'}`}>
-                                            {t}
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-
-                        </div>
-                    </div>
-                </ForceLandscapeWrapper>
-            )}
-
             {showPainter && (
                 <FretboardPainter
                     sessionKey={settings.key}
                     chordPair={settings.selectedChords}
+                    revealedFrets={revealedFrets}
                     onSave={handlePainterDone}
                     onSkip={handlePainterDone}
                 />

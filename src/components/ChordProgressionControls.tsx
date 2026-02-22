@@ -48,10 +48,17 @@ export function ChordProgressionControls({
     const [activeSlot, setActiveSlot] = useState<0 | 1>(0);
 
     const handleChordSelect = (chord: ChordNumeral) => {
-        // Ensure we always have 2 chords
-        const newChords = [...(settings.selectedChords || ["I", "IV"])];
+        // Ensure we always have exactly 2 chords
+        let newChords = [...(settings.selectedChords || ["I", "IV"])];
+
+        // Truncate to exactly 2 if an old config had more
+        if (newChords.length > 2) {
+            newChords = [newChords[0], newChords[1]];
+        }
+
+        // Fill if somehow less than 2
         if (newChords.length < 2) {
-            newChords.push("I"); // Fill if missing
+            newChords.push("I");
             if (newChords.length < 2) newChords.push("IV");
         }
 

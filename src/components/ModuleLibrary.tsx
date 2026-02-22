@@ -38,6 +38,7 @@ import { useModuleConfig } from '@/hooks/useModuleConfig';
 import { usePracticeSession } from '@/hooks/usePracticeSession';
 import { SessionBuilder } from '@/components/SessionBuilder';
 import { Save, Layers, Plus } from 'lucide-react';
+import { usePracticeSettings } from '@/contexts/PracticeSettingsContext';
 import {
     Dialog,
     DialogContent,
@@ -64,6 +65,8 @@ export function ModuleLibrary() {
     const [selectedPiece, setSelectedPiece] = useState<Piece | null>(null);
     const [exercises, setExercises] = useState<RepertoireItem[]>([]);
     const [sequences, setSequences] = useState<any[]>([]);
+
+    const { settings } = usePracticeSettings();
 
     // Scale module configuration
     const [scaleConfig, setScaleConfig] = useState<ScaleModuleConfig>({
@@ -258,6 +261,15 @@ export function ModuleLibrary() {
         ];
 
     const handleTryNow = (moduleType: ModuleType) => {
+        if (settings.defaultMetronome) {
+            if (moduleType === 'scale') setScaleConfig(prev => ({ ...prev, metronome: settings.defaultMetronome }));
+            if (moduleType === 'arpeggio') setArpeggioConfig(prev => ({ ...prev, metronome: settings.defaultMetronome }));
+            if (moduleType === 'rhythm') setRhythmConfig(prev => ({ ...prev, metronome: settings.defaultMetronome }));
+            if (moduleType === 'notewalking') setNotewalkingConfig(prev => ({ ...prev, metronome: settings.defaultMetronome }));
+            if (moduleType === 'chord_progressions') setChordProgressionsConfig(prev => ({ ...prev, metronome: settings.defaultMetronome }));
+            if (moduleType === 'ear_training') setEarTrainingConfig(prev => ({ ...prev, metronome: settings.defaultMetronome }));
+            // piece_mastery doesn't have a top-level state config here, it creates it dynamically below
+        }
         setActiveModule(moduleType);
     };
 

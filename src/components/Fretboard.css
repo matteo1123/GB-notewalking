@@ -121,7 +121,8 @@
 
   .fretboard {
     /* Mobile: WIDE and THIN - like a real guitar neck */
-    min-width: 600px;
+    width: 100%;
+    min-width: min(100%, 800px);
     max-height: 195px;
     height: 195px;
     padding: 12px 0;
@@ -290,11 +291,12 @@
 
 .notewalking-fretboard-override .fretboard,
 .notewalking-fretboard-override .fretboard-container {
-  min-width: min(100%, 800px) !important;
+  min-width: min(100%, 600px);
+  width: 100%;
 }
 
 .notewalking-fretboard-override .dot {
-  background-color: #3f3f46 !important;
+  background-color: #3f3f46;
   /* Dim grey scale background */
   opacity: 0.6;
 }
@@ -314,6 +316,33 @@
 .notewalking-fretboard-override .dot.active-note .degree-number {
   color: #facc15 !important;
   text-shadow: 0 0 4px rgba(0, 0, 0, 0.9) !important;
+}
+
+/* ACTIVE CHORD A (BLUE) HIGHLIGHTS */
+.notewalking-fretboard-override.active-chord-a .fret-note.is-active {
+  background-color: #3b82f6 !important;
+  /* Blue 500 */
+  color: white !important;
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.8) !important;
+}
+
+/* ACTIVE CHORD B (ORANGE) HIGHLIGHTS */
+.notewalking-fretboard-override.active-chord-b .fret-note.is-active {
+  background-color: #f97316 !important;
+  /* Orange 500 */
+  color: white !important;
+  box-shadow: 0 0 10px rgba(249, 115, 22, 0.8) !important;
+}
+
+/* PLAYING NOTE (MICROPHONE) HIGHLIGHT - Pierces through */
+.notewalking-fretboard-override .fret-note.is-playing {
+  background-color: #22d3ee !important;
+  /* Cyan 400 */
+  color: black !important;
+  box-shadow: 0 0 15px rgba(34, 211, 238, 1) !important;
+  z-index: 20;
+  transform: scale(1.15) !important;
+  border-width: 0px !important;
 }
 
 .notewalking-fretboard-override .dot.playing-note {

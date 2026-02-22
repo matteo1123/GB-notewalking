@@ -17,6 +17,7 @@ export interface ActiveSession {
     currentBlock: SessionBlock;
     timeElapsed: number; // seconds
     isPaused: boolean;
+    routineId?: string;
 }
 
 export interface SessionTimerState {
@@ -29,7 +30,7 @@ interface SessionContextType {
     completedSession: ActiveSession | null;
     timer: SessionTimerState;
     startSession: (availableTimeMinutes?: number, lessonId?: string) => Promise<void>;
-    startSessionWithPlan: (name: string, blocks: SessionBlock[]) => Promise<void>;
+    startSessionWithPlan: (name: string, blocks: SessionBlock[], routineId?: string) => Promise<void>;
     pauseSession: () => void;
     resumeSession: () => void;
     nextBlock: () => Promise<void>;
@@ -322,7 +323,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
      */
     const startSessionWithPlan = useCallback(async (
         name: string,
-        blocks: SessionBlock[]
+        blocks: SessionBlock[],
+        routineId?: string
     ) => {
         try {
             const { data: { user } } = await supabase.auth.getUser();
@@ -373,6 +375,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
                 currentBlock: firstBlock,
                 timeElapsed: 0,
                 isPaused: false,
+                routineId,
             });
 
             setTimer({

@@ -92,6 +92,7 @@ export function useBpmControls({
     // Mouse/Desktop and Touch/Mobile controls
     // Use relative positioning: track start Y and start BPM
     let isDragging = false;
+    let hasMoved = false;
     let startY = 0;
     let startBpm = 0;
 
@@ -111,6 +112,7 @@ export function useBpmControls({
       if (!isInControlArea || isInteractive) return;
 
       isDragging = true;
+      hasMoved = false;
 
       // Get Y position from either mouse or touch event
       if (e instanceof MouseEvent) {
@@ -120,13 +122,11 @@ export function useBpmControls({
       }
 
       startBpm = currentBpmRef.current;
-      document.body.style.cursor = "ns-resize";
-      e.preventDefault();
+      // Do not prevent default here, so clicks can still register if there's no movement!
     };
 
     const handleDragMove = (e: MouseEvent | TouchEvent) => {
       if (!isDragging) return;
-      e.preventDefault();
 
       // Get current Y position from either mouse or touch event
       let currentY: number;
@@ -136,21 +136,32 @@ export function useBpmControls({
         currentY = e.touches[0].clientY;
       }
 
-      // Calculate delta from START position (not last position)
+      // Calculate delta from START position
       const deltaY = startY - currentY;
 
-      // Scale: ~1/4 screen height (~200-250px on most devices) = 5 BPM
-      // So full screen (~800-1000px) would be ~20 BPM
-      // This gives us: deltaY * (5 / 250) = deltaY * 0.02
-      const pixelsPerBpm = 50; // 50 pixels = 1 BPM, so 250px = 5 BPM
-      const bpmChange = deltaY / pixelsPerBpm;
+      // Small threshold to differentiate between a tap and a drag
+      if (!hasMoved && Math.abs(deltaY) > 5) {
+        hasMoved = true;
+        document.body.style.cursor = "ns-resize";
+      }
 
-      // Set BPM relative to starting BPM
-      setBpmAbsolute(startBpm + bpmChange);
+      if (hasMoved) {
+        e.preventDefault(); // Only prevent default once we've established it's a drag
+
+        // Scale: ~1/4 screen height (~200-250px on most devices) = 5 BPM
+        // So full screen (~800-1000px) would be ~20 BPM
+        // This gives us: deltaY * (5 / 250) = deltaY * 0.02
+        const pixelsPerBpm = 50; // 50 pixels = 1 BPM, so 250px = 5 BPM
+        const bpmChange = deltaY / pixelsPerBpm;
+
+        // Set BPM relative to starting BPM
+        setBpmAbsolute(startBpm + bpmChange);
+      }
     };
 
     const handleDragEnd = () => {
       isDragging = false;
+      hasMoved = false;
       document.body.style.cursor = "";
     };
 

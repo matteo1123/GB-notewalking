@@ -70,7 +70,7 @@ const PremiumContent = () => {
     if (routine && routine.session_plan && routine.session_plan.length > 0) {
       await recordPractice(routineId);
       // Start session with the routine's saved session plan
-      await startSessionWithPlan(routine.name, routine.session_plan);
+      await startSessionWithPlan(routine.name, routine.session_plan, routine.id);
       // The component will re-render to show SessionExecutor when activeSession is set
     }
   };

@@ -26,6 +26,9 @@ import Profile from "./pages/Profile";
 import TestScaleModule from "./pages/TestScaleModule";
 import JsonTroubleshooter from "./pages/Admin/JsonTroubleshooter";
 import SprintPractice from "./pages/SprintPractice";
+import Course from "./pages/Course";
+import CourseVerifications from "./pages/Admin/CourseVerifications";
+import CourseEditor from "./pages/Admin/CourseEditor";
 
 const queryClient = new QueryClient();
 
@@ -46,6 +49,7 @@ const App = () => (
                     <Route path="/premium" element={<Premium />} />
                     <Route path="/recital" element={<RecitalPage />} />
                     <Route path="/profile" element={<Profile />} />
+                    <Route path="/course" element={<Course />} />
                     <Route path="/practice/sprint/:sprintId" element={<SprintPractice />} />
                     <Route path="/admin" element={<AdminRoute><AdminIndex /></AdminRoute>} />
                     <Route path="/admin/shape-library" element={<AdminRoute><ShapeLibrary /></AdminRoute>} />
@@ -55,6 +59,8 @@ const App = () => (
                     {/* LessonBuilder route removed - deprecated lessons system */}
                     <Route path="/admin/chord-trainer" element={<AdminRoute><div className="h-screen p-4"><ChordProgressionTrainer /></div></AdminRoute>} />
                     <Route path="/admin/json-troubleshooter" element={<AdminRoute><JsonTroubleshooter /></AdminRoute>} />
+                    <Route path="/admin/course-verifications" element={<AdminRoute><CourseVerifications /></AdminRoute>} />
+                    <Route path="/admin/course-editor" element={<AdminRoute><CourseEditor /></AdminRoute>} />
                   </Route>
                   <Route path="/auth" element={<Auth />} />
                   {/* Test route for Playwright E2E tests - only in dev */}

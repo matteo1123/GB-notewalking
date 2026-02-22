@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useRecital } from '@/contexts/RecitalContext';
+import { usePremiumStatus } from '@/hooks/usePremiumStatus';
 import { Button } from '@/components/ui/button';
 import { Music, Crown, LogIn, LogOut, Home, Menu, X, Radio } from 'lucide-react';
 import { SuggestionBox } from '@/components/SuggestionBox';
@@ -11,6 +12,7 @@ const Header = () => {
   const { user, signOut } = useAuth();
   const userRole = useUserRole();
   const { activeRecital } = useRecital();
+  const { isTrialExpiringSoon } = usePremiumStatus();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -56,6 +58,14 @@ const Header = () => {
                 </Button>
               </Link>
             )}
+
+            {/* Trial Expiration Warning */}
+            {isTrialExpiringSoon && (
+              <Link to="/premium" className="hidden lg:flex items-center text-xs font-bold text-orange-500 animate-pulse px-2 bg-orange-500/10 rounded-md border border-orange-500/20 mr-1">
+                Trial ending soon!
+              </Link>
+            )}
+
             <Link to="/premium" state={{ reset: location.pathname.startsWith('/premium') }}>
               <Button variant="outline" className="flex items-center gap-2">
                 <Crown className="h-4 w-4" />
@@ -130,6 +140,15 @@ const Header = () => {
                   className="px-3 py-2 hover:bg-muted rounded-md text-sm"
                 >
                   Admin
+                </Link>
+              )}
+              {isTrialExpiringSoon && (
+                <Link
+                  to="/premium"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="px-3 py-2 hover:bg-muted rounded-md text-sm font-bold text-orange-500 animate-pulse bg-orange-500/10 border-l-2 border-orange-500"
+                >
+                  Trial ending soon!
                 </Link>
               )}
               <Link

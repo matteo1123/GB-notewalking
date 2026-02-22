@@ -279,6 +279,22 @@ const ShapeLibrary = () => {
       return;
     }
 
+    const table = isChordMode ? 'chords' : 'scales';
+    const fkColumn = isChordMode ? 'chord_shape_id' : 'scale_shape';
+
+    // 1. Fetch existing items to allow for safe upserting (overwrite without breaking FKs)
+    const { data: existingItems, error: fetchError } = await supabase
+      .from(table as any)
+      .select('id, name')
+      .eq(fkColumn, sourceShape.id);
+
+    if (fetchError) {
+      toast({ title: "Error fetching existing items", description: fetchError.message, variant: 'destructive' });
+      return;
+    }
+
+    const existingItemsMap = new Map((existingItems || []).map(item => [item.name, item.id]));
+
     const rootFret = sourceShape.root_fret;
     // Chords might default to 0 if root_fret is missing
     const effectiveRootFret = rootFret ?? 0;
@@ -311,8 +327,6 @@ const ShapeLibrary = () => {
         created_by: user?.id,
       };
 
-      // We need to map notes_json to include time/duration for playback if needed, or just store raw shape
-      // The 'chords' table notes_json expects absolute positions.
       const finalNotesJson = sourceShape.shape_json.map((n: any) => ({
         string: n.string,
         fret: n.fret_offset, // Absolute for open chord
@@ -320,7 +334,10 @@ const ShapeLibrary = () => {
         duration: 1
       }));
 
-      const { error } = await supabase.from('chords' as any).insert([{ ...newChord, notes_json: finalNotesJson }]);
+      const payload: any = { ...newChord, notes_json: finalNotesJson };
+      if (existingItemsMap.has(payload.name)) payload.id = existingItemsMap.get(payload.name);
+
+      const { error } = await supabase.from('chords' as any).upsert([payload]);
 
       if (error) {
         toast({ title: "Error generalizing chord", description: error.message, variant: 'destructive' });
@@ -334,10 +351,27 @@ const ShapeLibrary = () => {
     const newItems = [];
 
     for (const rootNoteName of allNotes) {
+      // 1. Determine target anchoring note
+      // For chords, we anchor on the exact root Note.
+      // For modes (e.g., E Dorian), the shape was built relative to the *Major Root* (D Major).
+      // So we must anchor the shape at D Major on the fretboard, but name it E Dorian.
+      let targetAnchorNote = rootNoteName;
+      let majorKeyName: string | null = null;
+      let modeInfo = !isChordMode ? modeToMajorKeyInfo[sourceShape.Mode] : null;
+
+      if (!isChordMode && modeInfo) {
+        const targetRootIndex = allNotes.indexOf(rootNoteName);
+        const majorKeyIndex = (targetRootIndex - modeInfo.semitone_offset + 12) % 12;
+        majorKeyName = allNotes[majorKeyIndex];
+
+        // Use the underlying Major Key as the true geometric anchor for the shape
+        targetAnchorNote = majorKeyName;
+      }
+
       let startingFret = -1;
-      // Find where this root note exists on the root string
+      // Find where this anchor note exists on the root string
       for (let f = 0; f <= FRET_COUNT; f++) {
-        if (getNote(rootString, f) === rootNoteName) {
+        if (getNote(rootString, f) === targetAnchorNote) {
           startingFret = f;
           break;
         }
@@ -362,30 +396,15 @@ const ShapeLibrary = () => {
         };
       });
 
-      // Wrap around? No, chords don't wrap. If fret > 24 or < 0, it's invalid.
-      // But maybe we want to find the lowest valid position?
-      // For now, simple shift. If it goes off board, ignore?
-      if (newNotesJson.some(n => n.fret < 0 || n.fret > FRET_COUNT)) {
-        // Try octave shift?
-        // If too high -> shift down 12. If too low -> shift up 12.
-        const shiftedDown = newNotesJson.map(n => ({ ...n, fret: n.fret - 12 }));
-        if (!shiftedDown.some(n => n.fret < 0)) {
-          newNotesJson = shiftedDown;
-        } else {
-          // Ignore if cannot fit
-          // continue; 
-          // Actually we often want to generate it even if high up
-        }
-      }
-
-      const filteredNotesJson = newNotesJson.filter(note => note.fret >= 0 && note.fret <= FRET_COUNT);
+      // Safety Octave Shifting to prevent shapes from falling off the fretboard
+      let filteredNotesJson = normalizeNotesToFretboard<{ string: number, fret: number, time: number, duration: number }>(newNotesJson, FRET_COUNT);
       if (filteredNotesJson.length === 0) continue;
 
       const enharmonicallyCorrectRoot = getNoteWithEnharmonicPreference(rootString, startingFret, null); // Key?
 
       // Calculate Note Names
       const newNotes = filteredNotesJson.map(note => getNote(note.string, note.fret));
-      const uniqueNotes = [...new Set(newNotes)];
+      const uniqueNotes = [...new Set(newNotes)] as string[];
       const enharmonicNotes = determineEnharmonicNotes(uniqueNotes, enharmonicallyCorrectRoot);
 
       if (isChordMode) {
@@ -400,18 +419,11 @@ const ShapeLibrary = () => {
           chord_shape_id: sourceShape.id,
           is_movable: true,
           created_by: user?.id,
-        };
+        } as any;
+        if (existingItemsMap.has(newChord.name)) newChord.id = existingItemsMap.get(newChord.name);
         newItems.push(newChord);
       } else {
-        // Scale Logic (existing)
-        const modeInfo = modeToMajorKeyInfo[sourceShape.Mode];
-        let majorKey = null;
-        if (modeInfo) {
-          const rootNoteIndex = allNotes.indexOf(rootNoteName);
-          const majorKeyIndex = (rootNoteIndex - modeInfo.semitone_offset + 12) % 12;
-          majorKey = allNotes[majorKeyIndex];
-        }
-
+        // Scale Logic
         const newScale = {
           name: `${enharmonicallyCorrectRoot} ${sourceShape.name}`,
           intervals: sourceShape.intervals,
@@ -422,16 +434,16 @@ const ShapeLibrary = () => {
           Position: sourceShape.Position,
           mode: sourceShape.Mode,
           tonality: sourceShape.tonality,
-          major_key: majorKey,
+          major_key: majorKeyName,
           created_by: user?.id,
           scale_shape: sourceShape.id,
-        };
+        } as any;
+        if (existingItemsMap.has(newScale.name)) newScale.id = existingItemsMap.get(newScale.name);
         newItems.push(newScale);
       }
     }
 
-    const table = isChordMode ? 'chords' : 'scales';
-    const { error } = await supabase.from(table as any).insert(newItems);
+    const { error } = await supabase.from(table as any).upsert(newItems);
 
     if (error) {
       toast({ title: "Error generalizing", description: error.message, variant: 'destructive' });
@@ -440,30 +452,17 @@ const ShapeLibrary = () => {
     }
   };
 
-  // Regenerate: Delete existing scales from this shape and re-generalize
+  // Regenerate: Safely execute logic to overwrite existing properties without breaking foreign keys
   const handleRegenerate = async () => {
     if (!shapeToGeneralize) {
       toast({ title: "Error", description: "Please select a shape to regenerate." });
       return;
     }
 
-    const table = isChordMode ? 'chords' : 'scales';
-    const fkColumn = isChordMode ? 'chord_shape_id' : 'scale_shape';
+    toast({ title: "Regenerating", description: `Safely overwriting existing items...` });
 
-    // Delete existing items from this shape
-    const { error: deleteError, count } = await supabase
-      .from(table as any)
-      .delete()
-      .eq(fkColumn, shapeToGeneralize);
-
-    if (deleteError) {
-      toast({ title: "Error deleting old items", description: deleteError.message, variant: 'destructive' });
-      return;
-    }
-
-    toast({ title: "Deleted", description: `Removed existing items. Regenerating...` });
-
-    // Re-run generalize
+    // The generalize function now uses UPSERT logic by default, which maps UUIDs matching the exact name. 
+    // This safely overwrites the geometric fixes directly onto the active scales in the database.
     await handleGeneralize();
   };
 

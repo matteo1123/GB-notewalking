@@ -28,6 +28,7 @@ export interface MetronomeSettings {
   loop?: boolean;
   muted?: boolean;
   drumBeat?: boolean; // When true, plays kick on 1, snare on 3
+  subdivisions?: number; // Defines how many ticks occur per audible metronome click
 }
 
 export const DEFAULT_PROGRESSIVE_STEP_BPM = 5;
@@ -271,8 +272,12 @@ export function useMetronome(settings: MetronomeSettings) {
 
     const currentSettings = settingsRef.current;
     const measuresPerBpmChange = currentSettings.measuresPerBpmChange || 1;
+    const subdivisions = currentSettings.subdivisions || 1;
 
-    const beat = (beatCountRef.current % 4) + 1;
+    // beatCountRef now counts total subdivisions (notes). Calculate the actual beat (1-4).
+    const beat = Math.floor(beatCountRef.current / subdivisions) % 4 + 1;
+    const exactSubdivision = beatCountRef.current % subdivisions;
+
     const currentBpm = calculateCurrentBpm(
       beat,
       measureCountRef.current,
@@ -283,7 +288,10 @@ export function useMetronome(settings: MetronomeSettings) {
     if (skipFirstBeatRef.current) {
       skipFirstBeatRef.current = false;
     } else {
-      playClick(beat);
+      // Only play the audible click on the downbeat of the subdivision
+      if (exactSubdivision === 0) {
+        playClick(beat);
+      }
     }
 
     const nextState: MetronomeState = {
@@ -300,9 +308,10 @@ export function useMetronome(settings: MetronomeSettings) {
       currentSettings.onTick(nextState);
     }
 
+    // Increment subdivision counter
     beatCountRef.current += 1;
 
-    if (beatCountRef.current % 4 === 0) {
+    if (beatCountRef.current > 0 && beatCountRef.current % (4 * subdivisions) === 0) {
       measureCountRef.current += 1;
 
       if (currentSettings.mode !== "regular") {
@@ -335,13 +344,14 @@ export function useMetronome(settings: MetronomeSettings) {
       return;
     }
 
-    const nextBeat = (beatCountRef.current % 4) + 1;
+    const nextBeat = Math.floor(beatCountRef.current / subdivisions) % 4 + 1;
     const nextBpm = calculateCurrentBpm(
       nextBeat,
       measureCountRef.current,
       progressiveRoundRef.current
     );
-    const beatLength = (60 / nextBpm) * 1000;
+    // Divide beat length by subdivisions to tick exactly on each note
+    const beatLength = ((60 / nextBpm) * 1000) / subdivisions;
 
     clearScheduledBeat();
     timeoutRef.current = window.setTimeout(scheduleNextBeat, beatLength);

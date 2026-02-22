@@ -13,7 +13,9 @@ import { EarTrainingPracticeModuleConfig } from '@/types/practice';
 import { useSession } from '@/contexts/SessionContext';
 
 interface EarTrainingPracticeProps {
-    config: EarTrainingPracticeModuleConfig;
+    moduleConfig?: EarTrainingPracticeModuleConfig;
+    onConfigChange?: (config: EarTrainingPracticeModuleConfig) => void;
+    onExit?: () => void;
     autoStart?: boolean;
     sessionId?: string;
 }
@@ -85,20 +87,33 @@ const getNoteFromOffset = (rootNote: string, offset: number, targetOctave: numbe
 };
 
 
-export function EarTrainingPractice({ config, autoStart = false, sessionId }: EarTrainingPracticeProps) {
+export function EarTrainingPractice({ moduleConfig, onConfigChange, onExit, autoStart = false, sessionId }: EarTrainingPracticeProps) {
     const { activeSession } = useSession();
     const isPaused = activeSession?.isPaused || false;
 
     const [isPlaying, setIsPlaying] = useState(false);
-    const [currentLevel, setCurrentLevel] = useState(config.level || 0);
+    const [currentLevel, setCurrentLevel] = useState(moduleConfig?.level || 0);
     const [autoLevel, setAutoLevel] = useState(true);
     const [attempts, setAttempts] = useState<boolean[]>([]);
 
     // New Settings State
-    const [currentRootNote, setCurrentRootNote] = useState(config.root_note);
-    const [droneOctave, setDroneOctave] = useState(config.drone_octave || 3);
-    const [keyChangeInterval, setKeyChangeInterval] = useState(config.key_change_interval || 0);
+    const [currentRootNote, setCurrentRootNote] = useState(moduleConfig?.root_note || 'C');
+    const [droneOctave, setDroneOctave] = useState(moduleConfig?.drone_octave || 3);
+    const [keyChangeInterval, setKeyChangeInterval] = useState(moduleConfig?.key_change_interval || 0);
     const [correctGuessesSinceKeyChange, setCorrectGuessesSinceKeyChange] = useState(0);
+
+    // Sync state back to parent
+    useEffect(() => {
+        if (onConfigChange && moduleConfig) {
+            onConfigChange({
+                ...moduleConfig,
+                root_note: currentRootNote,
+                drone_octave: droneOctave,
+                key_change_interval: keyChangeInterval,
+                level: currentLevel
+            });
+        }
+    }, [currentRootNote, droneOctave, keyChangeInterval, currentLevel]);
 
     const [currentTargetDegree, setCurrentTargetDegree] = useState<Degree | null>(null);
     const [feedback, setFeedback] = useState<'correct' | 'incorrect' | null>(null);

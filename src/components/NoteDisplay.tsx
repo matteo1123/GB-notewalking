@@ -70,6 +70,13 @@ const NoteDisplay = ({
   const hoverIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [displayMode, setDisplayMode] = useState<'tablature' | 'grid' | 'fretboard'>(mode);
   const [showSingleNote, setShowSingleNote] = useState(false);
+  const [isAutoScrollEnabled, setIsAutoScrollEnabled] = useState(true);
+
+  const handleManualScroll = () => {
+    if (isAutoScrollEnabled) {
+      setIsAutoScrollEnabled(false);
+    }
+  };
 
   // Pitch detection is disabled for performance reasons
   const isListening = false;
@@ -91,7 +98,7 @@ const NoteDisplay = ({
   const currentTime = currentPosition;
 
   useEffect(() => {
-    if (!containerRef.current) return;
+    if (!containerRef.current || !isAutoScrollEnabled) return;
     const el = containerRef.current;
     const targetTime = currentTime;
     const percentage = Math.min(
@@ -173,8 +180,22 @@ const NoteDisplay = ({
       </div>
       <div
         ref={containerRef}
-        className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden animated-scrollbar"
+        className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden animated-scrollbar relative"
+        onWheel={handleManualScroll}
+        onTouchMove={handleManualScroll}
       >
+        {displayMode === 'tablature' && !isAutoScrollEnabled && (
+          <div className="sticky left-full right-4 flex justify-end -mt-2 mb-2 pr-4 z-20 pointer-events-none">
+            <Button
+              size="sm"
+              variant="secondary"
+              className="shadow-lg opacity-90 hover:opacity-100 pointer-events-auto"
+              onClick={() => setIsAutoScrollEnabled(true)}
+            >
+              Resume Auto-Scroll
+            </Button>
+          </div>
+        )}
         {displayMode === 'tablature' ? (
           <div
             className="space-y-2"
@@ -345,22 +366,19 @@ const NoteDisplay = ({
                 </div>
               </div>
             )}
-            {/* Ear Training always gets all notes, not affected by Single Note Mode or Help Me Learn */
-              /* UPDATE: For Help Me Learn, we ONLY want to show the notes in the current section */
-            }
+            {/* Filter notes based on Learning Mode and Single Note Mode */}
             <EarTrainingWrapper
-              notes={
-                isLearning && learnTimeline && learnTimeline[currentLearnIndex]
-                  ? notes.slice(learnTimeline[currentLearnIndex].startIndex, learnTimeline[currentLearnIndex].endIndex + 1).map((n, i) => ({
-                    ...n,
-                    // Remap time so it flows visually if needed? 
-                    // actually Fretboard doesn't use 'time' for static display, 
-                    // but 'time' is used for identifying current note.
-                    // We should keep original note objects essentially, 
-                    // but slice the array so Fretboard only renders these dots.
-                  }))
-                  : notes.map((n, idx) => ({ ...n, time: idx }))
-              }
+              notes={(() => {
+                let displayNotes = isLearning && learnTimeline && learnTimeline[currentLearnIndex]
+                  ? notes.slice(learnTimeline[currentLearnIndex].startIndex, learnTimeline[currentLearnIndex].endIndex + 1)
+                  : notes;
+
+                if (showSingleNote) {
+                  displayNotes = displayNotes.filter(n => Math.abs(n.time - currentTime) <= 0.08);
+                }
+
+                return displayNotes;
+              })()}
               major_key={major_key}
               tonalContext={tonalContext}
               displayMode="fretboard"

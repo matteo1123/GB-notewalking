@@ -37,6 +37,8 @@ const Profile = () => {
   const [loading, setLoading] = useState(true);
   const [isSubscribing, setIsSubscribing] = useState(false); // State for sub button
   const [isManagingSub, setIsManagingSub] = useState(false); // State for portal button
+  const [isClaimingCourse, setIsClaimingCourse] = useState(false);
+  const [courseEnrollment, setCourseEnrollment] = useState<any>(null);
   const { settings: practiceSettings, updateSettings: updatePracticeSettings, isLoading: practiceLoading } = usePracticeSettings();
 
   // Helper to check if premium based on date
@@ -84,9 +86,20 @@ const Profile = () => {
       }
     };
 
+    const fetchCourseEnrollment = async () => {
+      if (user) {
+        const { data } = await supabase
+          .from('course_enrollments' as any)
+          .select('*')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        setCourseEnrollment(data);
+      }
+    };
+
     const fetchData = async () => {
       setLoading(true);
-      await Promise.all([fetchProfile(), fetchPracticeLog()]);
+      await Promise.all([fetchProfile(), fetchPracticeLog(), fetchCourseEnrollment()]);
       setLoading(false);
     };
 
@@ -167,6 +180,47 @@ const Profile = () => {
       toast({ title: "Failed to open billing portal: " + err.message, variant: "destructive" });
     } finally {
       setIsManagingSub(false);
+    }
+  }
+
+  const handleClaimUdemyCourse = async () => {
+    if (!user || !profile) return;
+    try {
+      setIsClaimingCourse(true);
+
+      // 1. Insert course enrollment (pending verification)
+      const { error: enrollErr } = await supabase
+        .from('course_enrollments' as any)
+        .insert({ user_id: user.id, status: 'pending_verification', source: 'udemy' });
+
+      if (enrollErr) throw enrollErr;
+
+      // 2. Extend trial by 14 days
+      const currentPremium = profile.premium_until ? new Date(profile.premium_until) : new Date();
+      const targetDate = new Date();
+      targetDate.setDate(targetDate.getDate() + 14); // 14 days from now
+
+      // Only bump if they don't already have more than 14 days
+      const newDateToSet = currentPremium > targetDate ? currentPremium : targetDate;
+
+      const { error: profileErr } = await supabase
+        .from('profiles')
+        .update({ premium_until: newDateToSet.toISOString() } as any)
+        .eq('id', user.id);
+
+      if (profileErr) throw profileErr;
+
+      toast({ title: "Course Claimed!", description: "You've been granted 14 days of free Premium while we verify your purchase." });
+
+      // Refresh view natively
+      const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+      setProfile(data);
+      setCourseEnrollment({ status: 'pending_verification' });
+
+    } catch (e: any) {
+      toast({ title: "Failed to claim course", description: e.message, variant: 'destructive' });
+    } finally {
+      setIsClaimingCourse(false);
     }
   }
 
@@ -272,6 +326,33 @@ const Profile = () => {
                   </Button>
                 </div>
               )}
+
+              {/* Course Integration Sub-section */}
+              <div className="pt-6 border-t mt-6">
+                <h3 className="font-bold text-lg mb-2">Udemy Course Access</h3>
+
+                {courseEnrollment ? (
+                  <div className="bg-muted p-4 rounded-md">
+                    <p className="font-semibold text-primary">Enrollment Status: {
+                      courseEnrollment.status === 'verified' ? "🎉 Verified (90-Days Premium Active)" :
+                        courseEnrollment.status === 'pending_verification' ? "⏳ Verifying your purchase (14-day grace period active)" : "❌ Rejected"
+                    }</p>
+                    <Button asChild variant="link" className="px-0 mt-2"><Link to="/course">Go to Course Dashboard &rarr;</Link></Button>
+                  </div>
+                ) : (
+                  <div className="bg-orange-500/10 border border-orange-500/30 p-4 rounded-md">
+                    <p className="text-sm font-medium text-orange-600 dark:text-orange-400 mb-3">Did you purchase our Udemy course? Claim your 90-day premium pass here.</p>
+                    <Button
+                      variant="outline"
+                      onClick={handleClaimUdemyCourse}
+                      disabled={isClaimingCourse}
+                      className="border-orange-500 text-orange-600 hover:bg-orange-500 hover:text-white"
+                    >
+                      {isClaimingCourse ? 'Claiming...' : 'I bought the course on Udemy!'}
+                    </Button>
+                  </div>
+                )}
+              </div>
 
               {isPremium && (
                 <div className="pt-4">

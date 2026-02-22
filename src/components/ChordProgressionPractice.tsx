@@ -13,18 +13,20 @@ import {
 import { useMetronome, MetronomeState } from '@/hooks/useMetronome';
 
 interface ChordProgressionPracticeProps {
-    config?: ChordProgressionsModuleConfig;
+    moduleConfig?: ChordProgressionsModuleConfig;
+    onConfigChange?: (config: ChordProgressionsModuleConfig) => void;
+    onExit?: () => void;
     sessionId?: string;
 }
 
-export function ChordProgressionPractice({ config, sessionId }: ChordProgressionPracticeProps) {
-    const isModuleConfig = !!config?.module_type;
+export function ChordProgressionPractice({ moduleConfig, onConfigChange, onExit, sessionId }: ChordProgressionPracticeProps) {
+    const isModuleConfig = !!moduleConfig?.module_type;
 
     const [quality, setQuality] = useState<KeyQuality>('major');
 
-    const [selectedKey, setSelectedKey] = useState<string>(config?.key || 'C');
-    const [selectedProgressionId, setSelectedProgressionId] = useState<string>(config?.progression_id || MAJOR_PROGRESSIONS[0].id);
-    const [bpm, setBpm] = useState<number>(config?.target_bpm || 90);
+    const [selectedKey, setSelectedKey] = useState<string>(moduleConfig?.key || 'C');
+    const [selectedProgressionId, setSelectedProgressionId] = useState<string>(moduleConfig?.progression_id || MAJOR_PROGRESSIONS[0].id);
+    const [bpm, setBpm] = useState<number>(moduleConfig?.target_bpm || 90);
 
     const { state: metronomeState, togglePlayPause } = useMetronome({
         mode: "regular",
@@ -60,13 +62,24 @@ export function ChordProgressionPractice({ config, sessionId }: ChordProgression
     }, [isModuleConfig, randomize]);
 
     useEffect(() => {
-        if (config) {
-            setSelectedKey(config.key);
-            setSelectedProgressionId(config.progression_id);
-            const isMinor = MINOR_KEYS.includes(config.key as any);
+        if (moduleConfig) {
+            setSelectedKey(moduleConfig.key);
+            setSelectedProgressionId(moduleConfig.progression_id);
+            const isMinor = MINOR_KEYS.includes(moduleConfig.key as any);
             setQuality(isMinor ? 'minor' : 'major');
         }
-    }, [config]);
+    }, [moduleConfig]);
+
+    useEffect(() => {
+        if (onConfigChange && moduleConfig) {
+            onConfigChange({
+                ...moduleConfig,
+                key: selectedKey,
+                progression_id: selectedProgressionId,
+                target_bpm: bpm
+            });
+        }
+    }, [selectedKey, selectedProgressionId, bpm]);
 
     // Derived state
     const currentProgressions = quality === 'major' ? MAJOR_PROGRESSIONS : MINOR_PROGRESSIONS;

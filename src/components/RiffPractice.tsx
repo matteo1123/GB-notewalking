@@ -151,7 +151,6 @@ const RiffPractice = ({
   const [learnNotes, setLearnNotes] = useState<Note[]>([]);
   const [currentLearnIndex, setCurrentLearnIndex] = useState(0);
   const [harmonicContext, setHarmonicContext] = useState(repertoireItem.major_key);
-  const [tonalContext, setTonalContext] = useState("major");
   const [playContextNote, setPlayContextNote] = useState(false);
   const tickCountRef = useRef(0);
   const [tickCountState, setTickCountState] = useState(0); // For triggering re-renders in EarTraining
@@ -170,24 +169,7 @@ const RiffPractice = ({
     setHarmonicContext(repertoireItem.major_key);
   }, [repertoireItem.major_key]);
 
-  // Handle auto-start (skip in config mode)
-  useEffect(() => {
-    if (autoStart && !isConfigMode) {
-      // Small delay to ensure audio context is ready/user interaction context is satisfied
-      // Note: Modern browsers block audio without user interaction.
-      // Since the user CLICKED "Start Practice Session" to get here,
-      // the audio context should be allowed to resume/start.
-      const timer = setTimeout(() => {
-        if (metronome.audioContext.state === 'suspended') {
-          metronome.audioContext.resume();
-        }
-        metronome.start();
-        setIsPlaying(true);
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoStart, isConfigMode, metronome.start, metronome.audioContext]);
+
 
   const availableSequences = useMemo(() => {
     const itemType = repertoireItem.Type?.toLowerCase();
@@ -361,6 +343,7 @@ const RiffPractice = ({
     endBpm: targetBpm,
     measures: lessonExercise ? (lessonExercise.increments || 1) * (lessonExercise.measures_per_bpm || 4) : 8,
     measuresPerBpmChange: lessonExercise?.measures_per_bpm || 4,
+    subdivisions: activeSequence?.notes_per_click ? Number(activeSequence.notes_per_click) : 1,
     drumBeat,
     onComplete: isControlledSession && practiceSettings.autoAdvance ? onComplete : undefined,
   };
@@ -438,6 +421,25 @@ const RiffPractice = ({
   });
 
   const { playNote } = useNotePlayer(metronome.audioContext);
+
+  // Handle auto-start (skip in config mode)
+  useEffect(() => {
+    if (autoStart && !isConfigMode) {
+      // Small delay to ensure audio context is ready/user interaction context is satisfied
+      // Note: Modern browsers block audio without user interaction.
+      // Since the user CLICKED "Start Practice Session" to get here,
+      // the audio context should be allowed to resume/start.
+      const timer = setTimeout(() => {
+        if (metronome.audioContext.state === 'suspended') {
+          metronome.audioContext.resume();
+        }
+        metronome.start();
+        setIsPlaying(true);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoStart, isConfigMode, metronome.start, metronome.audioContext]);
 
   useEffect(() => {
     if (playContextNote && isPlaying) {
@@ -723,23 +725,6 @@ const RiffPractice = ({
                   </div>
                 </div>
               </div>
-              <div className="hidden sm:flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="tonal-context" className="text-sm">Tonal Context</Label>
-                  <Select value={tonalContext} onValueChange={setTonalContext}>
-                    <SelectTrigger className="w-[180px]" id="tonal-context">
-                      <SelectValue placeholder="Select a mode" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {MODES.map((mode) => (
-                        <SelectItem key={mode.value} value={mode.value}>
-                          {mode.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
               <div className="hidden sm:block">
                 <div className="flex items-center gap-2 text-sm mt-1">
                   <span className="px-2 py-0.5 bg-secondary rounded-full text-secondary-foreground">
@@ -856,7 +841,7 @@ const RiffPractice = ({
           <NoteDisplay
             notes={displayNotes}
             major_key={harmonicContext}
-            tonalContext={tonalContext}
+            tonalContext="Ionian"
             currentPosition={currentTime}
             isLearning={isLearning}
             setIsLearning={setIsLearning}

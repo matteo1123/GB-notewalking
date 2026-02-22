@@ -2,7 +2,8 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { ModuleCard } from './ModuleCard';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { Search, X, Settings, Star, StarOff } from 'lucide-react';
+import { Search, X, Settings, Star, StarOff, ChevronLeft, Flame } from 'lucide-react';
+import { CreateSprintDialog } from './CreateSprintDialog';
 import { RhythmTraining } from './RhythmTraining';
 import { ChordProgressionExercise } from './ChordProgressionExercise';
 import { ChordProgressionPractice } from './ChordProgressionPractice';
@@ -10,7 +11,7 @@ import { EarTrainingPractice } from './EarTrainingPractice';
 import ExerciseList from './ExerciseList';
 import { supabase } from '@/integrations/supabase/client';
 import { MODULE_REGISTRY } from '@/types/modules';
-import type { ModuleType, ScaleModuleConfig, ArpeggioModuleConfig } from '@/types/practice';
+import type { ModuleType, ScaleModuleConfig, ArpeggioModuleConfig, RhythmModuleConfig, NotewalkingModuleConfig, ChordProgressionsModuleConfig, EarTrainingPracticeModuleConfig, ModuleConfig } from '@/types/practice';
 import type { RepertoireItem } from '@/types/repertoire';
 import { PieceList } from './piece-mastery/PieceList';
 import { PieceMastery } from './piece-mastery/PieceMastery';
@@ -82,6 +83,15 @@ export function ModuleLibrary() {
         order_by: 'created_at',
         current_index: 0,
     });
+
+    // Sub-module configurations for Sprint creation
+    const [rhythmConfig, setRhythmConfig] = useState<RhythmModuleConfig>({ module_type: 'rhythm', rhythm_level: 1, duration_minutes: 2 });
+    const [notewalkingConfig, setNotewalkingConfig] = useState<NotewalkingModuleConfig>({ module_type: 'notewalking', key: 'C', chords: ['I', 'IV', 'V'], measures_per_chord: 4 });
+    const [chordProgressionsConfig, setChordProgressionsConfig] = useState<ChordProgressionsModuleConfig>({ module_type: 'chord_progressions', progression_id: '', key: 'C' });
+    const [earTrainingConfig, setEarTrainingConfig] = useState<EarTrainingPracticeModuleConfig>({ module_type: 'ear_training', root_note: 'C' });
+
+    // Sprint Dialog state
+    const [sprintDialogOpen, setSprintDialogOpen] = useState(false);
 
     // Save config dialog state
     const [saveDialogOpen, setSaveDialogOpen] = useState(false);
@@ -251,6 +261,23 @@ export function ModuleLibrary() {
         setActiveModule(moduleType);
     };
 
+    const getCurrentConfig = (): ModuleConfig | null => {
+        switch (activeModule) {
+            case 'scale': return scaleConfig;
+            case 'arpeggio': return arpeggioConfig;
+            case 'rhythm': return rhythmConfig;
+            case 'notewalking': return notewalkingConfig;
+            case 'chord_progressions': return chordProgressionsConfig;
+            case 'ear_training': return earTrainingConfig;
+            case 'piece_mastery':
+                if (selectedPiece) {
+                    return { module_type: 'piece_mastery', piece_id: selectedPiece.id, segment_seconds: 60 };
+                }
+                return null;
+            default: return null;
+        }
+    };
+
     const handleAddToRoutine = (moduleType: ModuleType) => {
         console.log('Add to routine:', moduleType);
         // TODO: Open routine builder with this module
@@ -298,16 +325,24 @@ export function ModuleLibrary() {
                             <p className="text-sm text-muted-foreground">Freeplay Mode</p>
                         </div>
                     </div>
-                    <Button onClick={handleCloseModule} variant="ghost" size="sm" className="gap-2">
-                        <X className="w-4 h-4" />
-                        Exit
-                    </Button>
+                    <div className="flex items-center gap-2">
+                        {getCurrentConfig() && (
+                            <Button onClick={() => setSprintDialogOpen(true)} variant="outline" size="sm" className="gap-2 border-orange-500/50 text-orange-600 hover:bg-orange-50 dark:text-orange-400 dark:hover:bg-orange-950/30">
+                                <Flame className="w-4 h-4" />
+                                <span className="hidden sm:inline">Create Sprint</span>
+                            </Button>
+                        )}
+                        <Button onClick={handleCloseModule} variant="ghost" size="sm" className="gap-2">
+                            <ChevronLeft className="w-4 h-4" />
+                            Back to Library
+                        </Button>
+                    </div>
                 </div>
 
                 {/* Module Content */}
                 <div className="flex-1 min-h-0">
-                    {activeModule === 'rhythm' && <RhythmTraining onExit={handleCloseModule} />}
-                    {activeModule === 'notewalking' && <ChordProgressionExercise onExit={handleCloseModule} />}
+                    {activeModule === 'rhythm' && <RhythmTraining moduleConfig={rhythmConfig} onConfigChange={setRhythmConfig as any} />}
+                    {activeModule === 'notewalking' && <ChordProgressionExercise moduleConfig={notewalkingConfig} onConfigChange={setNotewalkingConfig as any} />}
                     {(activeModule === 'scale' || activeModule === 'arpeggio') && (
                         <ExercisePracticeModule
                             moduleType={activeModule}
@@ -336,27 +371,33 @@ export function ModuleLibrary() {
                                     }
                                 }
                             }}
-                            onExit={handleCloseModule}
                         />
                     )}
                     {activeModule === 'chord_progressions' && (
-                        <ChordProgressionPractice />
+                        <ChordProgressionPractice moduleConfig={chordProgressionsConfig} onConfigChange={setChordProgressionsConfig as any} />
                     )}
                     {activeModule === 'piece_mastery' && (
                         selectedPiece ? (
                             <div className="h-full bg-background">
-                                <PieceMastery piece={selectedPiece} onBack={() => setSelectedPiece(null)} onExit={handleCloseModule} />
+                                <PieceMastery piece={selectedPiece} onBack={() => setSelectedPiece(null)} />
                             </div>
                         ) : (
                             <div className="h-full overflow-y-auto">
-                                <PieceList onSelectPiece={setSelectedPiece} onExit={handleCloseModule} />
+                                <PieceList onSelectPiece={setSelectedPiece} />
                             </div>
                         )
                     )}
                     {activeModule === 'ear_training' && (
-                        <EarTrainingPractice config={{ module_type: 'ear_training', root_note: 'C' }} />
+                        <EarTrainingPractice moduleConfig={earTrainingConfig} onConfigChange={setEarTrainingConfig as any} />
                     )}
                 </div>
+
+                <CreateSprintDialog
+                    open={sprintDialogOpen}
+                    onOpenChange={setSprintDialogOpen}
+                    moduleType={activeModule}
+                    moduleConfig={getCurrentConfig()}
+                />
             </div>
         );
     }

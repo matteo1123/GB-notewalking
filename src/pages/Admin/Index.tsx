@@ -109,6 +109,16 @@ const AdminIndex = () => {
             JSON Troubleshooter
           </Link>
         </li>
+        <li>
+          <Link to="/admin/course-verifications" className="text-blue-500 hover:underline">
+            Pending Course Verifications
+          </Link>
+        </li>
+        <li>
+          <Link to="/admin/course-editor" className="text-blue-500 hover:underline">
+            Manage Course Curriculum
+          </Link>
+        </li>
       </ul>
     </div>
   );

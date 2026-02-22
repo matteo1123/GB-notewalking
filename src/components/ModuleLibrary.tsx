@@ -342,7 +342,7 @@ export function ModuleLibrary() {
                 {/* Module Content */}
                 <div className="flex-1 min-h-0">
                     {activeModule === 'rhythm' && <RhythmTraining moduleConfig={rhythmConfig} onConfigChange={setRhythmConfig as any} />}
-                    {activeModule === 'notewalking' && <ChordProgressionExercise moduleConfig={notewalkingConfig} onConfigChange={setNotewalkingConfig as any} />}
+                    {activeModule === 'notewalking' && <ChordProgressionExercise moduleConfig={notewalkingConfig} onConfigChange={setNotewalkingConfig as any} onExit={handleCloseModule} />}
                     {(activeModule === 'scale' || activeModule === 'arpeggio') && (
                         <ExercisePracticeModule
                             moduleType={activeModule}

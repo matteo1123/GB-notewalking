@@ -33,11 +33,13 @@ serve(async (req) => {
             throw new Error("User not authenticated");
         }
 
-        // 2. Get Request Body (Price ID)
-        let priceId;
+        // 2. Get Request Body (Price ID, mode, metadata)
+        let priceId, mode, metadata;
         try {
             const body = await req.json();
             priceId = body.priceId;
+            mode = body.mode || "subscription";
+            metadata = body.metadata || {};
         } catch (e) {
             throw new Error("Invalid JSON body");
         }
@@ -85,7 +87,7 @@ serve(async (req) => {
         }
 
         // 4. Create Checkout Session
-        const session = await stripe.checkout.sessions.create({
+        const sessionParams: Stripe.Checkout.SessionCreateParams = {
             customer: customerId,
             line_items: [
                 {
@@ -93,10 +95,23 @@ serve(async (req) => {
                     quantity: 1,
                 },
             ],
-            mode: "subscription",
+            mode: mode as Stripe.Checkout.SessionCreateParams.Mode,
             success_url: `${frontendUrl}/premium?success=true`,
             cancel_url: `${frontendUrl}/premium?canceled=true`,
-        });
+        };
+
+        // Attach metadata to the session if provided (useful for webhooks)
+        if (Object.keys(metadata).length > 0) {
+            sessionParams.metadata = metadata;
+            // Also attach it to the resulting subscription/payment intent so the webhook can see it
+            if (mode === 'subscription') {
+                sessionParams.subscription_data = { metadata };
+            } else if (mode === 'payment') {
+                sessionParams.payment_intent_data = { metadata };
+            }
+        }
+
+        const session = await stripe.checkout.sessions.create(sessionParams);
 
         return new Response(
             JSON.stringify({ url: session.url }),

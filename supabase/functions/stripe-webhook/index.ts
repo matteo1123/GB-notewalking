@@ -42,9 +42,13 @@ serve(async (req) => {
 
         switch (event.type) {
             case "checkout.session.completed":
-                // Fired when a subscription is successfully created via Checkout
+                // Fired when a checkout session completes (subscription or one-time payment)
                 const session = event.data.object;
-                await handleSubscriptionUpdate(session);
+                if (session.metadata && session.metadata.type === 'course_purchase') {
+                    await handleCoursePurchase(session);
+                } else {
+                    await handleSubscriptionUpdate(session);
+                }
                 break;
 
             case "customer.subscription.updated":
@@ -73,6 +77,64 @@ serve(async (req) => {
         );
     }
 });
+
+async function handleCoursePurchase(session: any) {
+    const customerId = session.customer;
+
+    // We need the user's Supabase ID via the stripe_customer_id
+    if (customerId) {
+        const { data: profile } = await supabase
+            .from("profiles")
+            .select("id, premium_until")
+            .eq("stripe_customer_id", customerId)
+            .single();
+
+        if (profile) {
+            const userId = profile.id;
+
+            // 1. Calculate new premium_until date (add 90 days)
+            const now = new Date();
+            const currentPremium = profile.premium_until ? new Date(profile.premium_until) : now;
+            const baseDate = currentPremium > now ? currentPremium : now;
+
+            const newPremiumDate = new Date(baseDate);
+            newPremiumDate.setDate(newPremiumDate.getDate() + 90);
+
+            // Update profile with new premium duration
+            await supabase
+                .from("profiles")
+                .update({
+                    premium_until: newPremiumDate.toISOString(),
+                    is_premium: true
+                })
+                .eq("id", userId);
+
+            // 2. Enroll user in course
+            // Check if already enrolled to prevent duplicates
+            const { data: existingEnrollment } = await supabase
+                .from("course_enrollments")
+                .select("id")
+                .eq("user_id", userId)
+                .single();
+
+            if (!existingEnrollment) {
+                await supabase
+                    .from("course_enrollments")
+                    .insert({
+                        user_id: userId,
+                        source: 'stripe_one_time',
+                        status: 'verified'
+                    });
+            } else {
+                // If they had a pending enrollment, verify it
+                await supabase
+                    .from("course_enrollments")
+                    .update({ status: 'verified', source: 'stripe_one_time' })
+                    .eq("id", existingEnrollment.id);
+            }
+        }
+    }
+}
 
 async function handleSubscriptionUpdate(session: any) {
     const customerId = session.customer;

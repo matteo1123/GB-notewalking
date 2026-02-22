@@ -3,41 +3,20 @@ import { Sparkles, Target } from 'lucide-react';
 import { cn } from '@/lib/utils'; // standard shadcn utility
 
 const FOCUS_OPTIONS = [
+    'Economy of Motion',
+    'Economy of Force',
     'Relaxation',
-    'Structure',
-    'Efficiency of Motion',
-    'Efficiency of Force'
+    'Structure'
 ];
-
-const STORAGE_KEY = 'tempo_trekker_daily_focus';
-const STORAGE_DATE_KEY = 'tempo_trekker_daily_focus_date';
 
 export function DailyFocusWidget() {
     const [currentFocus, setCurrentFocus] = useState<string>('Rolling...');
     const [isSpinning, setIsSpinning] = useState(true);
 
     useEffect(() => {
-        // Find today's date string
-        const todayStr = new Date().toDateString();
-
-        // Check if we already have a focus for today
-        const savedDate = localStorage.getItem(STORAGE_DATE_KEY);
-        const savedFocus = localStorage.getItem(STORAGE_KEY);
-
-        let targetFocusStr = '';
-
-        if (savedDate === todayStr && savedFocus && FOCUS_OPTIONS.includes(savedFocus)) {
-            // Already rolled today
-            targetFocusStr = savedFocus;
-        } else {
-            // Need a new roll for today
-            const randIndex = Math.floor(Math.random() * FOCUS_OPTIONS.length);
-            targetFocusStr = FOCUS_OPTIONS[randIndex];
-
-            // Save it
-            localStorage.setItem(STORAGE_DATE_KEY, todayStr);
-            localStorage.setItem(STORAGE_KEY, targetFocusStr);
-        }
+        // Need a new roll for every load
+        const randIndex = Math.floor(Math.random() * FOCUS_OPTIONS.length);
+        const targetFocusStr = FOCUS_OPTIONS[randIndex];
 
         // Slot machine effect
         let spinCount = 0;

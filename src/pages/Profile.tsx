@@ -26,8 +26,10 @@ interface ProfileSettings {
   autoRecordEnabled?: boolean;
 }
 
-// Updated Stripe Price ID
-const STRIPE_PRICE_ID = "price_1SknWkEOnRZP4MxPtX889sCh";
+// Updated Stripe Price ID ($29.99/mo)
+const STRIPE_PRICE_ID = "price_1T3lcJEOnRZP4MxPepztrhp6";
+// Course Purchase Price ID ($179.99)
+const STRIPE_COURSE_PRICE_ID = "price_1T3lniEOnRZP4MxPH3uGYgSw";
 
 const Profile = () => {
   const { user } = useAuth();
@@ -36,6 +38,7 @@ const Profile = () => {
   const [practiceLog, setPracticeLog] = useState<PracticeLogWithExercise[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSubscribing, setIsSubscribing] = useState(false); // State for sub button
+  const [isBuyingCourse, setIsBuyingCourse] = useState(false); // State for course button
   const [isManagingSub, setIsManagingSub] = useState(false); // State for portal button
   const [isClaimingCourse, setIsClaimingCourse] = useState(false);
   const [courseEnrollment, setCourseEnrollment] = useState<any>(null);
@@ -155,6 +158,38 @@ const Profile = () => {
       toast({ title: "Failed to start subscription: " + err.message, variant: "destructive" });
     } finally {
       setIsSubscribing(false);
+    }
+  }
+
+  const handleBuyCourse = async () => {
+    try {
+      setIsBuyingCourse(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast({ title: "Please log in to purchase the course", variant: "destructive" });
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke('create-checkout-session', {
+        body: {
+          priceId: STRIPE_COURSE_PRICE_ID,
+          mode: 'payment',
+          metadata: { type: 'course_purchase' }
+        }
+      });
+
+      if (error) throw error;
+      if (data?.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error('No checkout URL returned');
+      }
+
+    } catch (err: any) {
+      console.error("Purchase error:", err);
+      toast({ title: "Failed to start checkout: " + err.message, variant: "destructive" });
+    } finally {
+      setIsBuyingCourse(false);
     }
   }
 
@@ -312,20 +347,38 @@ const Profile = () => {
                 </div>
               )}
 
-              {!isPremium && (
-                <div className="pt-4">
-                  <p className="mb-4 text-muted-foreground">
-                    Upgrade to Guitar Brain Premium for $9.99/mo to unlock all features.
-                  </p>
-                  <Button
-                    onClick={handleSubscribe}
-                    disabled={isSubscribing}
-                    className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white"
-                  >
-                    {isSubscribing ? 'Processing...' : 'Upgrade Now ($9.99/mo)'}
-                  </Button>
-                </div>
-              )}
+              <div className="pt-4 flex flex-col sm:flex-row gap-4">
+                {!isPremium && (
+                  <div className="flex-1 border rounded-lg p-4">
+                    <p className="mb-4 text-muted-foreground">
+                      Upgrade to Guitar Brain Premium for $29.99/mo to unlock all features.
+                    </p>
+                    <Button
+                      onClick={handleSubscribe}
+                      disabled={isSubscribing || isBuyingCourse}
+                      className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white w-full"
+                    >
+                      {isSubscribing ? 'Processing...' : 'Upgrade Now ($29.99/mo)'}
+                    </Button>
+                  </div>
+                )}
+
+                {(!courseEnrollment || courseEnrollment.status !== 'verified') && (
+                  <div className="flex-1 border rounded-lg p-4 border-indigo-500/30">
+                    <p className="mb-4 text-muted-foreground">
+                      Buy the Video Course + get 90 days of Premium.
+                    </p>
+                    <Button
+                      onClick={handleBuyCourse}
+                      disabled={isSubscribing || isBuyingCourse}
+                      variant="outline"
+                      className="w-full text-indigo-500 border-indigo-500 hover:bg-indigo-500/10"
+                    >
+                      {isBuyingCourse ? 'Processing...' : 'Buy Course ($179.99)'}
+                    </Button>
+                  </div>
+                )}
+              </div>
 
               {/* Course Integration Sub-section */}
               <div className="pt-6 border-t mt-6">

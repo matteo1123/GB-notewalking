@@ -14,6 +14,7 @@ import type { Piece } from './piece-mastery/types';
 import { useSession } from '@/contexts/SessionContext';
 import { EarTrainingPractice } from './EarTrainingPractice';
 import { ChordProgressionPractice } from './ChordProgressionPractice';
+import { DailyFocusWidget } from './DailyFocusWidget';
 
 // Helper to get display info from module type
 function getModuleDisplayInfo(moduleType: ModuleType): { icon: string; title: string; description: string } {
@@ -85,6 +86,9 @@ export function SessionExecutor() {
         <div className="h-full flex flex-col overflow-hidden">
             {/* Compact Progress Header */}
             <div className="flex-shrink-0 border-b bg-card p-3">
+                <div className="flex w-full items-center justify-center mb-2">
+                    <DailyFocusWidget />
+                </div>
                 <div className="flex items-center justify-between gap-4 mb-2">
                     {/* Left: Title & Block Info */}
                     <div className="flex items-center gap-3 min-w-0 flex-1">

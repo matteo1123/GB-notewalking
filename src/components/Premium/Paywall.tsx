@@ -6,10 +6,11 @@ import { Music, Star, Zap, LogIn, CreditCard, Loader2 } from 'lucide-react';
 
 interface PaywallProps {
   onSubscribe?: () => void;
+  onBuyCourse?: () => void;
   isLoading?: boolean;
 }
 
-const Paywall = ({ onSubscribe, isLoading }: PaywallProps) => {
+const Paywall = ({ onSubscribe, onBuyCourse, isLoading }: PaywallProps) => {
   return (
     <div className="min-h-screen bg-background p-4 flex flex-col items-center justify-center">
       <div className="max-w-4xl mx-auto space-y-8 w-full">
@@ -70,15 +71,29 @@ const Paywall = ({ onSubscribe, isLoading }: PaywallProps) => {
           {/* CTA */}
           <div className="space-y-4 pt-4">
             {onSubscribe ? (
-              <Button
-                size="lg"
-                className="text-lg px-8 py-6 w-full md:w-auto min-w-[300px] bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-xl hover:scale-105 transition-transform"
-                onClick={onSubscribe}
-                disabled={isLoading}
-              >
-                {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <CreditCard className="mr-2 h-5 w-5" />}
-                Upgrade to Premium ($9.99/mo)
-              </Button>
+              <div className="flex flex-col md:flex-row gap-4 justify-center items-center w-full">
+                <Button
+                  size="lg"
+                  className="text-lg px-8 py-6 w-full md:w-auto min-w-[300px] bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-xl hover:scale-105 transition-transform"
+                  onClick={onSubscribe}
+                  disabled={isLoading}
+                >
+                  {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <CreditCard className="mr-2 h-5 w-5" />}
+                  Upgrade to Premium ($29.99/mo)
+                </Button>
+                {onBuyCourse && (
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className="text-lg px-8 py-6 w-full md:w-auto min-w-[300px] border-2 border-indigo-600 text-indigo-400 hover:bg-indigo-600/10 hover:scale-105 transition-transform"
+                    onClick={onBuyCourse}
+                    disabled={isLoading}
+                  >
+                    {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Star className="mr-2 h-5 w-5" />}
+                    Buy Course + 3 Months ($179.99)
+                  </Button>
+                )}
+              </div>
             ) : (
               <Link to="/auth">
                 <Button
@@ -92,7 +107,7 @@ const Paywall = ({ onSubscribe, isLoading }: PaywallProps) => {
             )}
 
             <p className="text-sm text-muted-foreground mt-4">
-              {onSubscribe ? "Secure checkout powered by Stripe. Cancel anytime." : "Create an account to access premium guitar training tools"}
+              {onSubscribe ? "Secure checkout powered by Stripe. Premium cancels anytime." : "Create an account to access premium guitar training tools"}
             </p>
           </div>
         </div>

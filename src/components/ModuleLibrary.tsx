@@ -4,6 +4,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Search, X, Settings, Star, StarOff, ChevronLeft, Flame } from 'lucide-react';
 import { CreateSprintDialog } from './CreateSprintDialog';
+import { DailyFocusWidget } from './DailyFocusWidget';
 import { RhythmTraining } from './RhythmTraining';
 import { ChordProgressionExercise } from './ChordProgressionExercise';
 import { ChordProgressionPractice } from './ChordProgressionPractice';
@@ -333,7 +334,10 @@ export function ModuleLibrary() {
                     <div className="flex items-center gap-3">
                         <span className="text-2xl">{MODULE_REGISTRY[activeModule].icon}</span>
                         <div>
-                            <h2 className="text-xl font-bold">{MODULE_REGISTRY[activeModule].name}</h2>
+                            <div className="flex items-center gap-4">
+                                <h2 className="text-xl font-bold">{MODULE_REGISTRY[activeModule].name}</h2>
+                                <DailyFocusWidget />
+                            </div>
                             <p className="text-sm text-muted-foreground">Freeplay Mode</p>
                         </div>
                     </div>

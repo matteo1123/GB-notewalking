@@ -13,7 +13,7 @@ import { PriorityManager } from "@/components/PriorityManager";
 import { PressStart } from "@/components/PressStart";
 import { SessionRecap } from "@/components/SessionRecap";
 import { toast } from "sonner";
-import { Loader2, Settings } from "lucide-react";
+import { Loader2, Settings, Star } from "lucide-react";
 import { SessionProvider, useSession } from "@/contexts/SessionContext";
 import { SessionExecutor } from "@/components/SessionExecutor";
 import { SessionWrapUp } from "@/components/SessionWrapUp";
@@ -28,10 +28,11 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { DailyFocusWidget } from "@/components/DailyFocusWidget";
 
-// Updated Stripe Price ID
-const STRIPE_PRICE_ID = "price_1SknWkEOnRZP4MxPtX889sCh";
+// Updated Stripe Price ID ($29.99/mo)
+const STRIPE_PRICE_ID = "price_1T3lcJEOnRZP4MxPepztrhp6";
+// Course Purchase Price ID ($179.99)
+const STRIPE_COURSE_PRICE_ID = "price_1T3lniEOnRZP4MxPH3uGYgSw";
 
 /**
  * Inner component that consumes the SessionContext
@@ -53,6 +54,7 @@ const PremiumContent = () => {
   const exerciseId = searchParams.get("exerciseId");
   const [isPremium, setIsPremium] = useState(false);
   const [isSubscribing, setIsSubscribing] = useState(false);
+  const [isBuyingCourse, setIsBuyingCourse] = useState(false);
   const [checkingPremium, setCheckingPremium] = useState(true);
   const [activeTab, setActiveTab] = useState("practice");
   const [prioritiesOpen, setPrioritiesOpen] = useState(false);
@@ -228,6 +230,38 @@ const PremiumContent = () => {
     }
   }
 
+  const handleBuyCourse = async () => {
+    try {
+      setIsBuyingCourse(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error("Please log in to purchase the course");
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke('create-checkout-session', {
+        body: {
+          priceId: STRIPE_COURSE_PRICE_ID,
+          mode: 'payment',
+          metadata: { type: 'course_purchase' }
+        }
+      });
+
+      if (error) throw error;
+      if (data?.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error('No checkout URL returned');
+      }
+
+    } catch (err: any) {
+      console.error("Purchase error:", err);
+      toast.error("Failed to start checkout: " + err.message);
+    } finally {
+      setIsBuyingCourse(false);
+    }
+  }
+
   const handleExerciseSelect = async (item: RepertoireItem) => {
     if (!user) return;
 
@@ -314,9 +348,6 @@ const PremiumContent = () => {
           </Button>
           <h2 className="font-semibold text-sm sm:text-base truncate">Guitar Brain</h2>
           {isPremium && <span className="text-xs bg-gradient-to-r from-yellow-400 to-orange-500 text-black font-bold px-1.5 sm:px-2 py-0.5 rounded-full hidden lg:inline">PREMIUM</span>}
-          <div className="hidden md:flex ml-2">
-            <DailyFocusWidget />
-          </div>
         </div>
         <div className="flex items-center gap-1 sm:gap-2">
           {!isPremium && (
@@ -325,13 +356,25 @@ const PremiumContent = () => {
               variant="default"
               className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white border-0 text-xs sm:text-sm px-2 sm:px-3"
               onClick={handleSubscribe}
-              disabled={isSubscribing}
+              disabled={isSubscribing || isBuyingCourse}
             >
               {isSubscribing && <Loader2 className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" />}
-              <span className="hidden sm:inline">Upgrade ($9.99/mo)</span>
+              <span className="hidden sm:inline">Upgrade ($29.99/mo)</span>
               <span className="sm:hidden">Upgrade</span>
             </Button>
           )}
+          <Button
+            size="sm"
+            variant="outline"
+            className="hidden lg:flex border-indigo-600 text-indigo-400 hover:bg-indigo-600/10 text-xs sm:text-sm px-2 sm:px-3"
+            onClick={handleBuyCourse}
+            disabled={isSubscribing || isBuyingCourse}
+          >
+            {isBuyingCourse && <Loader2 className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" />}
+            <Star className="mr-1 h-3 w-3 sm:h-4 sm:w-4" />
+            <span className="hidden sm:inline">Buy Course ($179.99)</span>
+            <span className="sm:hidden">Course</span>
+          </Button>
           <Button
             variant="ghost"
             size="icon"

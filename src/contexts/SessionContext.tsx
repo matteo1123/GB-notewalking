@@ -132,6 +132,52 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
             if (completed) {
                 setCompletedSession(activeSession);
+
+                // Attempt to progress routine difficulty automatically
+                if (activeSession.routineId) {
+                    try {
+                        const { data: logs } = await (supabase as any)
+                            .from('practice_log')
+                            .select('module_type, max_bpm')
+                            .eq('session_id', activeSession.session.id);
+
+                        if (logs && logs.length > 0) {
+                            const { data: routine } = await (supabase as any)
+                                .from('practice_routines')
+                                .select('session_plan')
+                                .eq('id', activeSession.routineId)
+                                .single();
+
+                            if (routine && routine.session_plan) {
+                                let updated = false;
+                                const updatedPlan = routine.session_plan.map((block: any) => {
+                                    if (block.config?.metronome?.bpm) {
+                                        const currentBpm = block.config.metronome.bpm;
+                                        const blockLogs = logs.filter((l: any) => l.module_type === block.module_type && l.max_bpm);
+
+                                        if (blockLogs.length > 0) {
+                                            const bestLog = blockLogs.sort((a: any, b: any) => (b.max_bpm || 0) - (a.max_bpm || 0))[0];
+                                            if (bestLog && bestLog.max_bpm >= currentBpm) {
+                                                block.config.metronome.bpm = currentBpm + 2;
+                                                updated = true;
+                                            }
+                                        }
+                                    }
+                                    return block;
+                                });
+
+                                if (updated) {
+                                    await (supabase as any)
+                                        .from('practice_routines')
+                                        .update({ session_plan: updatedPlan })
+                                        .eq('id', activeSession.routineId);
+                                }
+                            }
+                        }
+                    } catch (err) {
+                        console.error("Failed to mutate routine progression:", err);
+                    }
+                }
             }
 
             setActiveSession(null);

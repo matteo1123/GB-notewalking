@@ -84,7 +84,7 @@ export async function getUserExercisePerformance(
     // Get all sequences
     const { data: sequences, error: seqError } = await supabase
         .from('sequences')
-        .select('id, name, notes_per_click');
+        .select('id, name, notes_per_click, note_value, is_triplet');
 
     if (seqError) {
         console.error('Error fetching sequences:', seqError);
@@ -100,9 +100,13 @@ export async function getUserExercisePerformance(
         const defaultSequence = sequences?.[0];
         if (!defaultSequence) continue;
 
+        const calculatedNotesPerClick = defaultSequence.note_value
+            ? ((defaultSequence.note_value / 4) * (defaultSequence.is_triplet ? 3 : 1))
+            : (defaultSequence.notes_per_click || 2.0);
+
         const notesPerSecond = calculateNotesPerSecond(
             performance.max_bpm,
-            defaultSequence.notes_per_click || 2.0
+            calculatedNotesPerClick
         );
 
         ranked.push({
@@ -111,7 +115,7 @@ export async function getUserExercisePerformance(
             scale_name: performance.scale_name,
             sequence_name: defaultSequence.name,
             user_max_bpm: performance.max_bpm,
-            notes_per_click: defaultSequence.notes_per_click || 2.0,
+            notes_per_click: calculatedNotesPerClick,
             notes_per_second: notesPerSecond,
             category: 'focus', // Will be categorized below
             last_practiced: performance.last_practiced

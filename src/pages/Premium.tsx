@@ -28,6 +28,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { DailyFocusWidget } from "@/components/DailyFocusWidget";
 
 // Updated Stripe Price ID
 const STRIPE_PRICE_ID = "price_1SknWkEOnRZP4MxPtX889sCh";
@@ -312,7 +313,10 @@ const PremiumContent = () => {
             <span className="hidden sm:inline">←</span> Back
           </Button>
           <h2 className="font-semibold text-sm sm:text-base truncate">Guitar Brain</h2>
-          {isPremium && <span className="text-xs bg-gradient-to-r from-yellow-400 to-orange-500 text-black font-bold px-1.5 sm:px-2 py-0.5 rounded-full hidden sm:inline">PREMIUM</span>}
+          {isPremium && <span className="text-xs bg-gradient-to-r from-yellow-400 to-orange-500 text-black font-bold px-1.5 sm:px-2 py-0.5 rounded-full hidden lg:inline">PREMIUM</span>}
+          <div className="hidden md:flex ml-2">
+            <DailyFocusWidget />
+          </div>
         </div>
         <div className="flex items-center gap-1 sm:gap-2">
           {!isPremium && (

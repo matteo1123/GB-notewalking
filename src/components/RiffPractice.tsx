@@ -281,6 +281,7 @@ const RiffPractice = ({
 
     const { error } = await supabase.from('practice_log').insert({
       user_id: user.id,
+      module_type: repertoireItem.category === 'arpeggio' ? 'arpeggio' : 'scale',
       exercise_id: exerciseData.id,
       scale_id: repertoireItem.id,
       scale_shape_id: 'scale_shape' in repertoireItem ? repertoireItem.scale_shape as string : null,
@@ -336,6 +337,14 @@ const RiffPractice = ({
     return lessonExercise?.target_bpm || metronomeBpm;
   }, [isControlledSession, practiceSettings.practiceMode, startingBpm, lessonExercise?.target_bpm, metronomeBpm]);
 
+  const calculatedNotesPerClick = useMemo(() => {
+    if (!activeSequence) return 1;
+    if (activeSequence.note_value) {
+      return (activeSequence.note_value / 4) * (activeSequence.is_triplet ? 3 : 1);
+    }
+    return activeSequence.notes_per_click ? Number(activeSequence.notes_per_click) : 1;
+  }, [activeSequence]);
+
   const metronomeSettings = {
     mode: mode,
     loop: loop,
@@ -343,7 +352,7 @@ const RiffPractice = ({
     endBpm: targetBpm,
     measures: lessonExercise ? (lessonExercise.increments || 1) * (lessonExercise.measures_per_bpm || 4) : 8,
     measuresPerBpmChange: lessonExercise?.measures_per_bpm || 4,
-    subdivisions: activeSequence?.notes_per_click ? Number(activeSequence.notes_per_click) : 1,
+    subdivisions: calculatedNotesPerClick,
     drumBeat,
     onComplete: isControlledSession && practiceSettings.autoAdvance ? onComplete : undefined,
   };
@@ -750,7 +759,7 @@ const RiffPractice = ({
                   )}
                 </div>
               </div>
-              <div className="hidden sm:block">
+              <div className="hidden sm:flex items-center gap-3">
                 <Select
                   value={activeSequence?.id.toString()}
                   onValueChange={(value) => {
@@ -773,6 +782,12 @@ const RiffPractice = ({
                     ))}
                   </SelectContent>
                 </Select>
+
+                {activeSequence && (
+                  <div className="text-sm font-medium text-muted-foreground bg-muted px-3 py-2 rounded-md border flex items-center gap-1.5" title="Notes per metronome click">
+                    🎵 {calculatedNotesPerClick} / click
+                  </div>
+                )}
               </div>
             </div>
 

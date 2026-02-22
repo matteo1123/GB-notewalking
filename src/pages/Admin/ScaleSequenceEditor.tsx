@@ -106,6 +106,8 @@ const ScaleSequenceEditor = () => {
       return;
     }
 
+    const calculatedNotesPerClick = subdivision ? ((subdivision / 4) * (isTriplet ? 3 : 1)) : 1;
+
     const sequenceData = {
       name: sequenceName,
       pattern_string: sequence,
@@ -113,6 +115,7 @@ const ScaleSequenceEditor = () => {
       note_value: subdivision,
       is_triplet: isTriplet,
       bpm: bpm,
+      notes_per_click: calculatedNotesPerClick,
       repetition_style: 'DIATONIC_SHIFT' // default value
     };
 

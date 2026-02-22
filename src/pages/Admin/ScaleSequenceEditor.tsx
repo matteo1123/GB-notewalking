@@ -257,7 +257,7 @@ const ScaleSequenceEditor = () => {
           <RiffPractice
             repertoireItem={{
               ...selectedScaleObject,
-              notes: generatedNotes,
+              notes: selectedScaleObject.notes_json, // Pass original full scale shape, not generated sequence notes
               id: selectedScaleObject.id,
               name: selectedScaleObject.name,
               category: selectedScaleObject.category,
@@ -265,7 +265,17 @@ const ScaleSequenceEditor = () => {
               tonic: selectedScaleObject.tonic,
               tonality: selectedScaleObject.tonality,
             }}
-            sequences={sequences.filter(s => s.Type === selectedScaleObject.Type)}
+            // Pass a fake sequences array containing the current edited sequence so it can be previewed seamlessly
+            sequences={[{
+              id: selectedSequenceId || 'preview-temp-id',
+              name: sequenceName || 'Preview Sequence',
+              pattern_string: sequence,
+              Type: selectedScaleObject.Type,
+              note_value: subdivision,
+              is_triplet: isTriplet,
+              bpm: bpm,
+              notes_per_click: subdivision ? ((subdivision / 4) * (isTriplet ? 3 : 1)) : 1
+            }]}
           />
         )}
       </div>

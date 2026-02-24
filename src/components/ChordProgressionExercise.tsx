@@ -382,6 +382,7 @@ export function ChordProgressionExercise({ autoStart = false, sessionId, onExit,
     const handlePitchDetected = useCallback(
         (result: { frequency: number; note: string; string: number; fret: number; confidence: number; }) => {
             setDetectedNote(result.note.replace(/\d/g, ""));
+            setDetectedPitch(result.note);
             setPitchConfidence(result.confidence);
         },
         []

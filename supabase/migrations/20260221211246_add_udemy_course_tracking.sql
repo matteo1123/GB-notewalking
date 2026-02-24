@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS public.course_enrollments (
     status TEXT NOT NULL CHECK (status IN ('pending_verification', 'verified', 'rejected')),
     enrolled_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     verified_at TIMESTAMP WITH TIME ZONE,
-    source TEXT DEFAULT 'udemy',
+    source TEXT DEFAULT 'guitar_brain',
     UNIQUE(user_id) -- A user can only have one course enrollment record for now
 );
 

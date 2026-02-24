@@ -121,10 +121,10 @@ export function PracticeSettingsProvider({ children }: PracticeSettingsProviderP
     );
 }
 
-export function usePracticeSettings() {
+export const usePracticeSettings = () => {
     const context = useContext(PracticeSettingsContext);
     if (!context) {
         throw new Error('usePracticeSettings must be used within a PracticeSettingsProvider');
     }
     return context;
-}
+};

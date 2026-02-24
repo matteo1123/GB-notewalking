@@ -218,7 +218,7 @@ const Profile = () => {
     }
   }
 
-  const handleClaimUdemyCourse = async () => {
+  const handleClaimCoursePurchase = async () => {
     if (!user || !profile) return;
     try {
       setIsClaimingCourse(true);
@@ -226,7 +226,7 @@ const Profile = () => {
       // 1. Insert course enrollment (pending verification)
       const { error: enrollErr } = await supabase
         .from('course_enrollments' as any)
-        .insert({ user_id: user.id, status: 'pending_verification', source: 'udemy' });
+        .insert({ user_id: user.id, status: 'pending_verification', source: 'guitar_brain_course' });
 
       if (enrollErr) throw enrollErr;
 
@@ -382,7 +382,7 @@ const Profile = () => {
 
               {/* Course Integration Sub-section */}
               <div className="pt-6 border-t mt-6">
-                <h3 className="font-bold text-lg mb-2">Udemy Course Access</h3>
+                <h3 className="font-bold text-lg mb-2">Video Course Access</h3>
 
                 {courseEnrollment ? (
                   <div className="bg-muted p-4 rounded-md">
@@ -394,14 +394,14 @@ const Profile = () => {
                   </div>
                 ) : (
                   <div className="bg-orange-500/10 border border-orange-500/30 p-4 rounded-md">
-                    <p className="text-sm font-medium text-orange-600 dark:text-orange-400 mb-3">Did you purchase our Udemy course? Claim your 90-day premium pass here.</p>
+                    <p className="text-sm font-medium text-orange-600 dark:text-orange-400 mb-3">Did you purchase our Guitar Brain course elsewhere? Claim your 90-day premium pass here.</p>
                     <Button
                       variant="outline"
-                      onClick={handleClaimUdemyCourse}
+                      onClick={handleClaimCoursePurchase}
                       disabled={isClaimingCourse}
                       className="border-orange-500 text-orange-600 hover:bg-orange-500 hover:text-white"
                     >
-                      {isClaimingCourse ? 'Claiming...' : 'I bought the course on Udemy!'}
+                      {isClaimingCourse ? 'Claiming...' : 'I bought the course!'}
                     </Button>
                   </div>
                 )}

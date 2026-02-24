@@ -155,7 +155,7 @@ export default function CourseEditor() {
         try {
             const { error } = await supabase
                 .from('course_videos' as any)
-                .upsert(updates.map(u => ({ id: u.id, order_index: u.order_index })));
+                .upsert(updates);
 
             if (error) throw error;
             toast({ title: 'Order saved', description: 'The course curriculum has been reordered.' });

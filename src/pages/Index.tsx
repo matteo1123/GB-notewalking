@@ -12,9 +12,9 @@ const Index = () => {
       <main className="flex-grow flex flex-col items-center justify-center bpm-control-area relative">
         <MetronomeScreen initialMode="regular" />
 
-        {/* Udemy Course Advertisement */}
+        {/* Course Advertisement */}
         <div className="w-full max-w-2xl px-4 pb-8 z-10">
-          <Link to="/profile">
+          <Link to="/course">
             <Card className="bg-gradient-to-r from-indigo-900/40 to-slate-900 border-indigo-500/30 hover:border-indigo-500/60 transition-colors group cursor-pointer overflow-hidden relative">
               <div className="absolute inset-0 bg-indigo-500/10 group-hover:bg-indigo-500/20 transition-colors" />
               <CardContent className="p-4 sm:p-6 flex items-center justify-between relative z-10">
@@ -24,7 +24,7 @@ const Index = () => {
                   </div>
                   <div>
                     <h3 className="font-bold text-lg text-white group-hover:text-indigo-200 transition-colors">Master Your Guitar Brain</h3>
-                    <p className="text-sm text-muted-foreground">Unlock the official Udemy course and get 90 days of Premium access free.</p>
+                    <p className="text-sm text-muted-foreground">Unlock the official GuitarBrain course and take your skills to the next level.</p>
                   </div>
                 </div>
                 <ArrowRight className="w-5 h-5 text-indigo-400 group-hover:translate-x-1 transition-transform" />

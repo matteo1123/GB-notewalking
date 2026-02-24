@@ -207,7 +207,17 @@ export interface EarTrainingPracticeModuleConfig {
   root_note: string; // e.g. 'C', 'G#'
   drone_octave?: number; // e.g. 2, 3, 4
   key_change_interval?: number; // 0 = never, >0 = every N correct guesses
-  level?: number; // starting level, 0-indexed internally
+  level?: number; // target level or starting level
+
+  // Audio Feedback & Options
+  listenOnlyMode?: boolean;
+  playScale?: boolean;
+  playAnswerScale?: boolean;
+  targetNoteRepeats?: number;
+
+  // Custom Training
+  trainingMode?: 'guided' | 'custom';
+  customDegrees?: string[]; // array of Degree strings e.g. ['1', '3', '5']
 }
 
 export type ModuleConfig =

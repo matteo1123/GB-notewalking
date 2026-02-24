@@ -130,7 +130,7 @@ export default function Course() {
                 <div className="bg-orange-500/10 border border-orange-500/50 p-4 rounded-xl mb-8 flex items-center justify-between">
                     <div>
                         <h3 className="font-bold text-orange-500">Trial Grace Period Active</h3>
-                        <p className="text-sm">We're verifying your Udemy purchase. Enjoy your 14-day free pass in the meantime!</p>
+                        <p className="text-sm">We're verifying your course purchase. Enjoy your 14-day free pass in the meantime!</p>
                     </div>
                 </div>
             )}
@@ -139,7 +139,7 @@ export default function Course() {
                 <div className="bg-destructive/10 border border-destructive bg-secondary p-6 rounded-xl mb-8 text-center">
                     <Lock className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
                     <h3 className="font-bold text-xl mb-2">Premium Content</h3>
-                    <p className="mb-4 text-muted-foreground">This course requires premium access or a verified Udemy purchase.</p>
+                    <p className="mb-4 text-muted-foreground">This course requires premium access or a verified course purchase.</p>
                     <Button onClick={() => navigate('/premium')} variant="default">Upgrade to Premium</Button>
                 </div>
             )}

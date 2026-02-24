@@ -6,7 +6,7 @@ export function useNotePlayer(audioContext: AudioContext | null) {
   const currentSourceRef = useRef<AudioBufferSourceNode | null>(null);
 
   const playNote = useCallback(
-    async (note: string) => {
+    async (note: string, volume: number = 1.0) => {
       if (!audioContext) return;
 
       const noteUrl = `https://idsufbsfywgmcrhldqxq.supabase.co/storage/v1/object/public/Piano/${note}.mp3`;
@@ -25,7 +25,14 @@ export function useNotePlayer(audioContext: AudioContext | null) {
 
         const source = audioContext.createBufferSource();
         source.buffer = buffer;
-        source.connect(audioContext.destination);
+
+        // Create a gain node for volume control
+        const gainNode = audioContext.createGain();
+        gainNode.gain.value = volume;
+
+        source.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+
         source.start(0);
         currentSourceRef.current = source;
       } catch (error) {
@@ -35,10 +42,34 @@ export function useNotePlayer(audioContext: AudioContext | null) {
     [audioContext]
   );
 
+  const preloadNotes = useCallback(
+    async (notes: string[]) => {
+      if (!audioContext) return;
+
+      const promises = notes.map(async (note) => {
+        const noteUrl = `https://idsufbsfywgmcrhldqxq.supabase.co/storage/v1/object/public/Piano/${note}.mp3`;
+        if (audioBufferCache.current[noteUrl]) return;
+
+        try {
+          const response = await fetch(noteUrl);
+          const arrayBuffer = await response.arrayBuffer();
+          const buffer = await audioContext.decodeAudioData(arrayBuffer);
+          audioBufferCache.current[noteUrl] = buffer;
+        } catch (error) {
+          console.error(`Failed to preload note ${note}`, error);
+        }
+      });
+
+      await Promise.all(promises);
+    },
+    [audioContext]
+  );
+
   const playSequence = useCallback(
     async (
       notes: { string: number; fret: number }[],
       tempo: number = 1.0,
+      volume: number = 1.0,
       onNoteStart?: (index: number) => void,
       onComplete?: () => void
     ) => {
@@ -77,7 +108,7 @@ export function useNotePlayer(audioContext: AudioContext | null) {
         const noteName = getNoteFromFret(note.string, note.fret);
 
         onNoteStart?.(i);
-        await playNote(noteName);
+        await playNote(noteName, volume);
 
         await new Promise(resolve => setTimeout(resolve, noteDuration));
       }
@@ -98,5 +129,5 @@ export function useNotePlayer(audioContext: AudioContext | null) {
     }
   }, []);
 
-  return { playNote, playSequence, stop };
+  return { playNote, playSequence, preloadNotes, stop };
 }

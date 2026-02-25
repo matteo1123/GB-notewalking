@@ -219,6 +219,7 @@ export function ChordProgressionExercise({ autoStart = false, sessionId, onExit,
     });
 
     const [detectedPitch, setDetectedPitch] = useState<string | null>(null);
+    const [simulatedNote, setSimulatedNote] = useState<string | null>(null);
     const [fretboardNotes, setFretboardNotes] = useState<any[]>([]);
     const [degreeMap, setDegreeMap] = useState<Map<string, number>>(new Map());
     const [scale, setScale] = useState(1);
@@ -288,12 +289,40 @@ export function ChordProgressionExercise({ autoStart = false, sessionId, onExit,
             });
         }
 
+        // --- KEYBOARD SHORTCUTS FOR NOTEWALKING ---
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Only capture raw numbers 1-7 if user isn't typing in an input
+            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+            const num = parseInt(e.key, 10);
+            if (num >= 1 && num <= 7) {
+                const targetNote = degreeToNote.get(num);
+                if (targetNote && targetNote !== simulatedNote) {
+                    setSimulatedNote(targetNote);
+                }
+            }
+        };
+
+        const handleKeyUp = (e: KeyboardEvent) => {
+            const num = parseInt(e.key, 10);
+            if (num >= 1 && num <= 7) {
+                setSimulatedNote(null);
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        window.addEventListener('keyup', handleKeyUp);
+
         noteNames.forEach(noteName => {
             const positions = findAllNoteOccurrences(noteName);
             positions.forEach(pos => {
                 // Determine if this is the EXACT pitch played within the revealed frets
                 const pitch = getGuitarPitch(pos.string, pos.fret);
-                const isCurrentlyPlaying = detectedPitch === pitch && revealedFrets.has(`${pos.string}-${pos.fret}`);
+
+                // Mic pitch needs exact string/fret match. Keyboard just needs the base note name.
+                const isCurrentlyPlaying =
+                    (detectedPitch === pitch || simulatedNote === noteName) &&
+                    revealedFrets.has(`${pos.string}-${pos.fret}`);
 
                 notes.push({
                     string: pos.string,
@@ -310,7 +339,12 @@ export function ChordProgressionExercise({ autoStart = false, sessionId, onExit,
         const filteredNotes = notes.filter(n => n.isPlaying || revealedFrets.has(`${n.string}-${n.fret}`));
 
         setFretboardNotes(filteredNotes);
-    }, [settings.key, settings.selectedChords, currentChordIndex, detectedPitch, revealedFrets, getGuitarPitch]);
+
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+            window.removeEventListener('keyup', handleKeyUp);
+        };
+    }, [settings.key, settings.selectedChords, currentChordIndex, detectedPitch, simulatedNote, revealedFrets, getGuitarPitch]);
 
     const metronomeSettings: MetronomeSettings = {
         mode,

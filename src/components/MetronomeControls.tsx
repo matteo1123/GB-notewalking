@@ -10,9 +10,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Play, Pause, Repeat, RotateCcw, Mic, Drum } from "lucide-react";
+import { Play, Pause, Repeat, RotateCcw, Mic, Drum, Activity } from "lucide-react";
 import { useNumberInputControls } from "@/hooks/useNumberInputControls";
 import { useAutoRecord } from "@/contexts/AutoRecordContext";
+import { GuitarTuner } from "@/components/GuitarTuner";
 
 export type MetronomeMode = "regular" | "speed-trainer" | "progressive";
 
@@ -75,6 +76,8 @@ export function MetronomeControls({
     loop: initialState.loop ?? false,
     drumBeat: initialState.drumBeat ?? false,
   });
+
+  const [isTunerActive, setIsTunerActive] = useState(false);
 
   const syncingFromPropsRef = useRef(false);
 
@@ -313,7 +316,24 @@ export function MetronomeControls({
             <Mic className={cn("h-4 w-4", autoRecordEnabled && "text-white")} />
           </Button>
         )}
+        {/* Tuner Toggle */}
+        <Button
+          variant={isTunerActive ? "default" : "outline"}
+          onClick={() => setIsTunerActive(!isTunerActive)}
+          size="sm"
+          className={cn("h-8 px-2", isTunerActive && "bg-blue-500 hover:bg-blue-600")}
+          title={isTunerActive ? "Tuner: ON (click to disable)" : "Tuner: OFF (click to enable)"}
+          data-testid="metronome-tuner-button"
+        >
+          <Activity className={cn("h-4 w-4", isTunerActive && "text-white")} />
+        </Button>
       </div>
+
+      {isTunerActive && (
+        <div className="pt-2 animate-in fade-in slide-in-from-top-2 duration-200">
+          <GuitarTuner isActive={isTunerActive} />
+        </div>
+      )}
 
       {mode !== "regular" && (
         <div className={cn(

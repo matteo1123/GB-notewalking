@@ -10,7 +10,8 @@ interface PitchDetectionResult {
 
 interface UsePitchDetectionProps {
   isEnabled: boolean;
-  onNoteDetected: (result: PitchDetectionResult) => void;
+  onNoteDetected?: (result: PitchDetectionResult) => void;
+  onPitchUpdate?: (centsOffset: number, note: string, frequency: number) => void;
   sensitivity?: number; // 0-1, higher = more sensitive
 }
 
@@ -50,6 +51,24 @@ const frequencyToNote = (frequency: number): string => {
   const n = h % 12;
 
   return noteNames[n] + octave;
+};
+
+// Convert frequency to note data including target frequency for tuning
+const frequencyToNoteData = (frequency: number): { note: string; targetFreq: number } | null => {
+  const A4 = 440;
+  const C0 = A4 * Math.pow(2, -4.75);
+  const noteNames = [
+    "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
+  ];
+
+  if (frequency <= 0) return null;
+
+  const h = Math.round(12 * Math.log2(frequency / C0));
+  const octave = Math.floor(h / 12);
+  const n = h % 12;
+
+  const targetFreq = C0 * Math.pow(2, h / 12);
+  return { note: noteNames[n] + octave, targetFreq };
 };
 
 // Convert frequency to guitar string and fret
@@ -125,6 +144,7 @@ const detectPitch = (audioData: Float32Array, sampleRate: number): number => {
 export const usePitchDetection = ({
   isEnabled,
   onNoteDetected,
+  onPitchUpdate,
   sensitivity = 0.7,
 }: UsePitchDetectionProps) => {
   const [isListening, setIsListening] = useState(false);
@@ -167,6 +187,17 @@ export const usePitchDetection = ({
       );
 
       if (frequency > 80 && frequency < 800) {
+
+        // --- NEW TUNER CONTINUOUS DATA ---
+        if (onPitchUpdate) {
+          const noteData = frequencyToNoteData(frequency);
+          if (noteData) {
+            const cents = 1200 * Math.log2(frequency / noteData.targetFreq);
+            onPitchUpdate(cents, noteData.note, frequency);
+          }
+        }
+
+        // --- EXISTING DISCRETE NOTE DETECTION ---
         // Guitar frequency range
         const note = frequencyToNote(frequency);
         const position = frequencyToGuitarPosition(frequency);
@@ -199,7 +230,7 @@ export const usePitchDetection = ({
               confidence: Math.min(rms * 10, 1),
             };
             setCurrentNote(result);
-            onNoteDetected(result);
+            if (onNoteDetected) onNoteDetected(result);
             lastTriggerTsRef.current = now;
             lastPeriodRef.current = periodBucket;
           }
@@ -213,7 +244,7 @@ export const usePitchDetection = ({
     if (isListening) {
       animationFrameRef.current = requestAnimationFrame(processAudio);
     }
-  }, [isEnabled, sensitivity, isListening, onNoteDetected]);
+  }, [isEnabled, sensitivity, isListening, onNoteDetected, onPitchUpdate]);
 
   const startListening = useCallback(async () => {
     console.log("Attempting to start pitch detection...");

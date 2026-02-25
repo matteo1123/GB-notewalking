@@ -28,8 +28,8 @@ interface ProfileSettings {
 
 // Updated Stripe Price ID ($29.99/mo)
 const STRIPE_PRICE_ID = "price_1T3lcJEOnRZP4MxPepztrhp6";
-// Course Purchase Price ID ($179.99)
-const STRIPE_COURSE_PRICE_ID = "price_1T3lniEOnRZP4MxPH3uGYgSw";
+// Course Purchase Price ID ($1.00 Test)
+const STRIPE_COURSE_PRICE_ID = "price_1T4bIGEOnRZP4MxPYTo7dKJt";
 
 const Profile = () => {
   const { user } = useAuth();
@@ -374,7 +374,7 @@ const Profile = () => {
                       variant="outline"
                       className="w-full text-indigo-500 border-indigo-500 hover:bg-indigo-500/10"
                     >
-                      {isBuyingCourse ? 'Processing...' : 'Buy Course ($179.99)'}
+                      {isBuyingCourse ? 'Processing...' : 'Buy Course ($1.00 Test)'}
                     </Button>
                   </div>
                 )}

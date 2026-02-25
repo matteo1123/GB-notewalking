@@ -25,6 +25,7 @@ export default function Course() {
     const [searchParams] = useSearchParams();
 
     const [isPremium, setIsPremium] = useState(false);
+    const [isBuyingCourse, setIsBuyingCourse] = useState(false);
     const [enrollmentStatus, setEnrollmentStatus] = useState<string | null>(null);
     const [progress, setProgress] = useState<string[]>([]);
     const [videos, setVideos] = useState<CourseVideo[]>([]);
@@ -33,43 +34,46 @@ export default function Course() {
 
     useEffect(() => {
         const loadCourseData = async () => {
-            if (!user) {
-                navigate('/auth');
-                return;
+            // 1. If user is logged in, pull their premium status, enrollments, and progress
+            if (user) {
+                // Check premium status
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('premium_until')
+                    .eq('id', user.id)
+                    .single();
+
+                const hasPremium = profile?.premium_until && new Date(profile.premium_until) > new Date();
+                setIsPremium(!!hasPremium);
+
+                // Check enrollment
+                const { data: enrollment } = await supabase
+                    .from('course_enrollments' as any)
+                    .select('status')
+                    .eq('user_id', user.id)
+                    .maybeSingle();
+
+                if (enrollment) {
+                    setEnrollmentStatus(enrollment.status);
+                }
+
+                // Load progress
+                const { data: progressData } = await supabase
+                    .from('course_progress' as any)
+                    .select('video_id')
+                    .eq('user_id', user.id);
+
+                if (progressData) {
+                    setProgress(progressData.map(p => p.video_id));
+                }
+            } else {
+                // Guest user resets
+                setIsPremium(false);
+                setEnrollmentStatus(null);
+                setProgress([]);
             }
 
-            // Check premium status
-            const { data: profile } = await supabase
-                .from('profiles')
-                .select('premium_until')
-                .eq('id', user.id)
-                .single();
-
-            const hasPremium = profile?.premium_until && new Date(profile.premium_until) > new Date();
-            setIsPremium(!!hasPremium);
-
-            // Check enrollment
-            const { data: enrollment } = await supabase
-                .from('course_enrollments' as any)
-                .select('status')
-                .eq('user_id', user.id)
-                .maybeSingle();
-
-            if (enrollment) {
-                setEnrollmentStatus(enrollment.status);
-            }
-
-            // Load progress
-            const { data: progressData } = await supabase
-                .from('course_progress' as any)
-                .select('video_id')
-                .eq('user_id', user.id);
-
-            if (progressData) {
-                setProgress(progressData.map(p => p.video_id));
-            }
-
-            // Fetch course videos
+            // 2. Fetch course videos (public read access via RLS)
             const { data: videoData } = await supabase
                 .from('course_videos' as any)
                 .select('*')
@@ -149,6 +153,46 @@ export default function Course() {
         }
     };
 
+    const handleBuyCourse = async () => {
+        if (!user) {
+            toast({
+                title: "Account Required",
+                description: "Please create a free account to securely link your course purchase.",
+            });
+            navigate('/auth');
+            return;
+        }
+
+        try {
+            setIsBuyingCourse(true);
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
+                toast({ title: "Error", description: "Please log in to purchase the course", variant: "destructive" });
+                return;
+            }
+
+            const { data, error } = await supabase.functions.invoke('create-checkout-session', {
+                body: {
+                    priceId: "price_1T4bIGEOnRZP4MxPYTo7dKJt", // $1 Test Product
+                    mode: 'payment',
+                    metadata: { type: 'course_purchase' }
+                }
+            });
+
+            if (error) throw error;
+            if (data?.url) {
+                window.location.href = data.url;
+            } else {
+                throw new Error('No checkout URL returned');
+            }
+        } catch (err: any) {
+            console.error("Purchase error:", err);
+            toast({ title: "Checkout Error", description: err.message, variant: "destructive" });
+        } finally {
+            setIsBuyingCourse(false);
+        }
+    };
+
     if (loading) return (
         <div className="p-8 flex flex-col items-center justify-center min-h-[50vh] text-muted-foreground">
             <Loader2 className="w-8 h-8 animate-spin mb-4" />
@@ -187,9 +231,10 @@ export default function Course() {
                                 <div className="absolute inset-0 bg-gradient-to-br from-slate-900 to-indigo-950 flex flex-col items-center justify-center text-center p-8">
                                     <Lock className="w-16 h-16 text-indigo-400 mb-4 opacity-50" />
                                     <h2 className="text-2xl font-bold mb-2">Premium Lesson</h2>
-                                    <p className="text-muted-foreground mb-6 max-w-md">This lesson is securely locked. You need GuitarBrain Premium or a verified course purchase to watch it.</p>
-                                    <Button onClick={() => navigate('/premium')} variant="default" className="gap-2">
-                                        <Crown className="w-4 h-4" /> Upgrade to Premium
+                                    <p className="text-muted-foreground mb-6 max-w-md">Purchasing the GuitarBrain Mastery course grants lifetime access to all lessons and instantly adds <strong>90 Days of Premium</strong> to your account.</p>
+                                    <Button onClick={handleBuyCourse} disabled={isBuyingCourse} variant="default" className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white">
+                                        {isBuyingCourse ? <Loader2 className="w-4 h-4 animate-spin" /> : <Crown className="w-4 h-4" />}
+                                        Buy Course ($1.00 Test)
                                     </Button>
                                 </div>
                             ) : activeVideoData.video_url ? (

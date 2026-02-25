@@ -72,7 +72,7 @@ const Header = () => {
                 Premium
               </Button>
             </Link>
-            <Link to="/course">
+            <Link to="/course?lesson=706c6c67-1c6e-45b9-a302-a7272d0ce85a&autoplay=1">
               <Button variant="outline" className="flex items-center gap-2">
                 <GraduationCap className="h-4 w-4" />
                 Course
@@ -166,7 +166,7 @@ const Header = () => {
                 Premium
               </Link>
               <Link
-                to="/course"
+                to="/course?lesson=706c6c67-1c6e-45b9-a302-a7272d0ce85a&autoplay=1"
                 onClick={() => setMobileMenuOpen(false)}
                 className="px-3 py-2 hover:bg-muted rounded-md text-sm flex items-center gap-2"
               >

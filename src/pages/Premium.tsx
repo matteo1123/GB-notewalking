@@ -31,8 +31,8 @@ import {
 
 // Updated Stripe Price ID ($29.99/mo)
 const STRIPE_PRICE_ID = "price_1T3lcJEOnRZP4MxPepztrhp6";
-// Course Purchase Price ID ($179.99)
-const STRIPE_COURSE_PRICE_ID = "price_1T3lniEOnRZP4MxPH3uGYgSw";
+// Course Purchase Price ID ($1.00 Test)
+const STRIPE_COURSE_PRICE_ID = "price_1T4bIGEOnRZP4MxPYTo7dKJt";
 
 /**
  * Inner component that consumes the SessionContext
@@ -372,7 +372,7 @@ const PremiumContent = () => {
           >
             {isBuyingCourse && <Loader2 className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" />}
             <Star className="mr-1 h-3 w-3 sm:h-4 sm:w-4" />
-            <span className="hidden sm:inline">Buy Course ($179.99)</span>
+            <span className="hidden sm:inline">Buy Course ($1.00 Test)</span>
             <span className="sm:hidden">Course</span>
           </Button>
           <Button

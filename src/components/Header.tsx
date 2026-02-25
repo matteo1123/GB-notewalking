@@ -5,7 +5,7 @@ import { useUserRole } from '@/hooks/useUserRole';
 import { useRecital } from '@/contexts/RecitalContext';
 import { usePremiumStatus } from '@/hooks/usePremiumStatus';
 import { Button } from '@/components/ui/button';
-import { Music, Crown, LogIn, LogOut, Home, Menu, X, Radio } from 'lucide-react';
+import { Music, Crown, LogIn, LogOut, Home, Menu, X, Radio, GraduationCap } from 'lucide-react';
 import { SuggestionBox } from '@/components/SuggestionBox';
 
 const Header = () => {
@@ -70,6 +70,12 @@ const Header = () => {
               <Button variant="outline" className="flex items-center gap-2">
                 <Crown className="h-4 w-4" />
                 Premium
+              </Button>
+            </Link>
+            <Link to="/course">
+              <Button variant="outline" className="flex items-center gap-2">
+                <GraduationCap className="h-4 w-4" />
+                Course
               </Button>
             </Link>
             {user && (
@@ -158,6 +164,14 @@ const Header = () => {
               >
                 <Crown className="h-4 w-4" />
                 Premium
+              </Link>
+              <Link
+                to="/course"
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-3 py-2 hover:bg-muted rounded-md text-sm flex items-center gap-2"
+              >
+                <GraduationCap className="h-4 w-4" />
+                Course
               </Link>
               {user && (
                 <Link

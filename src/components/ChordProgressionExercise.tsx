@@ -514,7 +514,7 @@ export function ChordProgressionExercise({ autoStart = false, sessionId, onExit,
                     <div className="flex-1 flex flex-row gap-1 p-1 min-h-0 overflow-hidden">
 
                         {/* LEFT: Settings (15% width) */}
-                        <div className="w-[120px] flex-shrink-0 flex flex-col gap-1 overflow-hidden bg-card border rounded p-1">
+                        <div className="w-1/5 min-w-[120px] max-w-[150px] flex-shrink-0 flex flex-col gap-1 overflow-hidden bg-card border rounded p-1">
                             {/* Key + Chords in minimal space */}
                             <div className="flex items-center gap-1">
                                 <span className="text-[10px] text-muted-foreground">Key</span>
@@ -659,7 +659,7 @@ export function ChordProgressionExercise({ autoStart = false, sessionId, onExit,
                         </div>
 
                         {/* RIGHT: Metronome (25% width) */}
-                        <div className="w-[140px] flex-shrink-0 flex flex-col gap-1 overflow-hidden bg-card border rounded p-1">
+                        <div className="w-1/4 min-w-[160px] max-w-[220px] flex-shrink-0 flex flex-col gap-1 overflow-hidden bg-card border rounded p-1">
                             {/* Beat Visualizer */}
                             <div className="flex-shrink-0">
                                 <BeatVisualizer

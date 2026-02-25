@@ -243,90 +243,102 @@ export function MetronomeControls({
   });
 
   return (
-    <div className={cn("space-y-2", compact ? "w-full" : "")}>
-      {/* Mode Selection and Play/Stop */}
-      <div className="flex items-center gap-1.5 flex-wrap">
-        <Select
-          value={mode}
-          onValueChange={(value) => updateState({ mode: value as MetronomeMode })}
-        >
-          <SelectTrigger className={cn("h-8 text-xs", compact ? "w-28" : "w-full")} data-testid="metronome-mode-select">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="regular">Regular</SelectItem>
-            <SelectItem value="speed-trainer">Speed Trainer</SelectItem>
-            <SelectItem value="progressive">Progressive</SelectItem>
-          </SelectContent>
-        </Select>
-        <Button
-          variant={isPlaying ? "secondary" : "default"}
-          onClick={onPlayPause}
-          size="sm"
-          className="h-8 px-2"
-          data-testid="metronome-start-button"
-        >
-          {isPlaying ? (
-            <Pause className="h-4 w-4" />
-          ) : (
-            <Play className="h-4 w-4" />
-          )}
-        </Button>
-        <Button
-          variant="outline"
-          onClick={onRestart}
-          size="sm"
-          className="h-8 px-2"
-          title="Restart"
-          data-testid="metronome-restart-button"
-        >
-          <Repeat className="h-4 w-4" />
-        </Button>
-        <Button
-          variant={loop ? "secondary" : "outline"}
-          onClick={() => updateState({ loop: !loop })}
-          size="sm"
-          className="h-8 px-2"
-          title="Loop"
-          data-testid="metronome-loop-button"
-        >
-          <RotateCcw className="h-4 w-4" />
-        </Button>
-        {/* Drum Beat Toggle */}
-        <Button
-          variant={drumBeat ? "default" : "outline"}
-          onClick={() => updateState({ drumBeat: !drumBeat })}
-          size="sm"
-          className={cn("h-8 px-2", drumBeat && "bg-orange-500 hover:bg-orange-600")}
-          title={drumBeat ? "Drum Beat: ON (Kick on 1, Snare on 3)" : "Drum Beat: OFF (click to enable)"}
-          data-testid="metronome-drum-button"
-        >
-          <Drum className={cn("h-4 w-4", drumBeat && "text-white")} />
-        </Button>
-        {/* Auto-Record Toggle - Premium Only */}
-        {isPremium && (
-          <Button
-            variant={autoRecordEnabled ? "default" : "outline"}
-            onClick={() => setAutoRecordEnabled(!autoRecordEnabled)}
-            size="sm"
-            className={cn("h-8 px-2", autoRecordEnabled && "bg-red-500 hover:bg-red-600")}
-            title={autoRecordEnabled ? "Auto-Record: ON (click to disable)" : "Auto-Record: OFF (click to enable)"}
-            data-testid="metronome-record-button"
+    <div className={cn("space-y-2 w-full")}>
+      {/* Container for all controls - using flex column to prevent haphazard wrapping */}
+      <div className="flex flex-col gap-1.5 w-full">
+        {/* Row 1: Mode Select and Play */}
+        <div className="flex items-center gap-1.5 w-full">
+          <Select
+            value={mode}
+            onValueChange={(value) => updateState({ mode: value as MetronomeMode })}
           >
-            <Mic className={cn("h-4 w-4", autoRecordEnabled && "text-white")} />
+            <SelectTrigger className="h-8 text-xs flex-1" data-testid="metronome-mode-select">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="regular">Regular</SelectItem>
+              <SelectItem value="speed-trainer">Speed Trainer</SelectItem>
+              <SelectItem value="progressive">Progressive</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button
+            variant={isPlaying ? "secondary" : "default"}
+            onClick={onPlayPause}
+            size="sm"
+            className="h-8 px-3 shrink-0"
+            data-testid="metronome-start-button"
+          >
+            {isPlaying ? (
+              <Pause className="h-4 w-4" />
+            ) : (
+              <Play className="h-4 w-4" />
+            )}
           </Button>
-        )}
-        {/* Tuner Toggle */}
-        <Button
-          variant={isTunerActive ? "default" : "outline"}
-          onClick={() => setIsTunerActive(!isTunerActive)}
-          size="sm"
-          className={cn("h-8 px-2", isTunerActive && "bg-blue-500 hover:bg-blue-600")}
-          title={isTunerActive ? "Tuner: ON (click to disable)" : "Tuner: OFF (click to enable)"}
-          data-testid="metronome-tuner-button"
-        >
-          <Activity className={cn("h-4 w-4", isTunerActive && "text-white")} />
-        </Button>
+        </div>
+
+        {/* Row 2: Secondary Tools (Loop, Restart, Drum, Mic, Tuner) */}
+        <div className="flex items-center gap-1.5 w-full justify-between">
+          <div className="flex items-center gap-1.5">
+            <Button
+              variant={loop ? "secondary" : "outline"}
+              onClick={() => updateState({ loop: !loop })}
+              size="sm"
+              className="h-8 w-8 p-0 shrink-0"
+              title="Loop"
+              data-testid="metronome-loop-button"
+            >
+              <RotateCcw className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              onClick={onRestart}
+              size="sm"
+              className="h-8 w-8 p-0 shrink-0"
+              title="Restart"
+              data-testid="metronome-restart-button"
+            >
+              <Repeat className="h-4 w-4" />
+            </Button>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            {/* Drum Beat Toggle */}
+            <Button
+              variant={drumBeat ? "default" : "outline"}
+              onClick={() => updateState({ drumBeat: !drumBeat })}
+              size="sm"
+              className={cn("h-8 w-8 p-0 shrink-0", drumBeat && "bg-orange-500 hover:bg-orange-600")}
+              title={drumBeat ? "Drum Beat: ON (Kick on 1, Snare on 3)" : "Drum Beat: OFF (click to enable)"}
+              data-testid="metronome-drum-button"
+            >
+              <Drum className={cn("h-4 w-4", drumBeat && "text-white")} />
+            </Button>
+            {/* Auto-Record Toggle - Premium Only */}
+            {isPremium && (
+              <Button
+                variant={autoRecordEnabled ? "default" : "outline"}
+                onClick={() => setAutoRecordEnabled(!autoRecordEnabled)}
+                size="sm"
+                className={cn("h-8 w-8 p-0 shrink-0", autoRecordEnabled && "bg-red-500 hover:bg-red-600")}
+                title={autoRecordEnabled ? "Auto-Record: ON (click to disable)" : "Auto-Record: OFF (click to enable)"}
+                data-testid="metronome-record-button"
+              >
+                <Mic className={cn("h-4 w-4", autoRecordEnabled && "text-white")} />
+              </Button>
+            )}
+            {/* Tuner Toggle */}
+            <Button
+              variant={isTunerActive ? "default" : "outline"}
+              onClick={() => setIsTunerActive(!isTunerActive)}
+              size="sm"
+              className={cn("h-8 w-8 p-0 shrink-0", isTunerActive && "bg-blue-500 hover:bg-blue-600")}
+              title={isTunerActive ? "Tuner: ON (click to disable)" : "Tuner: OFF (click to enable)"}
+              data-testid="metronome-tuner-button"
+            >
+              <Activity className={cn("h-4 w-4", isTunerActive && "text-white")} />
+            </Button>
+          </div>
+        </div>
       </div>
 
       {isTunerActive && (
@@ -336,10 +348,7 @@ export function MetronomeControls({
       )}
 
       {mode !== "regular" && (
-        <div className={cn(
-          "grid gap-1.5 text-xs",
-          compact ? "grid-cols-4 items-end" : "grid-cols-2 gap-2"
-        )} data-testid="metronome-advanced-fields">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5 md:gap-2 text-xs items-end w-full" data-testid="metronome-advanced-fields">
           <div className="space-y-0.5">
             <Label className="text-[10px]">End BPM</Label>
             <Input

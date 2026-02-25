@@ -4,9 +4,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, Circle, PlayCircle, Lock, Loader2 } from 'lucide-react';
+import { CheckCircle, Circle, PlayCircle, Lock, Loader2, Crown } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 export interface CourseVideo {
     id: string;
@@ -22,6 +22,7 @@ export default function Course() {
     const { user } = useAuth();
     const { toast } = useToast();
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
 
     const [isPremium, setIsPremium] = useState(false);
     const [enrollmentStatus, setEnrollmentStatus] = useState<string | null>(null);
@@ -76,13 +77,55 @@ export default function Course() {
 
             if (videoData && videoData.length > 0) {
                 setVideos(videoData);
-                setActiveVideo(videoData[0].id);
+
+                // Allow direct linking to a lesson via ?lesson=ID
+                const requestedLesson = searchParams.get('lesson');
+                if (requestedLesson && videoData.find(v => v.id === requestedLesson)) {
+                    setActiveVideo(requestedLesson);
+                } else {
+                    setActiveVideo(videoData[0].id);
+                }
             }
 
             setLoading(false);
         };
         loadCourseData();
-    }, [user, navigate]);
+    }, [user, navigate, searchParams]);
+
+    // Format standard YouTube URLs to Embed URLs
+    const getEmbedUrl = (url: string) => {
+        if (!url) return '';
+        try {
+            // If already an embed url, return it
+            if (url.includes('youtube.com/embed/')) return url;
+
+            let videoId = '';
+            if (url.includes('youtube.com/watch?v=')) {
+                videoId = new URL(url).searchParams.get('v') || '';
+            } else if (url.includes('youtu.be/')) {
+                videoId = url.split('youtu.be/')[1].split('?')[0];
+            }
+
+            if (videoId) {
+                // Check if we should auto-play this specific video from the funnel params
+                const shouldAutoplay = searchParams.get('autoplay') === '1' && searchParams.get('lesson') === activeVideo;
+                const params = new URLSearchParams({
+                    rel: '0', // Hide related videos from other channels
+                    modestbranding: '1', // Hide YouTube logo
+                    showinfo: '0', // Hide video title (mostly deprecated, but still partially works on some clients)
+                    iv_load_policy: '3', // Hide video annotations
+                    color: 'white', // Changes progress bar color
+                });
+
+                if (shouldAutoplay) params.append('autoplay', '1');
+
+                return `https://www.youtube.com/embed/${videoId}?${params.toString()}`;
+            }
+            return url;
+        } catch (e) {
+            return url; // fallback to original if parsing fails
+        }
+    };
 
     const toggleProgress = async (videoId: string, isCompleted: boolean) => {
         if (!user) return;
@@ -125,7 +168,6 @@ export default function Course() {
                 <p className="text-xl text-muted-foreground">Learn how to maximize your progress with Tempo Trekker tools.</p>
             </div>
 
-            {/* Course Enrollment Banner */}
             {enrollmentStatus === 'pending_verification' && (
                 <div className="bg-orange-500/10 border border-orange-500/50 p-4 rounded-xl mb-8 flex items-center justify-between">
                     <div>
@@ -135,33 +177,39 @@ export default function Course() {
                 </div>
             )}
 
-            {!isPremium && !enrollmentStatus && (
-                <div className="bg-destructive/10 border border-destructive bg-secondary p-6 rounded-xl mb-8 text-center">
-                    <Lock className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-                    <h3 className="font-bold text-xl mb-2">Premium Content</h3>
-                    <p className="mb-4 text-muted-foreground">This course requires premium access or a verified course purchase.</p>
-                    <Button onClick={() => navigate('/premium')} variant="default">Upgrade to Premium</Button>
-                </div>
-            )}
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
 
                 {/* Main Video Area */}
                 <div className="lg:col-span-2 space-y-6">
-                    <div className="aspect-video bg-black rounded-xl border-border border-2 overflow-hidden relative">
-                        {activeVideoData?.video_url ? (
-                            <iframe
-                                src={activeVideoData.video_url}
-                                title={activeVideoData.title}
-                                className="w-full h-full border-0 absolute inset-0"
-                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                allowFullScreen
-                            />
+                    <div className="aspect-video bg-[#0a0a0a] rounded-xl border-border border overflow-hidden relative shadow-2xl">
+                        {activeVideoData ? (
+                            activeVideoData.locked && !isPremium ? (
+                                <div className="absolute inset-0 bg-gradient-to-br from-slate-900 to-indigo-950 flex flex-col items-center justify-center text-center p-8">
+                                    <Lock className="w-16 h-16 text-indigo-400 mb-4 opacity-50" />
+                                    <h2 className="text-2xl font-bold mb-2">Premium Lesson</h2>
+                                    <p className="text-muted-foreground mb-6 max-w-md">This lesson is securely locked. You need GuitarBrain Premium or a verified course purchase to watch it.</p>
+                                    <Button onClick={() => navigate('/premium')} variant="default" className="gap-2">
+                                        <Crown className="w-4 h-4" /> Upgrade to Premium
+                                    </Button>
+                                </div>
+                            ) : activeVideoData.video_url ? (
+                                <iframe
+                                    src={getEmbedUrl(activeVideoData.video_url)}
+                                    title={activeVideoData.title}
+                                    className="w-full h-full border-0 absolute inset-0"
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                    allowFullScreen
+                                />
+                            ) : (
+                                <div className="absolute inset-0 bg-gradient-to-br from-slate-900 to-indigo-950 flex flex-col items-center justify-center text-center p-8">
+                                    <PlayCircle className="w-16 h-16 text-indigo-400 mb-4 opacity-50" />
+                                    <h2 className="text-2xl font-bold mb-2">Video Unavailable</h2>
+                                    <p className="text-muted-foreground text-sm">No video URL has been linked to this lesson yet.</p>
+                                </div>
+                            )
                         ) : (
-                            <div className="absolute inset-0 bg-gradient-to-br from-slate-900 to-indigo-950 flex flex-col items-center justify-center text-center p-8">
-                                <PlayCircle className="w-20 h-20 text-indigo-400 mb-4 opacity-50" />
-                                <h2 className="text-2xl font-bold mb-2">No Video Selected</h2>
-                                <p className="text-muted-foreground">Please select a lesson from the curriculum.</p>
+                            <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-8">
+                                <PlayCircle className="w-16 h-16 text-muted-foreground mb-4 opacity-20" />
                             </div>
                         )}
                     </div>
@@ -183,13 +231,13 @@ export default function Course() {
 
                 {/* Sidebar Navigation */}
                 <div className="space-y-6">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Course Progress</CardTitle>
-                            <CardDescription>{completedCount} of {videos.length} lessons completed</CardDescription>
-                            <Progress value={progressPercentage} className="mt-2" />
+                    <Card className="bg-[#0f0f13] border-gray-800">
+                        <CardHeader className="pb-4">
+                            <CardTitle className="text-lg">Curriculum</CardTitle>
+                            <CardDescription className="text-xs">{completedCount} of {videos.length} lessons completed</CardDescription>
+                            <Progress value={progressPercentage} className="mt-3 h-2" />
                         </CardHeader>
-                        <CardContent className="space-y-2 max-h-[600px] overflow-y-auto">
+                        <CardContent className="space-y-1.5 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
                             {videos.length === 0 ? (
                                 <p className="text-sm text-muted-foreground italic text-center py-4">No lessons available yet.</p>
                             ) : videos.map((video, idx) => {
@@ -200,11 +248,10 @@ export default function Course() {
                                 return (
                                     <button
                                         key={video.id}
-                                        disabled={!isAvailable}
                                         onClick={() => setActiveVideo(video.id)}
-                                        className={`w-full flex items-center gap-3 p-3 rounded-lg text-left transition-colors
-                                            ${isPlaying ? 'bg-primary/10 border border-primary/20' : 'hover:bg-muted'}
-                                            ${!isAvailable ? 'opacity-50 cursor-not-allowed' : ''}
+                                        className={`w-full flex items-center gap-3 p-3 rounded-lg text-left transition-all duration-200
+                                            ${isPlaying ? 'bg-primary/10 border border-primary/20 shadow-sm' : 'border border-transparent hover:bg-muted'}
+                                            ${!isAvailable && !isPlaying ? 'opacity-70' : ''}
                                         `}
                                     >
                                         <div className="flex-shrink-0">

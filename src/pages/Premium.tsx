@@ -55,6 +55,7 @@ const PremiumContent = () => {
   const [isPremium, setIsPremium] = useState(false);
   const [isSubscribing, setIsSubscribing] = useState(false);
   const [isBuyingCourse, setIsBuyingCourse] = useState(false);
+  const [courseEnrollment, setCourseEnrollment] = useState<any>(null);
   const [checkingPremium, setCheckingPremium] = useState(true);
   const [activeTab, setActiveTab] = useState("practice");
   const [prioritiesOpen, setPrioritiesOpen] = useState(false);
@@ -142,6 +143,16 @@ const PremiumContent = () => {
           setActiveTab("practice");
         } else {
           setActiveTab("practice");
+        }
+
+        const { data: enrollment } = await supabase
+          .from('course_enrollments' as any)
+          .select('status')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (enrollment) {
+          setCourseEnrollment(enrollment);
         }
       }
       setCheckingPremium(false);
@@ -291,7 +302,8 @@ const PremiumContent = () => {
   }
 
   if (!user || (!isPremium && user)) {
-    return <Paywall onSubscribe={user ? handleSubscribe : undefined} isLoading={isSubscribing} />;
+    const isEnrolled = courseEnrollment && (courseEnrollment.status === 'verified' || courseEnrollment.status === 'pending_verification');
+    return <Paywall onSubscribe={user ? handleSubscribe : undefined} onBuyCourse={isEnrolled ? undefined : handleBuyCourse} isLoading={isSubscribing || isBuyingCourse} />;
   }
 
   // 1. Check for Active Session
@@ -350,7 +362,7 @@ const PremiumContent = () => {
           {isPremium && <span className="text-xs bg-gradient-to-r from-yellow-400 to-orange-500 text-black font-bold px-1.5 sm:px-2 py-0.5 rounded-full hidden lg:inline">PREMIUM</span>}
         </div>
         <div className="flex items-center gap-1 sm:gap-2">
-          {!isPremium && (
+          {(!isPremium && courseEnrollment && (courseEnrollment.status === 'verified' || courseEnrollment.status === 'pending_verification')) && (
             <Button
               size="sm"
               variant="default"
@@ -363,18 +375,30 @@ const PremiumContent = () => {
               <span className="sm:hidden">Upgrade</span>
             </Button>
           )}
-          <Button
-            size="sm"
-            variant="outline"
-            className="hidden lg:flex border-indigo-600 text-indigo-400 hover:bg-indigo-600/10 text-xs sm:text-sm px-2 sm:px-3"
-            onClick={handleBuyCourse}
-            disabled={isSubscribing || isBuyingCourse}
-          >
-            {isBuyingCourse && <Loader2 className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" />}
-            <Star className="mr-1 h-3 w-3 sm:h-4 sm:w-4" />
-            <span className="hidden sm:inline">Buy Course ($1.00 Test)</span>
-            <span className="sm:hidden">Course</span>
-          </Button>
+          {(!courseEnrollment || (courseEnrollment.status !== 'verified' && courseEnrollment.status !== 'pending_verification')) ? (
+            <Button
+              size="sm"
+              variant="outline"
+              className="hidden lg:flex border-indigo-600 text-indigo-400 hover:bg-indigo-600/10 text-xs sm:text-sm px-2 sm:px-3"
+              onClick={handleBuyCourse}
+              disabled={isSubscribing || isBuyingCourse}
+            >
+              {isBuyingCourse && <Loader2 className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" />}
+              <Star className="mr-1 h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden sm:inline">Buy Course ($199.99)</span>
+              <span className="sm:hidden">Course</span>
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              variant="outline"
+              className="hidden lg:flex border-indigo-600 text-indigo-400 hover:bg-indigo-600/10 text-xs sm:text-sm px-2 sm:px-3"
+              onClick={() => navigate('/course?lesson=706c6c67-1c6e-45b9-a302-a7272d0ce85a&autoplay=1')}
+            >
+              <span className="hidden sm:inline">Course</span>
+              <span className="sm:hidden">Course</span>
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="icon"

@@ -12,7 +12,7 @@ const Header = () => {
   const { user, signOut } = useAuth();
   const userRole = useUserRole();
   const { activeRecital } = useRecital();
-  const { isTrialExpiringSoon } = usePremiumStatus();
+  const { isTrialExpiringSoon, isEnrolled } = usePremiumStatus();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -20,17 +20,8 @@ const Header = () => {
     <header className="max-w-4xl mx-auto relative">
       <div className="text-center">
         <div className="flex items-center justify-between mb-2 sm:mb-4">
-          {/* Left: Home link - hidden on mobile */}
+          {/* Left: Empty div to balance center logo */}
           <div className="flex-1 hidden sm:block">
-            {location.pathname !== '/' && (
-              <Link
-                to="/"
-                className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <Home className="h-4 w-4" />
-                Free Metronome
-              </Link>
-            )}
           </div>
 
           {/* Center: Logo - smaller on mobile */}
@@ -66,7 +57,7 @@ const Header = () => {
               </Link>
             )}
 
-            <Link to="/premium" state={{ reset: location.pathname.startsWith('/premium') }}>
+            <Link to={!user ? '/auth' : isEnrolled ? '/premium' : '/course'} state={{ reset: location.pathname.startsWith('/premium') }}>
               <Button variant="outline" className="flex items-center gap-2">
                 <Crown className="h-4 w-4" />
                 Premium
@@ -158,7 +149,7 @@ const Header = () => {
                 </Link>
               )}
               <Link
-                to="/premium"
+                to={!user ? '/auth' : isEnrolled ? '/premium' : '/course'}
                 onClick={() => setMobileMenuOpen(false)}
                 className="px-3 py-2 hover:bg-muted rounded-md text-sm flex items-center gap-2"
               >

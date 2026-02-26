@@ -4,9 +4,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, Circle, PlayCircle, Lock, Loader2, Crown } from 'lucide-react';
+import { CheckCircle, Circle, PlayCircle, Lock, Loader2, Crown, Info, Target, LineChart, Calendar } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 export interface CourseVideo {
     id: string;
@@ -31,6 +32,7 @@ export default function Course() {
     const [videos, setVideos] = useState<CourseVideo[]>([]);
     const [activeVideo, setActiveVideo] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
+    const [isHowItWorksOpen, setIsHowItWorksOpen] = useState(false);
 
     useEffect(() => {
         const loadCourseData = async () => {
@@ -207,9 +209,99 @@ export default function Course() {
 
     return (
         <div className="container max-w-6xl mx-auto py-8 px-4">
-            <div className="mb-8">
-                <h1 className="text-4xl font-black text-primary mb-2">Guitar Brain Mastery Course</h1>
-                <p className="text-xl text-muted-foreground">Learn how to maximize your progress with Tempo Trekker tools.</p>
+            <div className="mb-8 flex flex-col md:flex-row md:items-start justify-between gap-4">
+                <div>
+                    <h1 className="text-4xl font-black text-primary mb-2">The 90-Day Guitar Challenge</h1>
+                    <p className="text-xl text-muted-foreground max-w-2xl">
+                        What would happen if for the next 90 days, you focused on all the most important pillars of musicianship in an organized, progressive way?
+                    </p>
+                </div>
+
+                <Dialog open={isHowItWorksOpen} onOpenChange={setIsHowItWorksOpen}>
+                    <DialogTrigger asChild>
+                        <Button variant="outline" className="gap-2 shrink-0 border-primary/20 hover:bg-primary/5">
+                            <Info className="w-4 h-4 text-primary" />
+                            How the Challenge Works
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[600px] bg-slate-900 border-slate-800 text-slate-100">
+                        <DialogHeader>
+                            <DialogTitle className="text-2xl font-black text-center text-white mb-4">
+                                The 90-Day Guitar Challenge
+                            </DialogTitle>
+                        </DialogHeader>
+
+                        <div className="space-y-6 py-4">
+                            <p className="text-center text-lg text-slate-300">
+                                Commit to daily, focused practice across all pillars of musicianship for 90 days. Track your progress in detail and watch your playing transform.
+                            </p>
+
+                            <div className="grid gap-6">
+                                <div className="flex gap-4">
+                                    <div className="mt-1 bg-indigo-500/20 p-2 rounded-full h-fit">
+                                        <Target className="w-6 h-6 text-indigo-400" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-lg text-white">The Guided Curriculum</h3>
+                                        <p className="text-slate-400">Lifetime access to the video lessons detailing exactly <em className="text-slate-300">how</em> and <em className="text-slate-300">what</em> to practice.</p>
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-4">
+                                    <div className="mt-1 bg-orange-500/20 p-2 rounded-full h-fit">
+                                        <LineChart className="w-6 h-6 text-orange-400" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-lg text-white">The Tools & Tracking</h3>
+                                        <p className="text-slate-400">90 Days of Guitar Brain Premium included. We track every note you play, every session you log, and push you with tools like the Speed Trainer.</p>
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-4">
+                                    <div className="mt-1 bg-green-500/20 p-2 rounded-full h-fit">
+                                        <Calendar className="w-6 h-6 text-green-400" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-lg text-white">The Execution</h3>
+                                        <p className="text-slate-400">Show up. Build your custom routines. Let the AI Coach guide your priorities based on real data.</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="pt-6 border-t border-slate-800 text-center">
+                                <Button
+                                    onClick={() => {
+                                        setIsHowItWorksOpen(false);
+                                        handleBuyCourse();
+                                    }}
+                                    disabled={isBuyingCourse}
+                                    className="w-full sm:w-auto bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white text-lg py-6 px-8 rounded-xl shadow-lg hover:shadow-indigo-500/25 transition-all"
+                                >
+                                    {isBuyingCourse ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
+                                    Join the Challenge ($199.99)
+                                </Button>
+                                <p className="text-xs text-slate-500 mt-4">One-time payment grants lifetime course access and 90 days of Premium.</p>
+                                <div className="mt-6 p-4 bg-indigo-950/30 border border-indigo-500/20 rounded-xl text-left">
+                                    <h4 className="font-bold text-white mb-2 flex items-center gap-2">
+                                        <CheckCircle className="w-5 h-5 text-indigo-400" />
+                                        The 90-Day Guarantee
+                                    </h4>
+                                    <p className="text-sm text-slate-400">
+                                        If you do a 15-minute practice every day for 30 days and don't have:
+                                    </p>
+                                    <ol className="list-decimal list-inside text-sm text-slate-400 mt-2 space-y-1 ml-2">
+                                        <li>A better ear</li>
+                                        <li>Faster playing</li>
+                                        <li>Better ability to play chord tones over chord changes</li>
+                                    </ol>
+                                    <p className="text-sm text-slate-400 mt-2">
+                                        I will give you your money back and you can still keep the service for the full 90 days free of charge.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </DialogContent>
+                </Dialog>
             </div>
 
             {enrollmentStatus === 'pending_verification' && (
@@ -227,15 +319,21 @@ export default function Course() {
                 <div className="lg:col-span-2 space-y-6">
                     <div className="aspect-video bg-[#0a0a0a] rounded-xl border-border border overflow-hidden relative shadow-2xl">
                         {activeVideoData ? (
-                            activeVideoData.locked && !isPremium ? (
+                            activeVideoData.locked && enrollmentStatus !== 'verified' ? (
                                 <div className="absolute inset-0 bg-gradient-to-br from-slate-900 to-indigo-950 flex flex-col items-center justify-center text-center p-8">
                                     <Lock className="w-16 h-16 text-indigo-400 mb-4 opacity-50" />
-                                    <h2 className="text-2xl font-bold mb-2">Premium Lesson</h2>
-                                    <p className="text-muted-foreground mb-6 max-w-md">Purchasing the GuitarBrain Mastery course grants lifetime access to all lessons and instantly adds <strong>90 Days of Premium</strong> to your account.</p>
-                                    <Button onClick={handleBuyCourse} disabled={isBuyingCourse} variant="default" className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white">
-                                        {isBuyingCourse ? <Loader2 className="w-4 h-4 animate-spin" /> : <Crown className="w-4 h-4" />}
-                                        Buy Course ($1.00 Test)
-                                    </Button>
+                                    <h2 className="text-2xl font-bold mb-2">Challenge Lesson</h2>
+                                    <p className="text-muted-foreground mb-6 max-w-md">Join the 90-Day Challenge to unlock all lessons and instantly get <strong>90 Days of Premium</strong> tools to track your progress.</p>
+
+                                    <div className="flex flex-col sm:flex-row gap-4 items-center">
+                                        <Button onClick={handleBuyCourse} disabled={isBuyingCourse} variant="default" className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white">
+                                            {isBuyingCourse ? <Loader2 className="w-4 h-4 animate-spin" /> : <Crown className="w-4 h-4" />}
+                                            Join Challenge ($199.99)
+                                        </Button>
+                                        <Button variant="link" className="text-indigo-400 hover:text-indigo-300" onClick={() => setIsHowItWorksOpen(true)}>
+                                            How does this work?
+                                        </Button>
+                                    </div>
                                 </div>
                             ) : activeVideoData.video_url ? (
                                 <iframe
@@ -260,15 +358,24 @@ export default function Course() {
                     </div>
 
                     <div className="flex items-center justify-between">
-                        <h2 className="text-2xl font-bold">{activeVideoData?.title}</h2>
+                        <div>
+                            <h2 className="text-2xl font-bold">{activeVideoData?.title}</h2>
+                            {activeVideoData?.description && (
+                                <p className="text-muted-foreground mt-2">{activeVideoData.description}</p>
+                            )}
+                        </div>
                         {isPremium && (
                             <Button
-                                variant={progress.includes(activeVideo) ? "outline" : "default"}
-                                onClick={() => toggleProgress(activeVideo, progress.includes(activeVideo))}
+                                variant={progress.includes(activeVideo || '') ? "outline" : "default"}
+                                onClick={() => {
+                                    if (activeVideo) {
+                                        toggleProgress(activeVideo, progress.includes(activeVideo))
+                                    }
+                                }}
                                 className="gap-2"
                             >
-                                {progress.includes(activeVideo) ? <CheckCircle className="w-4 h-4 text-green-500" /> : <Circle className="w-4 h-4" />}
-                                {progress.includes(activeVideo) ? 'Completed' : 'Mark Complete'}
+                                {progress.includes(activeVideo || '') ? <CheckCircle className="w-4 h-4 text-green-500" /> : <Circle className="w-4 h-4" />}
+                                {progress.includes(activeVideo || '') ? 'Completed' : 'Mark Complete'}
                             </Button>
                         )}
                     </div>
@@ -288,7 +395,7 @@ export default function Course() {
                             ) : videos.map((video, idx) => {
                                 const isCompleted = progress.includes(video.id);
                                 const isPlaying = activeVideo === video.id;
-                                const isAvailable = isPremium || !video.locked;
+                                const isAvailable = enrollmentStatus === 'verified' || !video.locked;
 
                                 return (
                                     <button

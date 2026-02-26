@@ -6,6 +6,7 @@ export const usePremiumStatus = () => {
     const { user } = useAuth();
     const [isPremium, setIsPremium] = useState<boolean>(false);
     const [isTrialExpiringSoon, setIsTrialExpiringSoon] = useState<boolean>(false);
+    const [isEnrolled, setIsEnrolled] = useState<boolean>(false);
     const [loading, setLoading] = useState<boolean>(true);
 
     useEffect(() => {
@@ -16,6 +17,7 @@ export const usePremiumStatus = () => {
                 if (mounted) {
                     setIsPremium(false);
                     setIsTrialExpiringSoon(false);
+                    setIsEnrolled(false);
                     setLoading(false);
                 }
                 return;
@@ -50,9 +52,19 @@ export const usePremiumStatus = () => {
                     }
                 }
 
+                // Check if enrolled
+                const { data: enrollmentData } = await supabase
+                    .from('course_enrollments' as any)
+                    .select('status')
+                    .eq('user_id', user.id)
+                    .maybeSingle();
+
+                const enrolled = enrollmentData?.status === 'verified' || enrollmentData?.status === 'pending_verification';
+
                 if (mounted) {
                     setIsPremium(hasPremium);
                     setIsTrialExpiringSoon(expiringSoon);
+                    setIsEnrolled(enrolled);
                 }
             } catch (err) {
                 console.error("Error fetching premium status:", err);
@@ -68,5 +80,5 @@ export const usePremiumStatus = () => {
         };
     }, [user]);
 
-    return { isPremium, isTrialExpiringSoon, loading };
+    return { isPremium, isTrialExpiringSoon, isEnrolled, loading };
 };

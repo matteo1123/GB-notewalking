@@ -348,7 +348,7 @@ const Profile = () => {
               )}
 
               <div className="pt-4 flex flex-col sm:flex-row gap-4">
-                {!isPremium && (
+                {(!isPremium && courseEnrollment && (courseEnrollment.status === 'verified' || courseEnrollment.status === 'pending_verification')) && (
                   <div className="flex-1 border rounded-lg p-4">
                     <p className="mb-4 text-muted-foreground">
                       Upgrade to Guitar Brain Premium for $29.99/mo to unlock all features.
@@ -374,7 +374,7 @@ const Profile = () => {
                       variant="outline"
                       className="w-full text-indigo-500 border-indigo-500 hover:bg-indigo-500/10"
                     >
-                      {isBuyingCourse ? 'Processing...' : 'Buy Course ($1.00 Test)'}
+                      {isBuyingCourse ? 'Processing...' : 'Buy Course ($199.99)'}
                     </Button>
                   </div>
                 )}
@@ -543,27 +543,6 @@ const Profile = () => {
                   </div>
                   <Switch
                     id="drum-beat"
-                    checked={practiceSettings.defaultMetronome?.drum_beat ?? false}
-                    onCheckedChange={(value) => updatePracticeSettings({
-                      defaultMetronome: { ...practiceSettings.defaultMetronome, drum_beat: value }
-                    })}
-                  />
-                </div>
-
-                {/* Auto-Record Default */}
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label htmlFor="metronome-auto-record">Auto-Record by Default</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Automatically enable recording when starting practice
-                    </p>
-                  </div>
-                  <Switch
-                    id="metronome-auto-record"
-                    checked={practiceSettings.defaultMetronome?.auto_record ?? false}
-                    onCheckedChange={(value) => updatePracticeSettings({
-                      defaultMetronome: { ...practiceSettings.defaultMetronome, auto_record: value }
-                    })}
                   />
                 </div>
               </CardContent>

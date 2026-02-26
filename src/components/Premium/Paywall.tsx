@@ -72,25 +72,26 @@ const Paywall = ({ onSubscribe, onBuyCourse, isLoading }: PaywallProps) => {
           <div className="space-y-4 pt-4">
             {onSubscribe ? (
               <div className="flex flex-col md:flex-row gap-4 justify-center items-center w-full">
-                <Button
-                  size="lg"
-                  className="text-lg px-8 py-6 w-full md:w-auto min-w-[300px] bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-xl hover:scale-105 transition-transform"
-                  onClick={onSubscribe}
-                  disabled={isLoading}
-                >
-                  {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <CreditCard className="mr-2 h-5 w-5" />}
-                  Upgrade to Premium ($29.99/mo)
-                </Button>
                 {onBuyCourse && (
                   <Button
                     size="lg"
-                    variant="outline"
-                    className="text-lg px-8 py-6 w-full md:w-auto min-w-[300px] border-2 border-indigo-600 text-indigo-400 hover:bg-indigo-600/10 hover:scale-105 transition-transform"
+                    className="text-lg px-8 py-6 w-full md:w-auto min-w-[300px] bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-xl hover:scale-105 transition-transform"
                     onClick={onBuyCourse}
                     disabled={isLoading}
                   >
                     {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Star className="mr-2 h-5 w-5" />}
-                    Buy Course + 3 Months ($179.99)
+                    Buy Course + 90 Days Free ($199.99)
+                  </Button>
+                )}
+                {!onBuyCourse && (
+                  <Button
+                    size="lg"
+                    className="text-lg px-8 py-6 w-full md:w-auto min-w-[300px] bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-xl hover:scale-105 transition-transform"
+                    onClick={onSubscribe}
+                    disabled={isLoading}
+                  >
+                    {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <CreditCard className="mr-2 h-5 w-5" />}
+                    Upgrade to Premium ($29.99/mo)
                   </Button>
                 )}
               </div>

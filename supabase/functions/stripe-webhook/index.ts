@@ -145,13 +145,30 @@ async function handleSubscriptionUpdate(session: any) {
         const subscription = await stripe.subscriptions.retrieve(subscriptionId);
         const currentPeriodEnd = new Date(subscription.current_period_end * 1000); // Stripe is seconds
 
+        // Safely update premium_until (don't shrink)
+        const { data: profile } = await supabase
+            .from("profiles")
+            .select("premium_until")
+            .eq("stripe_customer_id", customerId)
+            .single();
+
+        let newPremiumUntil = currentPeriodEnd;
+        if (profile?.premium_until) {
+            const currentDbDate = new Date(profile.premium_until);
+            if (currentDbDate > currentPeriodEnd) {
+                newPremiumUntil = currentDbDate;
+            }
+        }
+
+        const isPremiumNow = newPremiumUntil > new Date();
+
         await supabase
             .from("profiles")
             .update({
                 stripe_subscription_id: subscriptionId,
                 subscription_status: 'active',
-                premium_until: currentPeriodEnd.toISOString(),
-                is_premium: true // Keep this for backward compatibility if needed, or remove
+                premium_until: newPremiumUntil.toISOString(),
+                is_premium: isPremiumNow
             })
             .eq("stripe_customer_id", customerId);
     }
@@ -162,18 +179,31 @@ async function handleSubscriptionChange(subscription: any) {
     const status = subscription.status;
     const currentPeriodEnd = new Date(subscription.current_period_end * 1000);
 
-    // If active or trialing, they are premium until the period ends
-    // If canceled, they remain premium until period ends (which Stripe handles via current_period_end)
-    // If unpaid, maybe revoke immediately? For now, trust period end.
+    // Fetch current profile
+    const { data: profile } = await supabase
+        .from("profiles")
+        .select("premium_until")
+        .eq("stripe_customer_id", customerId)
+        .single();
 
-    // Logic: Always trust current_period_end from Stripe for access duration
+    let newPremiumUntil = currentPeriodEnd;
+
+    // If they have accumulated time from a course purchase, don't shrink it
+    if (profile?.premium_until) {
+        const currentDbDate = new Date(profile.premium_until);
+        if (currentDbDate > currentPeriodEnd) {
+            newPremiumUntil = currentDbDate;
+        }
+    }
+
+    const isPremiumNow = newPremiumUntil > new Date();
 
     await supabase
         .from("profiles")
         .update({
             subscription_status: status,
-            premium_until: currentPeriodEnd.toISOString(),
-            is_premium: status === 'active' || status === 'trialing'
+            premium_until: newPremiumUntil.toISOString(),
+            is_premium: isPremiumNow
         })
         .eq("stripe_customer_id", customerId);
 }

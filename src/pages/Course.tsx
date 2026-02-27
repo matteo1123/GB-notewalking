@@ -4,10 +4,16 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, Circle, PlayCircle, Lock, Loader2, Crown, Info, Target, LineChart, Calendar } from 'lucide-react';
+import { CheckCircle, Circle, PlayCircle, Lock, Loader2, Crown, Info, Target, LineChart, Calendar, MessageCircleQuestion, Send } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Textarea } from '@/components/ui/textarea';
+
+// Updated Stripe Price ID ($29.99/mo)
+const STRIPE_PRICE_ID = "price_1T3lcJEOnRZP4MxPepztrhp6";
+// Course Purchase Price ID ($1.00 Test)
+const STRIPE_COURSE_PRICE_ID = "price_1T4bIGEOnRZP4MxPYTo7dKJt";
 
 export interface CourseVideo {
     id: string;
@@ -33,6 +39,10 @@ export default function Course() {
     const [activeVideo, setActiveVideo] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [isHowItWorksOpen, setIsHowItWorksOpen] = useState(false);
+
+    // Question submission state
+    const [questionText, setQuestionText] = useState('');
+    const [isSubmittingQuestion, setIsSubmittingQuestion] = useState(false);
 
     useEffect(() => {
         const loadCourseData = async () => {
@@ -98,12 +108,29 @@ export default function Course() {
         loadCourseData();
     }, [user, navigate, searchParams]);
 
-    // Format standard YouTube URLs to Embed URLs
+    // Format standard YouTube URLs or Bunny Stream URLs to Embed URLs
     const getEmbedUrl = (url: string) => {
         if (!url) return '';
         try {
-            // If already an embed url, return it
-            if (url.includes('youtube.com/embed/')) return url;
+            const shouldAutoplay = searchParams.get('autoplay') === '1' && searchParams.get('lesson') === activeVideo;
+
+            // Handle Bunny Stream URLs
+            if (url.includes('player.mediadelivery.net/embed/')) {
+                const bunnyUrl = new URL(url);
+                if (shouldAutoplay) {
+                    bunnyUrl.searchParams.set('autoplay', 'true');
+                }
+                return bunnyUrl.toString();
+            }
+
+            // Handle existing YouTube embeds
+            if (url.includes('youtube.com/embed/')) {
+                const ytUrl = new URL(url);
+                if (shouldAutoplay && !ytUrl.searchParams.has('autoplay')) {
+                    ytUrl.searchParams.set('autoplay', '1');
+                }
+                return ytUrl.toString();
+            }
 
             let videoId = '';
             if (url.includes('youtube.com/watch?v=')) {
@@ -114,7 +141,6 @@ export default function Course() {
 
             if (videoId) {
                 // Check if we should auto-play this specific video from the funnel params
-                const shouldAutoplay = searchParams.get('autoplay') === '1' && searchParams.get('lesson') === activeVideo;
                 const params = new URLSearchParams({
                     rel: '0', // Hide related videos from other channels
                     modestbranding: '1', // Hide YouTube logo
@@ -176,7 +202,8 @@ export default function Course() {
             const { data, error } = await supabase.functions.invoke('create-checkout-session', {
                 body: {
                     priceId: "price_1T4bIGEOnRZP4MxPYTo7dKJt", // $1 Test Product
-                    mode: 'payment',
+                    subscriptionPriceId: "price_1T3lcJEOnRZP4MxPepztrhp6", // $29.99/mo premium subscription
+                    mode: 'subscription',
                     metadata: { type: 'course_purchase' }
                 }
             });
@@ -192,6 +219,36 @@ export default function Course() {
             toast({ title: "Checkout Error", description: err.message, variant: "destructive" });
         } finally {
             setIsBuyingCourse(false);
+        }
+    };
+
+    const handleSubmitQuestion = async () => {
+        if (!user || !questionText.trim() || !activeVideoData) return;
+
+        setIsSubmittingQuestion(true);
+        try {
+            const { error } = await supabase.from('suggestions').insert({
+                content: questionText.trim(),
+                user_id: user.id,
+                source: `Course Video Question - ${activeVideoData.title}`
+            });
+
+            if (error) throw error;
+
+            toast({
+                title: "Question Submitted",
+                description: "Thanks for the question! I'll review it and get back to you.",
+            });
+            setQuestionText('');
+        } catch (error: any) {
+            console.error('Error submitting question:', error);
+            toast({
+                title: "Error",
+                description: "Failed to submit question. Please try again.",
+                variant: "destructive",
+            });
+        } finally {
+            setIsSubmittingQuestion(false);
         }
     };
 
@@ -269,18 +326,22 @@ export default function Course() {
                             </div>
 
                             <div className="pt-6 border-t border-slate-800 text-center">
-                                <Button
-                                    onClick={() => {
-                                        setIsHowItWorksOpen(false);
-                                        handleBuyCourse();
-                                    }}
-                                    disabled={isBuyingCourse}
-                                    className="w-full sm:w-auto bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white text-lg py-6 px-8 rounded-xl shadow-lg hover:shadow-indigo-500/25 transition-all"
-                                >
-                                    {isBuyingCourse ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
-                                    Join the Challenge ($199.99)
-                                </Button>
-                                <p className="text-xs text-slate-500 mt-4">One-time payment grants lifetime course access and 90 days of Premium.</p>
+                                {enrollmentStatus !== 'verified' && enrollmentStatus !== 'pending_verification' && (
+                                    <>
+                                        <Button
+                                            onClick={() => {
+                                                setIsHowItWorksOpen(false);
+                                                handleBuyCourse();
+                                            }}
+                                            disabled={isBuyingCourse}
+                                            className="w-full sm:w-auto bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white text-lg py-6 px-8 rounded-xl shadow-lg hover:shadow-indigo-500/25 transition-all"
+                                        >
+                                            {isBuyingCourse ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
+                                            Join the Challenge ($199.99)
+                                        </Button>
+                                        <p className="text-xs text-slate-500 mt-4">One-time payment grants lifetime course access and 90 days of Premium.</p>
+                                    </>
+                                )}
                                 <div className="mt-6 p-4 bg-indigo-950/30 border border-indigo-500/20 rounded-xl text-left">
                                     <h4 className="font-bold text-white mb-2 flex items-center gap-2">
                                         <CheckCircle className="w-5 h-5 text-indigo-400" />
@@ -320,21 +381,29 @@ export default function Course() {
                     <div className="aspect-video bg-[#0a0a0a] rounded-xl border-border border overflow-hidden relative shadow-2xl">
                         {activeVideoData ? (
                             activeVideoData.locked && enrollmentStatus !== 'verified' ? (
-                                <div className="absolute inset-0 bg-gradient-to-br from-slate-900 to-indigo-950 flex flex-col items-center justify-center text-center p-8">
-                                    <Lock className="w-16 h-16 text-indigo-400 mb-4 opacity-50" />
-                                    <h2 className="text-2xl font-bold mb-2">Challenge Lesson</h2>
-                                    <p className="text-muted-foreground mb-6 max-w-md">Join the 90-Day Challenge to unlock all lessons and instantly get <strong>90 Days of Premium</strong> tools to track your progress.</p>
-
-                                    <div className="flex flex-col sm:flex-row gap-4 items-center">
-                                        <Button onClick={handleBuyCourse} disabled={isBuyingCourse} variant="default" className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white">
-                                            {isBuyingCourse ? <Loader2 className="w-4 h-4 animate-spin" /> : <Crown className="w-4 h-4" />}
-                                            Join Challenge ($199.99)
-                                        </Button>
-                                        <Button variant="link" className="text-indigo-400 hover:text-indigo-300" onClick={() => setIsHowItWorksOpen(true)}>
-                                            How does this work?
-                                        </Button>
+                                enrollmentStatus === 'pending_verification' ? (
+                                    <div className="absolute inset-0 bg-gradient-to-br from-slate-900 to-indigo-950 flex flex-col items-center justify-center text-center p-8">
+                                        <Lock className="w-16 h-16 text-indigo-400 mb-4 opacity-50" />
+                                        <h2 className="text-2xl font-bold mb-2">Verifying Purchase</h2>
+                                        <p className="text-muted-foreground mb-6 max-w-md">Your course purchase is currently pending verification. This usually takes just a few moments.</p>
                                     </div>
-                                </div>
+                                ) : (
+                                    <div className="absolute inset-0 bg-gradient-to-br from-slate-900 to-indigo-950 flex flex-col items-center justify-center text-center p-8">
+                                        <Lock className="w-16 h-16 text-indigo-400 mb-4 opacity-50" />
+                                        <h2 className="text-2xl font-bold mb-2">Challenge Lesson</h2>
+                                        <p className="text-muted-foreground mb-6 max-w-md">Join the 90-Day Challenge to unlock all lessons and instantly get <strong>90 Days of Premium</strong> tools to track your progress.</p>
+
+                                        <div className="flex flex-col sm:flex-row gap-4 items-center">
+                                            <Button onClick={handleBuyCourse} disabled={isBuyingCourse} variant="default" className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white">
+                                                {isBuyingCourse ? <Loader2 className="w-4 h-4 animate-spin" /> : <Crown className="w-4 h-4" />}
+                                                Join Challenge ($199.99)
+                                            </Button>
+                                            <Button variant="link" className="text-indigo-400 hover:text-indigo-300" onClick={() => setIsHowItWorksOpen(true)}>
+                                                How does this work?
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )
                             ) : activeVideoData.video_url ? (
                                 <iframe
                                     src={getEmbedUrl(activeVideoData.video_url)}
@@ -379,6 +448,33 @@ export default function Course() {
                             </Button>
                         )}
                     </div>
+
+                    {user && (enrollmentStatus === 'verified' || enrollmentStatus === 'pending_verification') && (
+                        <div className="mt-8 border-t border-border/50 pt-8">
+                            <h3 className="text-lg font-bold flex items-center gap-2 mb-2">
+                                <MessageCircleQuestion className="w-5 h-5 text-indigo-400" />
+                                Ask a Question
+                            </h3>
+                            <p className="text-sm text-muted-foreground mb-4">
+                                Have a question about this lesson? I read every submission and often update lessons or create new ones to answer them!
+                            </p>
+                            <div className="flex gap-4">
+                                <Textarea
+                                    placeholder="What confused you about this lesson?"
+                                    value={questionText}
+                                    onChange={(e) => setQuestionText(e.target.value)}
+                                    className="resize-none min-h-[50px] bg-background border-border/50 focus-visible:ring-indigo-500/50"
+                                />
+                                <Button
+                                    onClick={handleSubmitQuestion}
+                                    disabled={!questionText.trim() || isSubmittingQuestion}
+                                    className="h-auto shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white"
+                                >
+                                    {isSubmittingQuestion ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                                </Button>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Sidebar Navigation */}

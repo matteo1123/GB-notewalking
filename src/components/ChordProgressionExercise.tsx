@@ -40,6 +40,7 @@ const DEFAULT_SETTINGS: ChordProgressionSettings = {
     droneEnabled: true,
     droneVolume: 0.5,
     promptFretboardPainter: true,
+    droneMode: "chord-major",
 };
 
 const KEYS = [
@@ -84,6 +85,7 @@ export function ChordProgressionExercise({ autoStart = false, sessionId, onExit,
             measuresPerChord: moduleConfig?.measures_per_chord || DEFAULT_SETTINGS.measuresPerChord,
             droneEnabled: DEFAULT_SETTINGS.droneEnabled,
             promptFretboardPainter: moduleConfig?.prompt_fretboard_painter ?? DEFAULT_SETTINGS.promptFretboardPainter,
+            droneMode: moduleConfig?.drone_mode ?? DEFAULT_SETTINGS.droneMode,
         };
     });
     const [isPlaying, setIsPlaying] = useState(autoStart);
@@ -109,13 +111,15 @@ export function ChordProgressionExercise({ autoStart = false, sessionId, onExit,
                 const newKey = moduleConfig.key || prev.key;
                 const newMeasures = moduleConfig.measures_per_chord || prev.measuresPerChord;
                 const newPainter = moduleConfig.prompt_fretboard_painter ?? prev.promptFretboardPainter;
+                const newDroneMode = moduleConfig.drone_mode ?? prev.droneMode;
 
                 // Stop the Infinite Loop: Bail out if nothing actually changed
                 if (
                     syncedChords === prev.selectedChords &&
                     newKey === prev.key &&
                     newMeasures === prev.measuresPerChord &&
-                    newPainter === prev.promptFretboardPainter
+                    newPainter === prev.promptFretboardPainter &&
+                    newDroneMode === prev.droneMode
                 ) {
                     return prev;
                 }
@@ -126,6 +130,7 @@ export function ChordProgressionExercise({ autoStart = false, sessionId, onExit,
                     selectedChords: syncedChords,
                     measuresPerChord: newMeasures,
                     promptFretboardPainter: newPainter,
+                    droneMode: newDroneMode,
                     // droneEnabled not in config
                 };
             });
@@ -206,7 +211,7 @@ export function ChordProgressionExercise({ autoStart = false, sessionId, onExit,
         return () => { ctx.close(); };
     }, []);
 
-    const { playNote } = useNotePlayer(audioContext);
+    const { playNote, playChord } = useNotePlayer(audioContext);
 
     const {
         currentChordIndex,
@@ -358,8 +363,26 @@ export function ChordProgressionExercise({ autoStart = false, sessionId, onExit,
             handleChordTick(state);
             recording.handleTick(tickCount);
             if (settings.droneEnabled && state.currentBeat === 1) {
-                const droneNote = currentChord.rootNote.replace("#", "b") + "3";
-                playNote(droneNote);
+                if (settings.droneMode === "pedal") {
+                    const droneNote = currentChord.rootNote.replace("#", "b") + "3";
+                    playNote(droneNote, settings.droneVolume);
+                } else {
+                    // Calculate if Major or Minor based on Diatonic rules
+                    // Major Key rules (chord-major): 1,4,5 are Major. 2,3,6,7 are Minor
+                    // Minor Key rules (chord-minor): 1,4,5 are Minor. 3,6,7 are Major. 2 is Diminished (we'll use minor as requested)
+
+                    let isMinor = false;
+                    const d = currentChord.degree; // 1-7
+
+                    if (settings.droneMode === "chord-major") {
+                        isMinor = [2, 3, 6, 7].includes(d);
+                    } else if (settings.droneMode === "chord-minor") {
+                        isMinor = [1, 2, 4, 5].includes(d);
+                    }
+
+                    const chordName = currentChord.rootNote + (isMinor ? "m" : "");
+                    playChord?.(chordName, settings.droneVolume);
+                }
             }
         },
     };
@@ -400,8 +423,8 @@ export function ChordProgressionExercise({ autoStart = false, sessionId, onExit,
             }
 
             if (wasPlaying) {
-                metronome.stop();
-                setTimeout(() => metronome.start(), 100);
+                // metronome.stop();
+                // We keep it running and just sync changes
             }
         },
         [metronome, onConfigChange, moduleConfig]
@@ -453,7 +476,8 @@ export function ChordProgressionExercise({ autoStart = false, sessionId, onExit,
                         key: updated.key,
                         chords: updated.selectedChords as string[],
                         measures_per_chord: updated.measuresPerChord,
-                        prompt_fretboard_painter: updated.promptFretboardPainter
+                        prompt_fretboard_painter: updated.promptFretboardPainter,
+                        drone_mode: updated.droneMode
                     });
                 }
 
@@ -476,8 +500,10 @@ export function ChordProgressionExercise({ autoStart = false, sessionId, onExit,
     }, [isPlaying, metronome, recording]);
 
     const handleRestart = useCallback(() => {
-        metronome.stop();
-        setTimeout(() => metronome.start(), 100);
+        if (metronome.state.isPlaying) {
+            metronome.stop();
+            setTimeout(() => metronome.start(), 100);
+        }
     }, [metronome]);
 
     useEffect(() => {
@@ -560,14 +586,32 @@ export function ChordProgressionExercise({ autoStart = false, sessionId, onExit,
                                 })}
                             </div>
 
-                            {/* Drone Toggle */}
-                            <button
-                                className={`h-6 text-[10px] rounded flex items-center justify-center gap-1 ${settings.droneEnabled ? "bg-green-600 text-white" : "bg-muted"}`}
-                                onClick={() => handleSettingsChange({ droneEnabled: !settings.droneEnabled })}
-                            >
-                                {settings.droneEnabled ? <Volume2 className="w-3 h-3" /> : <VolumeX className="w-3 h-3" />}
-                                Drone
-                            </button>
+                            {/* Drone Style */}
+                            <div className="flex items-center justify-between gap-1 w-full bg-muted/50 rounded p-1 border">
+                                <button
+                                    className={`h-6 flex-1 text-[10px] rounded flex flex-col items-center justify-center gap-0.5 leading-none transition-colors ${settings.droneEnabled ? "bg-green-600 text-white shadow-sm" : "bg-muted text-muted-foreground"}`}
+                                    onClick={() => handleSettingsChange({ droneEnabled: !settings.droneEnabled })}
+                                    title="Toggle Drone/Chords"
+                                >
+                                    {settings.droneEnabled ? <Volume2 className="w-3 h-3" /> : <VolumeX className="w-3 h-3" />}
+                                    <span>{settings.droneEnabled ? "ON" : "OFF"}</span>
+                                </button>
+
+                                <Select
+                                    value={settings.droneMode}
+                                    onValueChange={(v: "pedal" | "chord-major" | "chord-minor") => handleSettingsChange({ droneMode: v })}
+                                    disabled={!settings.droneEnabled}
+                                >
+                                    <SelectTrigger className="h-6 text-[10px] px-1 w-20 bg-background">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="pedal" className="text-[10px] py-1">Pedal</SelectItem>
+                                        <SelectItem value="chord-major" className="text-[10px] py-1">Major Key</SelectItem>
+                                        <SelectItem value="chord-minor" className="text-[10px] py-1">Minor Key</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
 
                             {/* Fretboard Button - Removed */}
                         </div>

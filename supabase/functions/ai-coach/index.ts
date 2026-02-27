@@ -104,6 +104,11 @@ const tools = [
                             type: "number",
                             description: "Measures per chord in notewalking (default 4)",
                         },
+                        drone_mode: {
+                            type: "string",
+                            enum: ["pedal", "chord-major", "chord-minor"],
+                            description: "Drone playback style for notewalking. 'pedal' plays a single root note, 'chord-major' plays diatonic chords for a major key, 'chord-minor' plays diatonic chords for a minor key (notewalking only)",
+                        },
                         // Chord progressions specific
                         progression_id: {
                             type: "string",
@@ -378,7 +383,7 @@ const SYSTEM_PROMPT = `You are Guitar Brain Coach, an AI assistant helping guita
 - **scale**: Scale practice (3nps, 2nps, 4nps patterns across the fretboard)
 - **arpeggio**: Arpeggio practice (chord tones across fretboard positions)
 - **rhythm**: 16th note strumming patterns (has levels 1-10)
-- **notewalking**: Ear training with chord tone walking over pedal notes
+- **notewalking**: Ear training with chord tone walking. Can be configured with 'drone_mode' to play pedal notes or diatonic chords (pedal, chord-major, chord-minor).
 - **chord_progressions**: Smooth chord transitions & progressions
 - **piece_mastery**: Song mastery with looped practice
 - **riff**: Riff practice
@@ -831,6 +836,7 @@ function createModuleConfig(input: any) {
                 key: input.notewalking_key || "C",
                 chords: input.notewalking_chords || ["I", "IV", "V"],
                 measures_per_chord: input.measures_per_chord || 4,
+                drone_mode: input.drone_mode || "chord-major",
             };
             break;
 

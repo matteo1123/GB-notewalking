@@ -1,4 +1,5 @@
 import { useCallback, useRef } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 export function useNotePlayer(audioContext: AudioContext | null) {
   const audioBufferCache = useRef<Record<string, AudioBuffer>>({});
@@ -57,6 +58,77 @@ export function useNotePlayer(audioContext: AudioContext | null) {
           audioBufferCache.current[noteUrl] = buffer;
         } catch (error) {
           console.error(`Failed to preload note ${note}`, error);
+        }
+      });
+
+      await Promise.all(promises);
+    },
+    [audioContext]
+  );
+
+  const playChord = useCallback(
+    async (chord: string, volume: number = 1.0) => {
+      if (!audioContext) return;
+
+      // Ensure proper formatting for sharps/flats if needed. The Guitar bucket has files like C.mp3, Cm.mp3, Db.mp3, Bbm.mp3
+      const formattedChord = chord.replace('#', 'b');
+
+      try {
+        let buffer;
+        if (audioBufferCache.current[formattedChord]) {
+          buffer = audioBufferCache.current[formattedChord];
+        } else {
+          // Fetch signed URL first since Guitar bucket is private
+          const { data, error } = await supabase.storage.from('Guitar').createSignedUrl(`${formattedChord}.mp3`, 3600);
+          if (error || !data) {
+            console.error(`Failed to get signed URL for chord ${formattedChord}`, error);
+            return;
+          }
+
+          const response = await fetch(data.signedUrl);
+          const arrayBuffer = await response.arrayBuffer();
+          buffer = await audioContext.decodeAudioData(arrayBuffer);
+          audioBufferCache.current[formattedChord] = buffer;
+        }
+
+        const source = audioContext.createBufferSource();
+        source.buffer = buffer;
+
+        const gainNode = audioContext.createGain();
+        gainNode.gain.value = volume;
+
+        source.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+
+        source.start(0);
+        // We do not overwrite currentSourceRef so that drone/chord does not immediately stop if playSequence or something else is running concurrently, 
+        //, but keeping track of it could be useful if they want to stop it. 
+        // For drone notes, we usually let them ring out. 
+      } catch (error) {
+        console.error(`Failed to play chord ${chord}`, error);
+      }
+    },
+    [audioContext]
+  );
+
+  const preloadChords = useCallback(
+    async (chords: string[]) => {
+      if (!audioContext) return;
+
+      const promises = chords.map(async (chord) => {
+        const formattedChord = chord.replace('#', 'b');
+        if (audioBufferCache.current[formattedChord]) return;
+
+        try {
+          const { data, error } = await supabase.storage.from('Guitar').createSignedUrl(`${formattedChord}.mp3`, 3600);
+          if (error || !data) return;
+
+          const response = await fetch(data.signedUrl);
+          const arrayBuffer = await response.arrayBuffer();
+          const buffer = await audioContext.decodeAudioData(arrayBuffer);
+          audioBufferCache.current[formattedChord] = buffer;
+        } catch (error) {
+          console.error(`Failed to preload chord ${chord}`, error);
         }
       });
 
@@ -129,5 +201,5 @@ export function useNotePlayer(audioContext: AudioContext | null) {
     }
   }, []);
 
-  return { playNote, playSequence, preloadNotes, stop };
+  return { playNote, playChord, playSequence, preloadNotes, preloadChords, stop };
 }

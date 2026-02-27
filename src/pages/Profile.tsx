@@ -173,7 +173,8 @@ const Profile = () => {
       const { data, error } = await supabase.functions.invoke('create-checkout-session', {
         body: {
           priceId: STRIPE_COURSE_PRICE_ID,
-          mode: 'payment',
+          subscriptionPriceId: STRIPE_PRICE_ID,
+          mode: 'subscription',
           metadata: { type: 'course_purchase' }
         }
       });

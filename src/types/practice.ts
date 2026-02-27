@@ -155,6 +155,7 @@ export interface NotewalkingModuleConfig {
   chords: string[];
   measures_per_chord: number;
   prompt_fretboard_painter?: boolean;
+  drone_mode?: "pedal" | "chord-major" | "chord-minor";
 }
 
 export interface ChordProgressionsModuleConfig {

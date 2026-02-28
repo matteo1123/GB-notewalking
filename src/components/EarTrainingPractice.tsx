@@ -89,7 +89,7 @@ const getNoteFromOffset = (rootNote: string, offset: number, targetOctave: numbe
 };
 
 
-export function EarTrainingPractice({ moduleConfig, onConfigChange, onExit, autoStart = false, sessionId }: EarTrainingPracticeProps) {
+export function EarTrainingPractice({ moduleConfig, onConfigChange, onExit, autoStart = true, sessionId }: EarTrainingPracticeProps) {
     const { activeSession } = useSession();
     const { user } = useAuth();
     const isPaused = activeSession?.isPaused || false;

@@ -29,7 +29,7 @@ interface ProfileSettings {
 // Updated Stripe Price ID ($29.99/mo)
 const STRIPE_PRICE_ID = "price_1T3lcJEOnRZP4MxPepztrhp6";
 // Course Purchase Price ID ($1.00 Test)
-const STRIPE_COURSE_PRICE_ID = "price_1T4bIGEOnRZP4MxPYTo7dKJt";
+const STRIPE_COURSE_PRICE_ID = "price_1T5sGBEOnRZP4MxPZp5xxScj";
 
 const Profile = () => {
   const { user } = useAuth();

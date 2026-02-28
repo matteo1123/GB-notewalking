@@ -4,9 +4,14 @@ import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { Play, Pause, ChevronLeft, ChevronRight, RotateCcw, ArrowLeft, Mic, Volume2, Music, Settings2, PlusCircle, Save, X, Timer } from "lucide-react";
+import { Play, Pause, ChevronLeft, ChevronRight, RotateCcw, ArrowLeft, Mic, Volume2, Music, Settings2, PlusCircle, Save, X, Timer, ImageIcon } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePieceMastery, PracticePhase } from "@/hooks/usePieceMastery";
 import { Piece } from "./types";
 import { cn } from "@/lib/utils";
@@ -25,8 +30,10 @@ interface PieceMasteryProps {
 export function PieceMastery({ piece, onBack, onExit, moduleConfig, onConfigChange }: PieceMasteryProps) {
     const [autoAdvance, setAutoAdvance] = useState(false);
     const [notes, setNotes] = useState(piece.notes || "");
-    const [quickRecordMode, setQuickRecordMode] = useState(moduleConfig?.quickRecordMode ?? false);
+    const isFreeLoop = piece.id === 'free-loop';
+    const [quickRecordMode, setQuickRecordMode] = useState(isFreeLoop ? true : moduleConfig?.quickRecordMode ?? false);
     const [recordDuration, setRecordDuration] = useState(moduleConfig?.recordDuration ?? 30);
+    const [isNotesPreview, setIsNotesPreview] = useState(false);
     const { toast } = useToast();
 
     const { state, controls } = usePieceMastery({
@@ -76,13 +83,49 @@ export function PieceMastery({ piece, onBack, onExit, moduleConfig, onConfigChan
         }
     };
 
+    // Helper to format time
+    const formatTime = (seconds: number) => {
+        const minutes = Math.floor(seconds / 60);
+        const remainingSeconds = Math.floor(seconds % 60);
+        return `${minutes}:${remainingSeconds < 10 ? '0' : ''}${remainingSeconds} `;
+    };
+
+    const formatTimeMinutes = (seconds: number) => {
+        const minutes = Math.floor(seconds / 60);
+        const remainingSeconds = Math.floor(seconds % 60);
+        return `${minutes}:${remainingSeconds < 10 ? '0' : ''}${remainingSeconds} `;
+    };
+
     // Handle Note Appending
     const handleAddTimestampedNote = () => {
-        const timestamp = formatTime(currentTime);
+        const timestamp = formatTimeMinutes(currentTime);
         const blockLabel = `Block ${currentBlockIndex + 1}`;
         const newNoteLine = `\n[${blockLabel} - ${timestamp}] `;
         setNotes(prev => prev + newNoteLine);
         toast({ title: "Timestamp added to notes" });
+        setIsNotesPreview(false); // Switch to edit mode when adding note
+    };
+
+    const handleInsertImage = () => {
+        const url = prompt("Enter image URL:");
+        if (url) {
+            setNotes(prev => `${prev}\n![Image](${url})\n`);
+            setIsNotesPreview(true); // Switch to preview to see the image immediately
+        }
+    };
+
+    const handleSaveNotes = async () => {
+        if (isFreeLoop) return; // Free loop notes don't save
+        try {
+            const { error } = await supabase
+                .from('pieces')
+                .update({ notes })
+                .eq('id', piece.id);
+            if (error) throw error;
+            toast({ title: "Notes saved" });
+        } catch (error: any) {
+            toast({ title: "Error saving notes", description: error.message, variant: "destructive" });
+        }
     };
 
     // Handle Range Slider Change
@@ -106,7 +149,7 @@ export function PieceMastery({ piece, onBack, onExit, moduleConfig, onConfigChan
     };
 
     return (
-        <div className="flex flex-col h-full max-h-screen">
+        <div className="flex flex-col h-[100dvh] md:h-screen md:max-h-screen bg-background overflow-hidden">
             {/* Header */}
             <div className="flex items-center gap-4 p-4 border-b bg-card">
                 <Button variant="ghost" size="icon" onClick={onBack}>
@@ -114,83 +157,89 @@ export function PieceMastery({ piece, onBack, onExit, moduleConfig, onConfigChan
                 </Button>
                 <div className="flex-1">
                     <h2 className="text-xl font-bold">{piece.name}</h2>
-                    <p className="text-sm text-muted-foreground flex items-center gap-2">
-                        Block {currentBlockIndex + 1} • {loopRange.label}
-                        {loopCount > 0 && <Badge variant="secondary" className="text-xs">Loop {loopCount}</Badge>}
-                    </p>
-                </div>
-                <div className="ml-auto flex items-center gap-2">
-                    <Button variant={autoAdvance ? "secondary" : "ghost"} size="sm" onClick={() => setAutoAdvance(!autoAdvance)} className="gap-2">
-                        <RotateCcw className="w-4 h-4" />
-                        Auto-Advance: {autoAdvance ? 'ON' : 'OFF'}
-                    </Button>
-                    {onExit && (
-                        <Button size="sm" variant="ghost" className="gap-1" onClick={onExit}>
-                            <X className="w-4 h-4" /> Exit
-                        </Button>
-                    )}
                 </div>
             </div>
 
             {/* Main Content Area */}
-            <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
+            <div className="flex-1 flex flex-col md:flex-row min-h-0 overflow-hidden">
 
                 {/* Left: Visualization & Controls */}
-                <div className="flex-1 p-6 flex flex-col justify-center items-center space-y-8 bg-background/50">
+                <div className={cn(
+                    "p-6 flex flex-col justify-center items-center space-y-8 bg-background/50 overflow-y-auto min-h-0",
+                    isFreeLoop ? "w-full md:w-[360px] border-r shrink-0" : "flex-1"
+                )}>
 
                     {/* Phase Indicator */}
-                    <div className={cn(
-                        "w-64 h-64 rounded-full flex flex-col items-center justify-center border-4 transition-all duration-300",
-                        getPhaseColor(phase),
-                        isPlaying ? "scale-105 shadow-xl" : "scale-100 opacity-80"
-                    )}>
-                        <PhaseIcon p={phase} />
-                        <span className="text-3xl font-black uppercase tracking-wider">
-                            {getPhaseLabel(phase)}
-                        </span>
-                        <div className="mt-2 text-sm font-mono opacity-80">
-                            {formatTimeMinutes(currentTime)}
+                    {!isFreeLoop && (
+                        <div className={cn(
+                            "w-64 h-64 rounded-full flex flex-col items-center justify-center border-4 transition-all duration-300",
+                            getPhaseColor(phase),
+                            isPlaying ? "scale-105 shadow-xl" : "scale-100 opacity-80"
+                        )}>
+                            <PhaseIcon p={phase} />
+                            <span className="text-3xl font-black uppercase tracking-wider">
+                                {getPhaseLabel(phase)}
+                            </span>
+                            <div className="mt-2 text-sm font-mono opacity-80">
+                                {formatTimeMinutes(currentTime)}
+                            </div>
                         </div>
-                    </div>
+                    )}
+
+                    {/* Simple Phase Indicator for Free Loop */}
+                    {isFreeLoop && (
+                        <div className={cn(
+                            "w-48 h-48 rounded-full flex flex-col items-center justify-center border-4 transition-all duration-300",
+                            getPhaseColor(phase),
+                            isPlaying ? "scale-105 shadow-xl" : "scale-100 opacity-80"
+                        )}>
+                            <PhaseIcon p={phase} />
+                            <span className="text-xl font-bold uppercase tracking-wider">
+                                {phase === 'user' ? 'Recording' : phase === 'playback' ? 'Listen' : 'Ready'}
+                            </span>
+                        </div>
+                    )}
 
                     {/* Timeline Bar */}
-                    <div className="w-full max-w-2xl space-y-6">
-                        {/* Combined Offset & Size Slider */}
-                        <div className="space-y-2">
-                            <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                                <span className="flex items-center gap-1"><Settings2 className="w-3 h-3" /> Loop Region</span>
-                                <span>Start: {formatTime(offset)} • Size: {Math.round(segmentSeconds)}s</span>
+                    {!isFreeLoop && (
+                        <div className="w-full max-w-2xl space-y-6">
+                            {/* Combined Offset & Size Slider */}
+                            <div className="space-y-2">
+                                <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                                    <span className="flex items-center gap-1"><Settings2 className="w-3 h-3" /> Loop Region</span>
+                                    <span>Start: {formatTime(offset)} • Size: {Math.round(segmentSeconds)}s</span>
+                                </div>
+                                <Slider
+                                    value={[offset, offset + segmentSeconds]}
+                                    min={0}
+                                    max={duration || 100} // Fallback if duration 0
+                                    step={1}
+                                    minStepsBetweenThumbs={1}
+                                    onValueChange={handleRangeChange}
+                                    className="py-2"
+                                />
                             </div>
-                            <Slider
-                                value={[offset, offset + segmentSeconds]}
-                                min={0}
-                                max={duration || 100} // Fallback if duration 0
-                                step={1}
-                                minStepsBetweenThumbs={1}
-                                onValueChange={handleRangeChange}
-                                className="py-2"
-                            />
+
+                            {/* Progress Container (Static Visualization) */}
+                            <div className="relative h-12 bg-secondary rounded-lg overflow-hidden border">
+                                {/* Loop Range Highlight */}
+                                <div
+                                    className="absolute h-full bg-primary/10 border-x-2 border-primary/30"
+                                    style={{ left: `${loopStartPercent}% `, width: `${loopWidthPercent}% ` }}
+                                />
+
+                                {/* Playhead */}
+                                <div
+                                    className="absolute top-0 bottom-0 w-1 bg-primary z-10 transition-all duration-100"
+                                    style={{ left: `${progressPercent}% ` }}
+                                />
+
+                                {/* Time Labels */}
+                                <span className="absolute bottom-1 left-2 text-[10px] text-muted-foreground">0:00</span>
+                                <span className="absolute bottom-1 right-2 text-[10px] text-muted-foreground">{formatTime(duration)}</span>
+                            </div>
                         </div>
-
-                        {/* Progress Container (Static Visualization) */}
-                        <div className="relative h-12 bg-secondary rounded-lg overflow-hidden border">
-                            {/* Loop Range Highlight */}
-                            <div
-                                className="absolute h-full bg-primary/10 border-x-2 border-primary/30"
-                                style={{ left: `${loopStartPercent}%`, width: `${loopWidthPercent}%` }}
-                            />
-
-                            {/* Playhead */}
-                            <div
-                                className="absolute top-0 bottom-0 w-1 bg-primary z-10 transition-all duration-100"
-                                style={{ left: `${progressPercent}%` }}
-                            />
-
-                            {/* Time Labels */}
-                            <span className="absolute bottom-1 left-2 text-[10px] text-muted-foreground">0:00</span>
-                            <span className="absolute bottom-1 right-2 text-[10px] text-muted-foreground">{formatTime(duration)}</span>
-                        </div>
-                    </div>
+                    )}
 
                     {/* Controls */}
                     <div className="flex items-center gap-6">
@@ -212,70 +261,50 @@ export function PieceMastery({ piece, onBack, onExit, moduleConfig, onConfigChan
 
                     <div className="flex gap-2">
                         <Button variant="ghost" size="sm" onClick={() => controls.setBlock(currentBlockIndex)}>
-                            <RotateCcw className="h-4 w-4 mr-2" /> Restart Block
+                            <RotateCcw className="h-4 w-4 mr-2" /> Restart Loop
                         </Button>
                     </div>
 
                     {/* Pitch Shift Control */}
-                    <div className="bg-muted/50 rounded-lg p-4">
-                        <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm font-medium flex items-center gap-2">
-                                🎵 Pitch Shift
-                            </span>
-                            <Badge variant={pitchShift === 0 ? "secondary" : "default"}>
-                                {pitchShift === 0 ? "Original" : `${pitchShift > 0 ? "+" : ""}${pitchShift} semitone${Math.abs(pitchShift) !== 1 ? "s" : ""}`}
-                            </Badge>
-                        </div>
-                        <Slider
-                            value={[pitchShift]}
-                            min={-6}
-                            max={6}
-                            step={1}
-                            onValueChange={([value]) => {
-                                controls.setPitchShift(value);
-                                onConfigChange?.({
-                                    offset: state.offset,
-                                    segmentSeconds: state.segmentSeconds,
-                                    pitchShift: value
-                                });
-                            }}
-                            className="py-2"
-                        />
-                        <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
-                            <span>-6</span>
-                            <span>0</span>
-                            <span>+6</span>
-                        </div>
-                    </div>
-
-                    {/* Quick Record Mode Control */}
-                    <div className="bg-muted/50 rounded-lg p-4">
-                        <div className="flex items-center justify-between mb-3">
-                            <div className="flex items-center gap-2">
-                                <Timer className="w-4 h-4" />
-                                <Label htmlFor="quick-record-toggle" className="text-sm font-medium cursor-pointer">
-                                    Quick Record
-                                </Label>
+                    {!isFreeLoop && (
+                        <div className="bg-muted/50 rounded-lg p-4">
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-sm font-medium flex items-center gap-2">
+                                    🎵 Pitch Shift
+                                </span>
+                                <Badge variant={pitchShift === 0 ? "secondary" : "default"}>
+                                    {pitchShift === 0 ? "Original" : `${pitchShift > 0 ? "+" : ""}${pitchShift} semitone${Math.abs(pitchShift) !== 1 ? "s" : ""} `}
+                                </Badge>
                             </div>
-                            <Switch
-                                id="quick-record-toggle"
-                                checked={quickRecordMode}
-                                onCheckedChange={(checked) => {
-                                    setQuickRecordMode(checked);
+                            <Slider
+                                value={[pitchShift]}
+                                min={-6}
+                                max={6}
+                                step={1}
+                                onValueChange={([value]) => {
+                                    controls.setPitchShift(value);
                                     onConfigChange?.({
                                         offset: state.offset,
                                         segmentSeconds: state.segmentSeconds,
-                                        pitchShift: state.pitchShift,
-                                        quickRecordMode: checked,
-                                        recordDuration
+                                        pitchShift: value
                                     });
                                 }}
+                                className="py-2"
                             />
+                            <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
+                                <span>-6</span>
+                                <span>0</span>
+                                <span>+6</span>
+                            </div>
                         </div>
-                        {quickRecordMode && (
+                    )}
+
+                    {/* Quick Record Mode Control */}
+                    {isFreeLoop ? (
+                        <div className="bg-muted/50 rounded-lg p-4 w-full">
                             <div className="space-y-2">
-                                <div className="flex justify-between text-xs text-muted-foreground">
-                                    <span>Duration</span>
+                                <div className="flex justify-between text-xs font-semibold mb-2">
+                                    <span className="flex items-center gap-1"><Timer className="w-3 h-3" /> Loop Duration</span>
                                     <Badge variant="secondary">{recordDuration}s</Badge>
                                 </div>
                                 <Slider
@@ -289,50 +318,128 @@ export function PieceMastery({ piece, onBack, onExit, moduleConfig, onConfigChan
                                             offset: state.offset,
                                             segmentSeconds: state.segmentSeconds,
                                             pitchShift: state.pitchShift,
-                                            quickRecordMode,
+                                            quickRecordMode: true,
                                             recordDuration: value
                                         });
                                     }}
                                     className="py-2"
                                 />
-                                <div className="flex justify-between text-[10px] text-muted-foreground">
+                                <div className="flex justify-between text-[10px] text-muted-foreground pt-1">
                                     <span>10s</span>
                                     <span>30s</span>
                                     <span>60s</span>
                                 </div>
-                                <p className="text-xs text-muted-foreground mt-2">
-                                    Skip listening phase—just record and playback.
-                                </p>
                             </div>
-                        )}
-                    </div>
+                        </div>
+                    ) : (
+                        <div className="bg-muted/50 rounded-lg p-4 w-full">
+                            <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-2">
+                                    <Timer className="w-4 h-4" />
+                                    <Label htmlFor="quick-record-toggle" className="text-sm font-medium cursor-pointer">
+                                        Quick Record
+                                    </Label>
+                                </div>
+                                <Switch
+                                    id="quick-record-toggle"
+                                    checked={quickRecordMode}
+                                    onCheckedChange={(checked) => {
+                                        setQuickRecordMode(checked);
+                                        onConfigChange?.({
+                                            offset: state.offset,
+                                            segmentSeconds: state.segmentSeconds,
+                                            pitchShift: state.pitchShift,
+                                            quickRecordMode: checked,
+                                            recordDuration
+                                        });
+                                    }}
+                                />
+                            </div>
+                            {quickRecordMode && (
+                                <div className="space-y-2 mt-4">
+                                    <div className="flex justify-between text-xs text-muted-foreground">
+                                        <span>Duration</span>
+                                        <Badge variant="secondary">{recordDuration}s</Badge>
+                                    </div>
+                                    <Slider
+                                        value={[recordDuration]}
+                                        min={10}
+                                        max={60}
+                                        step={5}
+                                        onValueChange={([value]) => {
+                                            setRecordDuration(value);
+                                            onConfigChange?.({
+                                                offset: state.offset,
+                                                segmentSeconds: state.segmentSeconds,
+                                                pitchShift: state.pitchShift,
+                                                quickRecordMode,
+                                                recordDuration: value
+                                            });
+                                        }}
+                                        className="py-2"
+                                    />
+                                    <div className="flex justify-between text-[10px] text-muted-foreground">
+                                        <span>10s</span>
+                                        <span>30s</span>
+                                        <span>60s</span>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground mt-2">
+                                        Skip listening phase—just record and playback.
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                 </div>
 
                 {/* Right: Notes Panel */}
-                <div className="md:w-96 border-l bg-card flex flex-col h-full">
-                    <div className="p-4 border-b bg-muted/20 flex justify-between items-center">
-                        <h3 className="font-semibold flex items-center gap-2">
-                            <Music className="w-4 h-4" /> Notes & Chords
-                        </h3>
-                        <Button size="sm" variant="outline" onClick={handleAddTimestampedNote} title="Add timestamped note">
-                            <PlusCircle className="w-4 h-4 mr-2" /> Add Note
-                        </Button>
+                <div className={cn(
+                    "bg-card flex flex-col h-full min-w-0 border-l p-0 m-0", // reset margins/padding from outer div to prevent extra spacing
+                    isFreeLoop ? "flex-1" : "md:w-96 w-full shrink-0"
+                )}>
+                    <div className="p-4 border-b bg-muted/20 flex flex-col gap-2">
+                        <div className="flex justify-between items-center">
+                            <h3 className="font-semibold flex items-center gap-2">
+                                <Music className="w-4 h-4" /> Notes
+                            </h3>
+                            <div className="flex gap-1">
+                                <Button size="icon" variant="ghost" onClick={handleInsertImage} title="Insert Image">
+                                    <ImageIcon className="w-4 h-4" />
+                                </Button>
+                                <Button size="sm" variant="outline" onClick={handleAddTimestampedNote} title="Add timestamped note">
+                                    <PlusCircle className="w-4 h-4 mr-1" /> Time
+                                </Button>
+                            </div>
+                        </div>
+                        <Tabs value={isNotesPreview ? "preview" : "edit"} onValueChange={(v) => setIsNotesPreview(v === "preview")}>
+                            <TabsList className="w-full grid grid-cols-2">
+                                <TabsTrigger value="edit">Edit</TabsTrigger>
+                                <TabsTrigger value="preview">Preview</TabsTrigger>
+                            </TabsList>
+                        </Tabs>
                     </div>
 
-                    <div className="flex-1 p-4 overflow-hidden flex flex-col gap-2">
-                        <Textarea
-                            value={notes}
-                            onChange={(e) => setNotes(e.target.value)}
-                            className="flex-1 font-mono text-sm leading-relaxed resize-none bg-background/50"
-                            placeholder="Add your tabs, chords, or notes here..."
-                        />
-                        <Button className="w-full" disabled={notes === piece.notes}>
+                    <div className="flex-1 p-4 overflow-hidden flex flex-col gap-2 min-h-0">
+                        {isNotesPreview ? (
+                            <div className="flex-1 overflow-y-auto prose prose-sm dark:prose-invert max-w-none p-4 bg-background/50 rounded-md border text-left prose-img:rounded-md prose-img:max-w-full w-full">
+                                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                    {notes || "*Nothing here yet. Switch to Edit to write your chords or drop an image.*"}
+                                </ReactMarkdown>
+                            </div>
+                        ) : (
+                            <Textarea
+                                value={notes}
+                                onChange={(e) => setNotes(e.target.value)}
+                                className="flex-1 font-mono text-sm leading-relaxed resize-none bg-background/50"
+                                placeholder="Add your tabs, chords, or markdown here. Add an image using ![desc](url)"
+                            />
+                        )}
+                        <Button className="w-full shrink-0" onClick={handleSaveNotes} disabled={notes === piece.notes}>
                             <Save className="w-4 h-4 mr-2" /> Save Notes
                         </Button>
                     </div>
                 </div>
-
             </div>
         </div>
     );

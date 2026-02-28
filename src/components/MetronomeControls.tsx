@@ -182,13 +182,18 @@ export function MetronomeControls({
     }
   }, [drumBeatProp]);
 
+  const onStateChangeRef = useRef(onStateChange);
+  useEffect(() => {
+    onStateChangeRef.current = onStateChange;
+  }, [onStateChange]);
+
   useEffect(() => {
     if (syncingFromPropsRef.current) {
       syncingFromPropsRef.current = false;
       return;
     }
 
-    onStateChange({
+    onStateChangeRef.current({
       mode,
       startBpm,
       endBpm,
@@ -207,7 +212,6 @@ export function MetronomeControls({
     progressiveStepBpm,
     loop,
     drumBeat,
-    onStateChange,
   ]);
 
   useNumberInputControls({

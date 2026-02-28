@@ -37,7 +37,7 @@ interface RhythmTrainingProps {
     onConfigChange?: (config: RhythmModuleConfig) => void;
 }
 
-export function RhythmTraining({ autoStart = false, sessionId, onExit, moduleConfig, onConfigChange }: RhythmTrainingProps) {
+export function RhythmTraining({ autoStart = true, sessionId, onExit, moduleConfig, onConfigChange }: RhythmTrainingProps) {
     // Rhythm mode and deviation types
     const [rhythmMode, setRhythmMode] = useState<RhythmMode>('random');
     const [deviationTypes, setDeviationTypes] = useState<DeviationOptions>({ skip: true, triplet: false });

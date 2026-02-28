@@ -269,11 +269,11 @@ export function usePieceMastery({
                 playbackRef.current.currentTime = 0;
                 playbackRef.current.play().catch(e => console.error("Playback failed", e));
 
-                const duration = loopRange.end - loopRange.start;
+                const duration = skipPiecePhase ? recordDurationSeconds : loopRange.end - loopRange.start;
                 scheduleTransition(duration * 1000);
             }
         }
-    }, [phase, recorderState.audioBlob, recorderState.status, loopRange]);
+    }, [phase, recorderState.audioBlob, recorderState.status, loopRange, skipPiecePhase, recordDurationSeconds]);
 
     // Notify parent of loop completion
     useEffect(() => {

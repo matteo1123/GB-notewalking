@@ -11,6 +11,8 @@ import {
   MetronomeState,
 } from "@/hooks/useMetronome";
 import { useBpmControls } from "@/hooks/useBpmControls";
+import { useAutoRecord } from "@/contexts/AutoRecordContext";
+import { useAutoRecording } from "@/hooks/useAutoRecording";
 
 export interface MetronomeScreenProps {
   initialMode?: MetronomeMode;
@@ -75,6 +77,20 @@ export function MetronomeScreen({
     drumBeat: false,
   });
 
+  const { autoRecordEnabled, isPremium } = useAutoRecord();
+  const [tickCount, setTickCount] = useState(0);
+
+  const recording = useAutoRecording({
+    enabled: autoRecordEnabled && isPremium,
+    moduleType: "metronome",
+    metronomeConfig: {
+      mode,
+      bpm: startBpm,
+      drum_beat: drumBeat,
+      auto_record: autoRecordEnabled,
+    },
+  });
+
   const metronome = useMetronome({
     mode,
     startBpm,
@@ -83,7 +99,11 @@ export function MetronomeScreen({
     measuresPerBpmChange: measuresPerIncrement,
     progressiveStepBpm: currentProgressiveStepBpm,
     drumBeat,
-    onTick,
+    onTick: (state) => {
+      setTickCount((prev) => prev + 1);
+      recording.handleTick(tickCount);
+      if (onTick) onTick(state);
+    },
   });
 
   const handleCurrentBpmChange = useCallback(

@@ -107,7 +107,8 @@ export type ModuleType =
   | 'piece_mastery'
   | 'chord_progressions'
   | 'riff'
-  | 'ear_training';
+  | 'ear_training'
+  | 'metronome';
 
 // Ear Training Options for module configs
 export interface EarTrainingModuleOptions {
@@ -156,6 +157,7 @@ export interface NotewalkingModuleConfig {
   measures_per_chord: number;
   prompt_fretboard_painter?: boolean;
   drone_mode?: "pedal" | "chord-major" | "chord-minor";
+  scale_view?: "major" | "minor" | "both";
 }
 
 export interface ChordProgressionsModuleConfig {

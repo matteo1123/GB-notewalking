@@ -100,7 +100,7 @@ const RiffPractice = ({
   onComplete,
   onExerciseSelect,
   autoAdvance = false,
-  autoStart = false,
+  autoStart = true,
   timeLimit,
   isControlledSession = false,
   lessonExercise,

@@ -24,6 +24,7 @@ export interface ChordProgressionSettings {
     droneVolume: number;
     promptFretboardPainter: boolean;
     droneMode: "pedal" | "chord-major" | "chord-minor";
+    scaleView?: "major" | "minor" | "both";
 }
 
 export interface ChordProgressionState {

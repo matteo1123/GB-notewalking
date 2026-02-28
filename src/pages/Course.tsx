@@ -12,8 +12,8 @@ import { Textarea } from '@/components/ui/textarea';
 
 // Updated Stripe Price ID ($29.99/mo)
 const STRIPE_PRICE_ID = "price_1T3lcJEOnRZP4MxPepztrhp6";
-// Course Purchase Price ID ($1.00 Test)
-const STRIPE_COURSE_PRICE_ID = "price_1T4bIGEOnRZP4MxPYTo7dKJt";
+// Course Purchase Price ID ($199.99)
+const STRIPE_COURSE_PRICE_ID = "price_1T5sGBEOnRZP4MxPZp5xxScj";
 
 export interface CourseVideo {
     id: string;
@@ -43,6 +43,11 @@ export default function Course() {
     // Question submission state
     const [questionText, setQuestionText] = useState('');
     const [isSubmittingQuestion, setIsSubmittingQuestion] = useState(false);
+
+    // Email capture state (for logged out users)
+    const [emailInput, setEmailInput] = useState('');
+    const [isSubmittingEmail, setIsSubmittingEmail] = useState(false);
+    const [isEmailSubmitted, setIsEmailSubmitted] = useState(false);
 
     useEffect(() => {
         const loadCourseData = async () => {
@@ -99,7 +104,8 @@ export default function Course() {
                 if (requestedLesson && videoData.find(v => v.id === requestedLesson)) {
                     setActiveVideo(requestedLesson);
                 } else {
-                    setActiveVideo(videoData[0].id);
+                    const firstChordToneVideo = videoData.find(v => v.title.toLowerCase().includes('hit your first chord tone'));
+                    setActiveVideo(firstChordToneVideo ? firstChordToneVideo.id : videoData[0].id);
                 }
             }
 
@@ -201,7 +207,7 @@ export default function Course() {
 
             const { data, error } = await supabase.functions.invoke('create-checkout-session', {
                 body: {
-                    priceId: "price_1T4bIGEOnRZP4MxPYTo7dKJt", // $1 Test Product
+                    priceId: "price_1T5sGBEOnRZP4MxPZp5xxScj", // $199.99 Product
                     subscriptionPriceId: "price_1T3lcJEOnRZP4MxPepztrhp6", // $29.99/mo premium subscription
                     mode: 'subscription',
                     metadata: { type: 'course_purchase' }
@@ -249,6 +255,40 @@ export default function Course() {
             });
         } finally {
             setIsSubmittingQuestion(false);
+        }
+    };
+
+    const handleEmailSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!emailInput.trim() || !emailInput.includes('@')) return;
+
+        setIsSubmittingEmail(true);
+        try {
+            const { error } = await supabase.from('email_subscribers').insert({
+                email: emailInput.trim(),
+                source: 'Course PDF Signup',
+                requested_resource: 'Hitting Chord Tones PDF',
+            });
+
+            // Note: Postgres will throw an error if the email violates the UNIQUE constraint.
+            // That's fine, we can either ignore or show "Already registered".
+            if (error && error.code !== '23505') throw error; // 23505 is unique violation
+
+            setIsEmailSubmitted(true);
+            toast({
+                title: "Success! PDF Sent.",
+                description: "Check your inbox for the Hitting Chord Tones PDF in the next few minutes.",
+            });
+            setEmailInput('');
+        } catch (error: any) {
+            console.error('Email sub error:', error);
+            toast({
+                title: "Wait a second",
+                description: "We couldn't process your email right now. Try again?",
+                variant: "destructive",
+            });
+        } finally {
+            setIsSubmittingEmail(false);
         }
     };
 
@@ -426,7 +466,46 @@ export default function Course() {
                         )}
                     </div>
 
-                    <div className="flex items-center justify-between">
+                    {!user && (
+                        <div className="mt-8 bg-gradient-to-br from-indigo-900/40 to-slate-900 border border-indigo-500/20 rounded-xl overflow-hidden relative shadow-lg">
+                            <div className="p-6 md:p-8 flex flex-col md:flex-row items-center gap-6 relative z-10">
+                                <div className="flex-1 text-center md:text-left">
+                                    <h3 className="text-2xl font-black text-white mb-2 flex flex-row justify-center md:justify-start items-center gap-2">
+                                        <Target className="w-6 h-6 text-indigo-400" />
+                                        Free Practice Aid PDF
+                                    </h3>
+                                    <p className="text-slate-300 text-sm max-w-md mx-auto md:mx-0">
+                                        Having trouble getting to the chord tones in time? Get the free <strong>Hitting Chord Tones PDF</strong> guide sent straight to your inbox to study offline.
+                                    </p>
+                                </div>
+                                <div className="w-full md:w-auto min-w-[300px]">
+                                    {isEmailSubmitted ? (
+                                        <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4 text-center">
+                                            <CheckCircle className="w-8 h-8 text-green-400 mx-auto mb-2" />
+                                            <p className="text-green-300 font-bold text-sm">Perfect. PDF is on the way!</p>
+                                        </div>
+                                    ) : (
+                                        <form onSubmit={handleEmailSubmit} className="flex flex-col gap-3">
+                                            <input
+                                                type="email"
+                                                placeholder="Enter your email address..."
+                                                value={emailInput}
+                                                onChange={(e) => setEmailInput(e.target.value)}
+                                                required
+                                                className="w-full bg-black/40 border border-slate-700 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-lg px-4 py-3 text-white placeholder-slate-500"
+                                            />
+                                            <Button type="submit" disabled={isSubmittingEmail || !emailInput} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-6">
+                                                {isSubmittingEmail ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Send className="w-5 h-5 mr-2" />}
+                                                Send me the Free PDF
+                                            </Button>
+                                        </form>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="flex items-center justify-between mt-6">
                         <div>
                             <h2 className="text-2xl font-bold">{activeVideoData?.title}</h2>
                             {activeVideoData?.description && (

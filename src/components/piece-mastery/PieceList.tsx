@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Play, Edit, Trash2, Music, X } from "lucide-react";
+import { Plus, Play, Edit, Trash2, Music, X, Repeat, Mic } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Piece } from "./types";
 import { PieceEditor } from "./PieceEditor";
@@ -108,6 +108,30 @@ export function PieceList({ onSelectPiece, onExit }: PieceListProps) {
             </div>
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {/* Static Mock Piece for "Free Feedback Loop" */}
+                <Card
+                    className="cursor-pointer border-dashed hover:border-primary hover:bg-muted/50 transition-colors group relative overflow-hidden flex flex-col items-center justify-center p-6 text-center"
+                    onClick={() => onSelectPiece({
+                        id: 'free-loop',
+                        user_id: user?.id || '',
+                        name: 'Free Feedback Loop',
+                        audio_url: null,
+                        segment_seconds: 15, // default
+                        duration_seconds: 0,
+                        notes: '',
+                        created_at: new Date().toISOString()
+                    })}
+                >
+                    <Repeat className="w-12 h-12 text-muted-foreground mb-4 group-hover:text-primary transition-colors" />
+                    <h3 className="text-xl font-bold mb-2">Free Feedback Loop</h3>
+                    <p className="text-sm text-muted-foreground mb-4">
+                        A tight play-and-listen cycle. No backing track needed.
+                    </p>
+                    <Button variant="secondary" className="w-full group-hover:bg-primary group-hover:text-primary-foreground">
+                        <Mic className="mr-2 h-4 w-4" /> Start Loop
+                    </Button>
+                </Card>
+
                 {pieces.map((piece) => (
                     <Card
                         key={piece.id}

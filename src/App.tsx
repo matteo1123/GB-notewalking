@@ -8,6 +8,7 @@ import { AutoRecordProvider } from "@/contexts/AutoRecordContext";
 import { PracticeSettingsProvider } from "@/contexts/PracticeSettingsContext";
 import { RecitalProvider } from "@/contexts/RecitalContext";
 import { RecitalBanner } from "@/components/RecitalBanner";
+import { Analytics } from "@/components/Analytics";
 import Index from "./pages/Index";
 import RecitalPage from "./pages/Recital";
 import Premium from "./pages/Premium";
@@ -42,6 +43,7 @@ const App = () => (
               <Toaster />
               <Sonner />
               <BrowserRouter>
+                <Analytics />
                 <RecitalBanner />
                 <Routes>
                   <Route path="/" element={<Index />} />

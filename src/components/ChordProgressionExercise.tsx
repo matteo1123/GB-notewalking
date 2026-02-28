@@ -22,7 +22,7 @@ import Fretboard from "./Fretboard";
 import { FretboardPainter } from "./FretboardPainter";
 import { useSession } from "@/contexts/SessionContext";
 import { createDegreeMap, findAllNoteOccurrences } from "@/lib/musicTheory";
-import { getChordTones, calculateDegreeFromRoot } from "@/lib/chordProgression";
+import { getChordTones, calculateDegreeFromRoot, getChordInfo } from "@/lib/chordProgression";
 import { ChordNumeral } from "@/types/chords";
 import { ForceLandscapeWrapper } from "./ForceLandscapeWrapper";
 import {
@@ -41,6 +41,7 @@ const DEFAULT_SETTINGS: ChordProgressionSettings = {
     droneVolume: 0.5,
     promptFretboardPainter: true,
     droneMode: "pedal",
+    scaleView: "major",
 };
 
 const KEYS = [
@@ -70,7 +71,7 @@ interface ChordProgressionExerciseProps {
     onConfigChange?: (config: NotewalkingModuleConfig) => void;
 }
 
-export function ChordProgressionExercise({ autoStart = false, sessionId, onExit, moduleConfig, onConfigChange }: ChordProgressionExerciseProps) {
+export function ChordProgressionExercise({ autoStart = true, sessionId, onExit, moduleConfig, onConfigChange }: ChordProgressionExerciseProps) {
     const [settings, setSettings] = useState<ChordProgressionSettings>(() => {
         let initChords = (moduleConfig?.chords as any) || DEFAULT_SETTINGS.selectedChords;
         if (Array.isArray(initChords)) {
@@ -86,6 +87,7 @@ export function ChordProgressionExercise({ autoStart = false, sessionId, onExit,
             droneEnabled: DEFAULT_SETTINGS.droneEnabled,
             promptFretboardPainter: moduleConfig?.prompt_fretboard_painter ?? DEFAULT_SETTINGS.promptFretboardPainter,
             droneMode: moduleConfig?.drone_mode ?? DEFAULT_SETTINGS.droneMode,
+            scaleView: moduleConfig?.scale_view ?? DEFAULT_SETTINGS.scaleView,
         };
     });
     const [isPlaying, setIsPlaying] = useState(autoStart);
@@ -112,6 +114,7 @@ export function ChordProgressionExercise({ autoStart = false, sessionId, onExit,
                 const newMeasures = moduleConfig.measures_per_chord || prev.measuresPerChord;
                 const newPainter = moduleConfig.prompt_fretboard_painter ?? prev.promptFretboardPainter;
                 const newDroneMode = moduleConfig.drone_mode ?? prev.droneMode;
+                const newScaleView = moduleConfig.scale_view ?? prev.scaleView;
 
                 // Stop the Infinite Loop: Bail out if nothing actually changed
                 if (
@@ -119,7 +122,8 @@ export function ChordProgressionExercise({ autoStart = false, sessionId, onExit,
                     newKey === prev.key &&
                     newMeasures === prev.measuresPerChord &&
                     newPainter === prev.promptFretboardPainter &&
-                    newDroneMode === prev.droneMode
+                    newDroneMode === prev.droneMode &&
+                    newScaleView === prev.scaleView
                 ) {
                     return prev;
                 }
@@ -131,6 +135,7 @@ export function ChordProgressionExercise({ autoStart = false, sessionId, onExit,
                     measuresPerChord: newMeasures,
                     promptFretboardPainter: newPainter,
                     droneMode: newDroneMode,
+                    scaleView: newScaleView,
                     // droneEnabled not in config
                 };
             });
@@ -269,19 +274,37 @@ export function ChordProgressionExercise({ autoStart = false, sessionId, onExit,
     }, []);
 
     useEffect(() => {
-        const dMap = createDegreeMap(settings.key);
+        const majorMap = createDegreeMap(settings.key, "major");
+        const minorMap = createDegreeMap(settings.key, "minor");
+        const dMap = new Map<string, number>();
+
+        if (settings.scaleView === "minor") {
+            minorMap.forEach((v, k) => dMap.set(k, v));
+        } else if (settings.scaleView === "both") {
+            majorMap.forEach((v, k) => dMap.set(k, v));
+            minorMap.forEach((v, k) => dMap.set(k, v));
+        } else {
+            // default major
+            majorMap.forEach((v, k) => dMap.set(k, v));
+        }
+
         setDegreeMap(dMap);
         const notes: any[] = [];
         const noteNames = Array.from(dMap.keys());
-        const degreeToNote = new Map<number, string>();
-        dMap.forEach((degree, note) => degreeToNote.set(degree, note));
+
+        // Build multi-map for degree -> notes (allows flat 3rd AND natural 3rd to both be active "3"s)
+        const degreeToNotes = new Map<number, string[]>();
+        dMap.forEach((degree, note) => {
+            if (!degreeToNotes.has(degree)) degreeToNotes.set(degree, []);
+            degreeToNotes.get(degree)!.push(note);
+        });
 
         const structureNotes = new Set<string>();
         settings.selectedChords.forEach(numeral => {
             const tones = getChordTones(numeral as ChordNumeral);
             tones.forEach(t => {
-                const n = degreeToNote.get(t);
-                if (n) structureNotes.add(n);
+                const nList = degreeToNotes.get(t);
+                if (nList) nList.forEach(n => structureNotes.add(n));
             });
         });
 
@@ -289,8 +312,8 @@ export function ChordProgressionExercise({ autoStart = false, sessionId, onExit,
         if (settings.selectedChords[currentChordIndex]) {
             const tones = getChordTones(settings.selectedChords[currentChordIndex] as ChordNumeral);
             tones.forEach(t => {
-                const n = degreeToNote.get(t);
-                if (n) activeNotes.add(n);
+                const nList = degreeToNotes.get(t);
+                if (nList) nList.forEach(n => activeNotes.add(n));
             });
         }
 
@@ -301,9 +324,12 @@ export function ChordProgressionExercise({ autoStart = false, sessionId, onExit,
 
             const num = parseInt(e.key, 10);
             if (num >= 1 && num <= 7) {
-                const targetNote = degreeToNote.get(num);
-                if (targetNote && targetNote !== simulatedNote) {
-                    setSimulatedNote(targetNote);
+                const targetNotes = degreeToNotes.get(num);
+                if (targetNotes && targetNotes.length > 0) {
+                    // Just take the first one for simulated keyboard pressing (since keyboard input is simple 1-7)
+                    if (targetNotes[0] !== simulatedNote) {
+                        setSimulatedNote(targetNotes[0]);
+                    }
                 }
             }
         };
@@ -349,7 +375,7 @@ export function ChordProgressionExercise({ autoStart = false, sessionId, onExit,
             window.removeEventListener('keydown', handleKeyDown);
             window.removeEventListener('keyup', handleKeyUp);
         };
-    }, [settings.key, settings.selectedChords, currentChordIndex, detectedPitch, simulatedNote, revealedFrets, getGuitarPitch]);
+    }, [settings.key, settings.selectedChords, settings.scaleView, currentChordIndex, detectedPitch, simulatedNote, revealedFrets, getGuitarPitch]);
 
     const metronomeSettings: MetronomeSettings = {
         mode,
@@ -477,7 +503,8 @@ export function ChordProgressionExercise({ autoStart = false, sessionId, onExit,
                         chords: updated.selectedChords as string[],
                         measures_per_chord: updated.measuresPerChord,
                         prompt_fretboard_painter: updated.promptFretboardPainter,
-                        drone_mode: updated.droneMode
+                        drone_mode: updated.droneMode,
+                        scale_view: updated.scaleView
                     });
                 }
 
@@ -531,6 +558,18 @@ export function ChordProgressionExercise({ autoStart = false, sessionId, onExit,
     const scaleDegree = detectedNote ? calculateDegreeFromRoot(detectedNote, settings.key) : null;
     const degreeColor = scaleDegree ? DEGREE_COLORS[scaleDegree] || "#666" : "#666";
 
+    // Helpers for top banners
+    const getFormattedChordName = (key: string, numeral: ChordNumeral) => {
+        const info = getChordInfo(key, numeral);
+        const isMinor = numeral.toLowerCase() === numeral && !numeral.endsWith('°');
+        const isDim = numeral.endsWith('°');
+        return `${info.rootNote}${isMinor ? 'm' : isDim ? 'dim' : ''}`;
+    };
+
+    const getFormattedChordTones = (numeral: ChordNumeral) => {
+        return getChordTones(numeral).join(", ");
+    };
+
     return (
         <>
             {/* @LANDSCAPE-LOCK: Do not remove ForceLandscapeWrapper — it forces landscape on mobile phones */}
@@ -554,21 +593,7 @@ export function ChordProgressionExercise({ autoStart = false, sessionId, onExit,
                                 </Select>
                             </div>
 
-                            {/* Chord Slots - Compact */}
-                            <div className="flex gap-1">
-                                <button
-                                    className={`flex-1 py-1 rounded border text-sm font-bold ${activeSlot === 0 ? "bg-primary text-primary-foreground" : "bg-muted"}`}
-                                    onClick={() => setActiveSlot(0)}
-                                >
-                                    {currentChordA}
-                                </button>
-                                <button
-                                    className={`flex-1 py-1 rounded border text-sm font-bold ${activeSlot === 1 ? "bg-primary text-primary-foreground" : "bg-muted"}`}
-                                    onClick={() => setActiveSlot(1)}
-                                >
-                                    {currentChordB}
-                                </button>
-                            </div>
+                            {/* Chord Slots - Compact (REMOVED: Now handled by top banners) */}
 
                             {/* Chord Grid - 4 cols */}
                             <div className="grid grid-cols-4 gap-0.5 flex-1 overflow-y-auto">
@@ -599,7 +624,12 @@ export function ChordProgressionExercise({ autoStart = false, sessionId, onExit,
 
                                 <Select
                                     value={settings.droneMode}
-                                    onValueChange={(v: "pedal" | "chord-major" | "chord-minor") => handleSettingsChange({ droneMode: v })}
+                                    onValueChange={(v: "pedal" | "chord-major" | "chord-minor") => {
+                                        const update: Partial<ChordProgressionSettings> = { droneMode: v };
+                                        if (v === "chord-major") update.scaleView = "major";
+                                        if (v === "chord-minor") update.scaleView = "minor";
+                                        handleSettingsChange(update);
+                                    }}
                                     disabled={!settings.droneEnabled}
                                 >
                                     <SelectTrigger className="h-6 text-[10px] px-1 w-20 bg-background">
@@ -613,6 +643,24 @@ export function ChordProgressionExercise({ autoStart = false, sessionId, onExit,
                                 </Select>
                             </div>
 
+                            {/* Scale View */}
+                            <div className="flex items-center justify-between gap-1 w-full bg-muted/50 rounded p-1 border mt-1">
+                                <span className="text-[10px] text-muted-foreground ml-1 font-bold">Scale View</span>
+                                <Select
+                                    value={settings.scaleView}
+                                    onValueChange={(v: "major" | "minor" | "both") => handleSettingsChange({ scaleView: v })}
+                                >
+                                    <SelectTrigger className="h-6 text-[10px] px-1 w-20 bg-background">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="major" className="text-[10px] py-1">Major</SelectItem>
+                                        <SelectItem value="minor" className="text-[10px] py-1">Minor</SelectItem>
+                                        <SelectItem value="both" className="text-[10px] py-1">Both</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
                             {/* Fretboard Button - Removed */}
                         </div>
 
@@ -621,15 +669,28 @@ export function ChordProgressionExercise({ autoStart = false, sessionId, onExit,
                             {/* Inner Top Header: Chord A | Mic Tuner | Chord B */}
                             <div className="h-[40px] md:h-auto flex flex-row shrink-0 border-b border-gray-800">
                                 {/* Chord A */}
-                                <div className={`flex-1 flex justify-center items-center py-1 transition-colors duration-300 gap-2 border-r border-gray-800 ${activeSlot === 0 ? 'bg-blue-900/20' : ''}`}>
-                                    <div className="flex flex-col items-end mr-2">
+                                <button
+                                    onClick={() => setActiveSlot(0)}
+                                    className={`relative flex-1 flex justify-center items-center py-1 transition-all duration-300 gap-3 border-r border-gray-800 ${activeSlot === 0 ? 'bg-blue-900/30 ring-2 ring-inset ring-blue-500 shadow-[inset_0_0_15px_rgba(59,130,246,0.3)] z-10' : 'hover:bg-gray-800/50'
+                                        } ${currentChordIndex === 0 && isPlaying ? 'bg-yellow-500/20' : ''}`}
+                                >
+                                    {currentChordIndex === 0 && isPlaying && (
+                                        <div className="absolute top-1 left-2 text-[10px] font-black text-yellow-400 animate-pulse tracking-widest hidden md:block">
+                                            ▶ PLAYING
+                                        </div>
+                                    )}
+                                    <div className="flex flex-col items-end text-right">
                                         <h4 className="text-[10px] md:text-xs font-bold text-gray-400">Chord A</h4>
-                                        <div className="text-[8px] md:text-[10px] font-mono text-gray-400">{settings.key} {currentChordA}</div>
+                                        <div className="text-[9px] md:text-[11px] font-black text-white">{getFormattedChordName(settings.key, currentChordA as ChordNumeral)}</div>
+                                        <div className="text-[8px] md:text-[9px] font-mono text-gray-500">Tones: {getFormattedChordTones(currentChordA as ChordNumeral)}</div>
                                     </div>
-                                    <div className={`text-xl md:text-3xl font-black ${activeSlot === 0 ? 'text-blue-400 drop-shadow-[0_0_8px_rgba(96,165,250,0.5)]' : 'text-gray-500'}`}>
+                                    <div className={`text-2xl md:text-3xl font-black ${currentChordIndex === 0 && isPlaying ? 'text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.6)]' :
+                                            activeSlot === 0 ? 'text-blue-400 drop-shadow-[0_0_8px_rgba(96,165,250,0.5)]' : 'text-gray-500'
+                                        }`}
+                                    >
                                         {currentChordA}
                                     </div>
-                                </div>
+                                </button>
 
                                 {/* Floating Tiny Tuner */}
                                 <div className="w-[120px] shrink-0 border-l border-r border-gray-800 bg-black flex flex-col relative justify-center items-center z-10 shadow-xl">
@@ -656,15 +717,28 @@ export function ChordProgressionExercise({ autoStart = false, sessionId, onExit,
                                 </div>
 
                                 {/* Chord B */}
-                                <div className={`flex-1 flex justify-center items-center py-1 transition-colors duration-300 gap-2 ${activeSlot === 1 ? 'bg-orange-900/20' : ''}`}>
-                                    <div className={`text-xl md:text-3xl font-black ${activeSlot === 1 ? 'text-orange-400 drop-shadow-[0_0_8px_rgba(251,146,60,0.5)]' : 'text-gray-500'}`}>
+                                <button
+                                    onClick={() => setActiveSlot(1)}
+                                    className={`relative flex-1 flex justify-center items-center py-1 transition-all duration-300 gap-3 ${activeSlot === 1 ? 'bg-orange-900/30 ring-2 ring-inset ring-orange-500 shadow-[inset_0_0_15px_rgba(249,115,22,0.3)] z-10' : 'hover:bg-gray-800/50'
+                                        } ${currentChordIndex === 1 && isPlaying ? 'bg-yellow-500/20' : ''}`}
+                                >
+                                    {currentChordIndex === 1 && isPlaying && (
+                                        <div className="absolute top-1 right-2 text-[10px] font-black text-yellow-400 animate-pulse tracking-widest hidden md:block">
+                                            PLAYING ◀
+                                        </div>
+                                    )}
+                                    <div className={`text-2xl md:text-3xl font-black ${currentChordIndex === 1 && isPlaying ? 'text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.6)]' :
+                                            activeSlot === 1 ? 'text-orange-400 drop-shadow-[0_0_8px_rgba(251,146,60,0.5)]' : 'text-gray-500'
+                                        }`}
+                                    >
                                         {currentChordB}
                                     </div>
-                                    <div className="flex flex-col items-start ml-2">
+                                    <div className="flex flex-col items-start text-left">
                                         <h4 className="text-[10px] md:text-xs font-bold text-gray-400">Chord B</h4>
-                                        <div className="text-[8px] md:text-[10px] font-mono text-gray-400">{settings.key} {currentChordB}</div>
+                                        <div className="text-[9px] md:text-[11px] font-black text-white">{getFormattedChordName(settings.key, currentChordB as ChordNumeral)}</div>
+                                        <div className="text-[8px] md:text-[9px] font-mono text-gray-500">Tones: {getFormattedChordTones(currentChordB as ChordNumeral)}</div>
                                     </div>
-                                </div>
+                                </button>
                             </div>
 
                             {/* The Fretboard */}

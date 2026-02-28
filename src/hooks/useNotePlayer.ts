@@ -78,14 +78,14 @@ export function useNotePlayer(audioContext: AudioContext | null) {
         if (audioBufferCache.current[formattedChord]) {
           buffer = audioBufferCache.current[formattedChord];
         } else {
-          // Fetch signed URL first since Guitar bucket is private
-          const { data, error } = await supabase.storage.from('Guitar').createSignedUrl(`${formattedChord}.mp3`, 3600);
-          if (error || !data) {
-            console.error(`Failed to get signed URL for chord ${formattedChord}`, error);
+          // Guitar bucket is public — use getPublicUrl for direct access
+          const { data } = supabase.storage.from('Guitar').getPublicUrl(`${formattedChord}.mp3`);
+          if (!data?.publicUrl) {
+            console.error(`Failed to get public URL for chord ${formattedChord}`);
             return;
           }
 
-          const response = await fetch(data.signedUrl);
+          const response = await fetch(data.publicUrl);
           const arrayBuffer = await response.arrayBuffer();
           buffer = await audioContext.decodeAudioData(arrayBuffer);
           audioBufferCache.current[formattedChord] = buffer;
@@ -120,10 +120,10 @@ export function useNotePlayer(audioContext: AudioContext | null) {
         if (audioBufferCache.current[formattedChord]) return;
 
         try {
-          const { data, error } = await supabase.storage.from('Guitar').createSignedUrl(`${formattedChord}.mp3`, 3600);
-          if (error || !data) return;
+          const { data } = supabase.storage.from('Guitar').getPublicUrl(`${formattedChord}.mp3`);
+          if (!data?.publicUrl) return;
 
-          const response = await fetch(data.signedUrl);
+          const response = await fetch(data.publicUrl);
           const arrayBuffer = await response.arrayBuffer();
           const buffer = await audioContext.decodeAudioData(arrayBuffer);
           audioBufferCache.current[formattedChord] = buffer;

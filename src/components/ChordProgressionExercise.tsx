@@ -40,7 +40,7 @@ const DEFAULT_SETTINGS: ChordProgressionSettings = {
     droneEnabled: true,
     droneVolume: 0.5,
     promptFretboardPainter: true,
-    droneMode: "chord-major",
+    droneMode: "pedal",
 };
 
 const KEYS = [
@@ -423,8 +423,8 @@ export function ChordProgressionExercise({ autoStart = false, sessionId, onExit,
             }
 
             if (wasPlaying) {
-                // metronome.stop();
-                // We keep it running and just sync changes
+                metronome.stop();
+                setTimeout(() => metronome.start(), 100);
             }
         },
         [metronome, onConfigChange, moduleConfig]

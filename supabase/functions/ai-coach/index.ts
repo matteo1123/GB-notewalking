@@ -836,7 +836,7 @@ function createModuleConfig(input: any) {
                 key: input.notewalking_key || "C",
                 chords: input.notewalking_chords || ["I", "IV", "V"],
                 measures_per_chord: input.measures_per_chord || 4,
-                drone_mode: input.drone_mode || "chord-major",
+                drone_mode: input.drone_mode || "pedal",
             };
             break;
 

@@ -80,8 +80,43 @@ serve(async (req) => {
 
 async function handleCoursePurchase(session: any) {
     const customerId = session.customer;
+    const subscriptionPriceId = session.metadata?.subscriptionPriceId;
 
-    // We need the user's Supabase ID via the stripe_customer_id
+    // 1. Manage the payment method for future subscriptions
+    const paymentIntentId = session.payment_intent;
+    let paymentMethodId = null;
+
+    if (paymentIntentId) {
+        try {
+            const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+            paymentMethodId = paymentIntent.payment_method;
+            if (paymentMethodId && customerId) {
+                // Set as default payment method (setup_future_usage already attached it)
+                await stripe.customers.update(customerId, {
+                    invoice_settings: { default_payment_method: paymentMethodId as string },
+                });
+            }
+        } catch (err) {
+            console.error("Error setting default payment method:", err);
+        }
+    }
+
+    // 2. Create the 90-day trial subscription
+    if (customerId && subscriptionPriceId) {
+        try {
+            await stripe.subscriptions.create({
+                customer: customerId,
+                items: [{ price: subscriptionPriceId }],
+                trial_period_days: 90,
+                default_payment_method: paymentMethodId as string | undefined,
+                metadata: { source: 'course_purchase_auto' }
+            });
+        } catch (err) {
+            console.error("Error creating auto-subscription:", err);
+        }
+    }
+
+    // 3. We need the user's Supabase ID via the stripe_customer_id to update app access
     if (customerId) {
         const { data: profile } = await supabase
             .from("profiles")

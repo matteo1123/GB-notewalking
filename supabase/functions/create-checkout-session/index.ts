@@ -87,53 +87,31 @@ serve(async (req) => {
                 .eq("id", user.id);
         }
 
-        // 4. Create Checkout Session
         const isCoursePurchase = metadata.type === 'course_purchase' && subscriptionPriceId;
-
-        const lineItems = isCoursePurchase ? [
-            // The ongoing subscription
-            {
-                price: subscriptionPriceId,
-                quantity: 1,
-            },
-            // The one-time course fee
-            {
-                price: priceId,
-                quantity: 1,
-            }
-        ] : [
-            {
-                price: priceId,
-                quantity: 1,
-            }
-        ];
 
         const sessionParams: Stripe.Checkout.SessionCreateParams = {
             customer: customerId,
-            line_items: lineItems,
-            mode: isCoursePurchase ? 'subscription' : (mode as Stripe.Checkout.SessionCreateParams.Mode),
+            line_items: [{ price: priceId, quantity: 1 }],
+            mode: isCoursePurchase ? 'payment' : (mode as Stripe.Checkout.SessionCreateParams.Mode),
             success_url: `${frontendUrl}/premium?success=true`,
             cancel_url: `${frontendUrl}/premium?canceled=true`,
         };
 
         if (isCoursePurchase) {
-            sessionParams.subscription_data = {
-                trial_period_days: 90,
+            // Include subscriptionPriceId in metadata so the webhook can create the subscription
+            metadata.subscriptionPriceId = subscriptionPriceId;
+            sessionParams.payment_intent_data = {
+                setup_future_usage: 'off_session',
                 metadata: metadata
             };
+        } else if (mode === 'subscription') {
+            sessionParams.subscription_data = { metadata };
+        } else if (mode === 'payment') {
+            sessionParams.payment_intent_data = { metadata };
         }
 
-        // Attach metadata to the session if provided (useful for webhooks)
         if (Object.keys(metadata).length > 0) {
             sessionParams.metadata = metadata;
-            if (!isCoursePurchase) {
-                // Also attach it to the resulting subscription/payment intent so the webhook can see it
-                if (mode === 'subscription') {
-                    sessionParams.subscription_data = { metadata };
-                } else if (mode === 'payment') {
-                    sessionParams.payment_intent_data = { metadata };
-                }
-            }
         }
 
         const session = await stripe.checkout.sessions.create(sessionParams);

@@ -267,8 +267,14 @@ const PremiumContent = () => {
       }
 
     } catch (err: any) {
-      console.error("Purchase error:", err);
-      toast.error("Failed to start checkout: " + err.message);
+      console.error("Purchase error raw:", err);
+      if (err.context && typeof err.context.json === 'function') {
+        const body = await err.context.json().catch(() => ({}));
+        console.error("Purchase error body:", body);
+        toast.error(body.error || err.message);
+      } else {
+        toast.error("Failed to start checkout: " + err.message);
+      }
     } finally {
       setIsBuyingCourse(false);
     }
@@ -394,7 +400,7 @@ const PremiumContent = () => {
               size="sm"
               variant="outline"
               className="hidden lg:flex border-indigo-600 text-indigo-400 hover:bg-indigo-600/10 text-xs sm:text-sm px-2 sm:px-3"
-              onClick={() => navigate('/course?lesson=706c6c67-1c6e-45b9-a302-a7272d0ce85a&autoplay=1')}
+              onClick={() => navigate('/course?autoplay=1')}
             >
               <span className="hidden sm:inline">Course</span>
               <span className="sm:hidden">Course</span>

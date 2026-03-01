@@ -118,7 +118,7 @@ export default function Course() {
     const getEmbedUrl = (url: string) => {
         if (!url) return '';
         try {
-            const shouldAutoplay = searchParams.get('autoplay') === '1' && searchParams.get('lesson') === activeVideo;
+            const shouldAutoplay = searchParams.get('autoplay') === '1' || !searchParams.has('lesson');
 
             // Handle Bunny Stream URLs
             if (url.includes('player.mediadelivery.net/embed/')) {
@@ -221,8 +221,14 @@ export default function Course() {
                 throw new Error('No checkout URL returned');
             }
         } catch (err: any) {
-            console.error("Purchase error:", err);
-            toast({ title: "Checkout Error", description: err.message, variant: "destructive" });
+            console.error("Purchase error raw:", err);
+            if (err.context && typeof err.context.json === 'function') {
+                const body = await err.context.json().catch(() => ({}));
+                console.error("Purchase error body:", body);
+                toast({ title: "Checkout Error", description: body.error || err.message, variant: "destructive" });
+            } else {
+                toast({ title: "Checkout Error", description: err.message, variant: "destructive" });
+            }
         } finally {
             setIsBuyingCourse(false);
         }

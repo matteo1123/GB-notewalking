@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
-import { Play, Pause, CheckCircle, Music, Clock, RotateCcw, ChevronRight, Calendar } from 'lucide-react';
+import { Play, Pause, CheckCircle, Music, Clock, RotateCcw, ChevronRight, Calendar, Sparkles } from 'lucide-react';
 import type { SessionBlock } from '@/lib/sessionGenerator';
 
 interface RecordedAudio {
@@ -13,6 +13,7 @@ interface RecordedAudio {
     module_type: string;
     duration: number;
     created_at: string;
+    practice_evaluations?: { ai_feedback: string }[];
 }
 
 interface SessionRecapProps {
@@ -107,7 +108,12 @@ export function SessionRecap({ onStartNewSession }: SessionRecapProps) {
             // Fetch recordings from this session
             const { data: recordingsData } = await supabase
                 .from('practice_log')
-                .select('id, audio, module_type, duration, created_at')
+                .select(`
+                    id, audio, module_type, duration, created_at,
+                    practice_evaluations (
+                        ai_feedback
+                    )
+                `)
                 .eq('session_id', session.id)
                 .not('audio', 'is', null);
 
@@ -316,6 +322,14 @@ export function SessionRecap({ onStartNewSession }: SessionRecapProps) {
                                             <span className="text-primary">• Up next</span>
                                         )}
                                     </div>
+                                    {recording.practice_evaluations?.[0]?.ai_feedback && (
+                                        <div className="mt-3 p-3 bg-primary/5 rounded border border-primary/20 text-sm">
+                                            <span className="font-semibold text-primary flex items-center gap-1 mb-1">
+                                                <Sparkles className="w-3 h-3" /> AI Coach Feedback
+                                            </span>
+                                            <p className="whitespace-pre-wrap">{recording.practice_evaluations[0].ai_feedback}</p>
+                                        </div>
+                                    )}
                                 </div>
                                 {index < recordings.length - 1 && autoPlayQueue.length === 0 && currentlyPlaying !== index && (
                                     <ChevronRight className="w-4 h-4 text-muted-foreground" />

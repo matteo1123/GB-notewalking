@@ -33,6 +33,18 @@ import {
     SelectValue,
 } from "./ui/select";
 
+// Helpers for top banners & chord tracking
+const getFormattedChordName = (key: string, numeral: ChordNumeral) => {
+    const info = getChordInfo(key, numeral);
+    const isMinor = numeral.toLowerCase() === numeral && !numeral.endsWith('°');
+    const isDim = numeral.endsWith('°');
+    return `${info.rootNote}${isMinor ? 'm' : isDim ? 'dim' : ''}`;
+};
+
+const getFormattedChordTones = (numeral: ChordNumeral) => {
+    return getChordTones(numeral).join(", ");
+};
+
 const DEFAULT_SETTINGS: ChordProgressionSettings = {
     key: "C",
     selectedChords: ["I", "IV"],
@@ -558,18 +570,6 @@ export function ChordProgressionExercise({ autoStart = true, sessionId, onExit, 
     const scaleDegree = detectedNote ? calculateDegreeFromRoot(detectedNote, settings.key) : null;
     const degreeColor = scaleDegree ? DEGREE_COLORS[scaleDegree] || "#666" : "#666";
 
-    // Helpers for top banners
-    const getFormattedChordName = (key: string, numeral: ChordNumeral) => {
-        const info = getChordInfo(key, numeral);
-        const isMinor = numeral.toLowerCase() === numeral && !numeral.endsWith('°');
-        const isDim = numeral.endsWith('°');
-        return `${info.rootNote}${isMinor ? 'm' : isDim ? 'dim' : ''}`;
-    };
-
-    const getFormattedChordTones = (numeral: ChordNumeral) => {
-        return getChordTones(numeral).join(", ");
-    };
-
     return (
         <>
             {/* @LANDSCAPE-LOCK: Do not remove ForceLandscapeWrapper — it forces landscape on mobile phones */}
@@ -685,7 +685,7 @@ export function ChordProgressionExercise({ autoStart = true, sessionId, onExit, 
                                         <div className="text-[8px] md:text-[9px] font-mono text-gray-500">Tones: {getFormattedChordTones(currentChordA as ChordNumeral)}</div>
                                     </div>
                                     <div className={`text-2xl md:text-3xl font-black ${currentChordIndex === 0 && isPlaying ? 'text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.6)]' :
-                                            activeSlot === 0 ? 'text-blue-400 drop-shadow-[0_0_8px_rgba(96,165,250,0.5)]' : 'text-gray-500'
+                                        activeSlot === 0 ? 'text-blue-400 drop-shadow-[0_0_8px_rgba(96,165,250,0.5)]' : 'text-gray-500'
                                         }`}
                                     >
                                         {currentChordA}
@@ -728,7 +728,7 @@ export function ChordProgressionExercise({ autoStart = true, sessionId, onExit, 
                                         </div>
                                     )}
                                     <div className={`text-2xl md:text-3xl font-black ${currentChordIndex === 1 && isPlaying ? 'text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.6)]' :
-                                            activeSlot === 1 ? 'text-orange-400 drop-shadow-[0_0_8px_rgba(251,146,60,0.5)]' : 'text-gray-500'
+                                        activeSlot === 1 ? 'text-orange-400 drop-shadow-[0_0_8px_rgba(251,146,60,0.5)]' : 'text-gray-500'
                                         }`}
                                     >
                                         {currentChordB}

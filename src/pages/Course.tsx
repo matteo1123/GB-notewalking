@@ -121,10 +121,11 @@ export default function Course() {
             const shouldAutoplay = searchParams.get('autoplay') === '1' || !searchParams.has('lesson');
 
             // Handle Bunny Stream URLs
-            if (url.includes('player.mediadelivery.net/embed/')) {
+            if (url.includes('player.mediadelivery.net/embed/') || url.includes('iframe.mediadelivery.net/embed/')) {
                 const bunnyUrl = new URL(url);
                 if (shouldAutoplay) {
                     bunnyUrl.searchParams.set('autoplay', 'true');
+                    bunnyUrl.searchParams.set('muted', 'true'); // Required by modern browsers for autoplay
                 }
                 return bunnyUrl.toString();
             }
@@ -134,6 +135,7 @@ export default function Course() {
                 const ytUrl = new URL(url);
                 if (shouldAutoplay && !ytUrl.searchParams.has('autoplay')) {
                     ytUrl.searchParams.set('autoplay', '1');
+                    ytUrl.searchParams.set('mute', '1'); // Required by modern browsers for autoplay
                 }
                 return ytUrl.toString();
             }
@@ -155,7 +157,10 @@ export default function Course() {
                     color: 'white', // Changes progress bar color
                 });
 
-                if (shouldAutoplay) params.append('autoplay', '1');
+                if (shouldAutoplay) {
+                    params.append('autoplay', '1');
+                    params.append('mute', '1'); // Required by modern browsers for autoplay
+                }
 
                 return `https://www.youtube.com/embed/${videoId}?${params.toString()}`;
             }

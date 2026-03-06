@@ -250,6 +250,9 @@ export const usePitchDetection = ({
     console.log("Attempting to start pitch detection...");
     try {
       console.log("Requesting microphone access...");
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("Microphone API not available. This might be because you are running locally without HTTPS.");
+      }
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           sampleRate: 44100,

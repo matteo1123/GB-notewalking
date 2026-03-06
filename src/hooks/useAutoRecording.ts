@@ -129,6 +129,9 @@ export function useAutoRecording(options: AutoRecordingOptions) {
                 }
                 stream = new MediaStream([audioTrack.clone()]);
             } else {
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    throw new Error("Microphone API not available. This might be because you are running locally without HTTPS.");
+                }
                 // Request new mic access
                 stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             }
@@ -232,7 +235,8 @@ export function useAutoRecording(options: AutoRecordingOptions) {
                     duration: recordingDurationSeconds,
                     audio: publicUrl,
                     module_type: moduleType,
-                    module_config: configWithMetronome,
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    module_config: configWithMetronome as any,
                     session_id: sessionId || null,
                     created_at: new Date().toISOString(),
                 })

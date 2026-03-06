@@ -30,10 +30,12 @@ export async function extractMonoFloat32Array(blob: Blob, targetSampleRate = 220
 /**
  * Executes the MIDI conversion in our background Web Worker
  */
+import BasicPitchWorker from '../workers/basicPitch.worker?worker';
+
 export async function convertAudioToMidiInWorker(float32Array: Float32Array): Promise<any[]> {
     return new Promise((resolve, reject) => {
         // Instantiate the worker using Vite's syntax
-        const worker = new Worker(new URL('../workers/basicPitch.worker.ts', import.meta.url), { type: 'module' });
+        const worker = new BasicPitchWorker();
 
         worker.onmessage = (e) => {
             const { type, payload } = e.data;

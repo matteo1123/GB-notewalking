@@ -23,6 +23,7 @@ export interface AutoRecordingState {
     scheduledClickCount: number | null; // When recording will start
     hasRecorded: boolean;
     isEvaluating: boolean;
+    feedback: string | null;
 }
 
 /**
@@ -69,6 +70,7 @@ export function useAutoRecording(options: AutoRecordingOptions) {
         scheduledClickCount: null,
         hasRecorded: false,
         isEvaluating: false,
+        feedback: null,
     });
 
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -305,10 +307,23 @@ export function useAutoRecording(options: AutoRecordingOptions) {
                 throw new Error(errResult.error || "Edge function failed");
             }
 
-            toast({
-                title: 'Evaluation Complete',
-                description: 'The AI Coach has provided feedback on your performance!',
-            });
+            const resultData = await response.json();
+
+            setState(prev => ({ ...prev, feedback: resultData.feedback }));
+
+            if (resultData.db_error) {
+                console.error("Evaluation saved with DB error:", resultData.db_error);
+                toast({
+                    title: 'Evaluation Complete (Not Saved)',
+                    description: `The AI Coach provided feedback, but we couldn't save it: ${resultData.db_error}`,
+                    variant: 'destructive',
+                });
+            } else {
+                toast({
+                    title: 'Evaluation Complete',
+                    description: 'The AI Coach has provided feedback on your performance!',
+                });
+            }
 
         } catch (err: any) {
             console.error("Evaluation pipeline failed:", err);
@@ -376,6 +391,7 @@ export function useAutoRecording(options: AutoRecordingOptions) {
             scheduledClickCount: null,
             hasRecorded: false,
             isEvaluating: false,
+            feedback: null,
         });
         recordedChunksRef.current = [];
         contextHistoryRef.current = [];

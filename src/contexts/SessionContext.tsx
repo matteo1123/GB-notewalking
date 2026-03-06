@@ -133,6 +133,26 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             if (completed) {
                 setCompletedSession(activeSession);
 
+                // Reward XP Points via Edge Function
+                try {
+                    const { data: { session: authSession } } = await supabase.auth.getSession();
+                    if (authSession?.access_token) {
+                        const moduleTypes = activeSession.session.session_plan.map(b => b.module_type);
+
+                        await supabase.functions.invoke('award-points', {
+                            body: {
+                                sessionId: activeSession.session.id,
+                                durationSeconds: activeSession.timeElapsed,
+                                moduleTypes,
+                                completed: true
+                            }
+                        });
+                        console.log("XP awarded for session completion");
+                    }
+                } catch (err) {
+                    console.error("Failed to award points:", err);
+                }
+
                 // Attempt to progress routine difficulty automatically
                 if (activeSession.routineId) {
                     try {

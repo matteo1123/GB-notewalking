@@ -233,14 +233,46 @@ export function useRoutines(): UseRoutinesReturn {
                 .from('practice_routines')
                 .select('*')
                 .eq('id', id)
-                .single();
+                .maybeSingle();
 
             if (fetchError) throw fetchError;
 
-            return data as PracticeRoutine;
+            if (data) {
+                return data as PracticeRoutine;
+            }
+
+            // Fallback: Check if it's a historical practice session
+            const { data: sessionData, error: sessionError } = await (supabase as any)
+                .from('practice_sessions')
+                .select('*')
+                .eq('id', id)
+                .maybeSingle();
+
+            if (sessionError) throw sessionError;
+
+            if (sessionData) {
+                return {
+                    id: sessionData.id,
+                    user_id: sessionData.user_id,
+                    name: `Past Session (${new Date(sessionData.started_at).toLocaleDateString()})`,
+                    description: "Replay a past practice session",
+                    icon: '🕒',
+                    color: 'gray',
+                    session_plan: sessionData.session_plan,
+                    total_duration_minutes: sessionData.total_duration_seconds ? Math.ceil(sessionData.total_duration_seconds / 60) : 0,
+                    is_active: true,
+                    is_favorite: false,
+                    times_practiced: 1,
+                    created_at: sessionData.started_at,
+                    updated_at: sessionData.started_at,
+                    created_by_ai: false
+                } as PracticeRoutine;
+            }
+
+            return null;
 
         } catch (err: any) {
-            console.error('Failed to get routine:', err);
+            console.error('Failed to get routine/session:', err);
             return null;
         }
     }, []);
@@ -323,6 +355,30 @@ export function useRoutines(): UseRoutinesReturn {
             const routine = routines.find(r => r.id === id);
             if (!routine) return false;
 
+            // If it's a history session, clicking favorite should save it as a real routine
+            if (routine.is_history) {
+                const originalSession = await getRoutine(id);
+                if (!originalSession) return false;
+
+                const newRoutine = await createRoutine({
+                    name: routine.name.replace("Recent: ", "Saved: "),
+                    description: "Saved from practice history",
+                    icon: '⭐',
+                    color: 'orange',
+                    session_plan: originalSession.session_plan,
+                    is_favorite: true,
+                });
+
+                if (newRoutine) {
+                    toast({
+                        title: 'Session Saved!',
+                        description: 'This past session is now saved as a favorite routine.',
+                    });
+                    return true;
+                }
+                return false;
+            }
+
             const { error: updateError } = await (supabase as any)
                 .from('practice_routines')
                 .update({ is_favorite: !routine.is_favorite })
@@ -341,7 +397,7 @@ export function useRoutines(): UseRoutinesReturn {
             console.error('Failed to toggle favorite:', err);
             return false;
         }
-    }, [routines]);
+    }, [routines, getRoutine, createRoutine, toast]);
 
     /**
      * Duplicate a routine with a new name

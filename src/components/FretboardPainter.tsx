@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Save, SkipForward } from 'lucide-react';
+import { Save, SkipForward, Sparkles } from 'lucide-react';
 import Fretboard from './Fretboard';
 import { useToast } from '@/hooks/use-toast';
 import { createDegreeMap, findAllNoteOccurrences } from '@/lib/musicTheory';
@@ -14,9 +14,10 @@ interface FretboardPainterProps {
     revealedFrets: Set<string>;
     onSave: () => void;
     onSkip: () => void;
+    aiFeedback?: string | null;
 }
 
-export function FretboardPainter({ sessionKey, chordPair, revealedFrets, onSave, onSkip }: FretboardPainterProps) {
+export function FretboardPainter({ sessionKey, chordPair, revealedFrets, onSave, onSkip, aiFeedback }: FretboardPainterProps) {
     const [comfortLevel, setComfortLevel] = useState<number>(2);
     const [paintedFrets, setPaintedFrets] = useState<Set<string>>(new Set(revealedFrets));
     const [dbData, setDbData] = useState<Record<string, number>>({});
@@ -248,8 +249,16 @@ export function FretboardPainter({ sessionKey, chordPair, revealedFrets, onSave,
                     </div>
 
                     {/* CENTER: The Fretboard */}
-                    <div className="flex-1 overflow-auto flex items-center justify-center p-2 relative min-h-0">
-                        <div className="w-full h-full max-w-[1200px] flex items-center justify-center notewalking-fretboard-override">
+                    <div className="flex-1 overflow-auto flex flex-col items-center justify-center p-2 relative min-h-0 gap-2">
+                        {aiFeedback && (
+                            <div className="w-full max-w-[1200px] flex-shrink-0 bg-purple-900/20 border border-purple-500/30 rounded-lg p-3 md:p-4 text-left shadow-lg overflow-y-auto max-h-[150px] md:max-h-[200px]">
+                                <h4 className="text-purple-400 font-bold flex items-center gap-2 mb-2 text-sm md:text-base">
+                                    <Sparkles className="w-4 h-4" /> AI Coach Feedback
+                                </h4>
+                                <p className="text-xs md:text-sm text-gray-300 whitespace-pre-wrap leading-relaxed">{aiFeedback}</p>
+                            </div>
+                        )}
+                        <div className="w-full h-full min-h-[150px] max-w-[1200px] flex items-center justify-center notewalking-fretboard-override">
                             <Fretboard
                                 selectedNotes={fretboardNotes}
                                 degreeMap={degreeMap}

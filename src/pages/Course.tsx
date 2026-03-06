@@ -9,6 +9,7 @@ import { Progress } from '@/components/ui/progress';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from '@/components/ui/textarea';
+import { useGamification } from '@/hooks/useGamification';
 
 // Updated Stripe Price ID ($29.99/mo)
 const STRIPE_PRICE_ID = "price_1T3lcJEOnRZP4MxPepztrhp6";
@@ -25,6 +26,15 @@ export interface CourseVideo {
     locked: boolean;
 }
 
+export interface RewardVideo {
+    id: string;
+    title: string;
+    description: string | null;
+    url: string;
+    unlock_cost: number;
+    prerequisite_level: number;
+}
+
 export default function Course() {
     const { user } = useAuth();
     const { toast } = useToast();
@@ -36,9 +46,15 @@ export default function Course() {
     const [enrollmentStatus, setEnrollmentStatus] = useState<string | null>(null);
     const [progress, setProgress] = useState<string[]>([]);
     const [videos, setVideos] = useState<CourseVideo[]>([]);
+    const [rewardVideos, setRewardVideos] = useState<RewardVideo[]>([]);
+    const [unlockedRewardVideoIds, setUnlockedRewardVideoIds] = useState<string[]>([]);
     const [activeVideo, setActiveVideo] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [isHowItWorksOpen, setIsHowItWorksOpen] = useState(false);
+
+    // Gamification Hook
+    const { points, level, refresh: refreshGamification } = useGamification();
+    const [isUnlocking, setIsUnlocking] = useState(false);
 
     // Question submission state
     const [questionText, setQuestionText] = useState('');
@@ -65,10 +81,10 @@ export default function Course() {
 
                 // Check enrollment
                 const { data: enrollment } = await supabase
-                    .from('course_enrollments' as any)
+                    .from('course_enrollments')
                     .select('status')
                     .eq('user_id', user.id)
-                    .maybeSingle();
+                    .maybeSingle() as { data: { status: string } | null, error: unknown };
 
                 if (enrollment) {
                     setEnrollmentStatus(enrollment.status);
@@ -76,33 +92,60 @@ export default function Course() {
 
                 // Load progress
                 const { data: progressData } = await supabase
-                    .from('course_progress' as any)
+                    .from('course_progress')
                     .select('video_id')
-                    .eq('user_id', user.id);
+                    .eq('user_id', user.id) as { data: { video_id: string }[] | null, error: unknown };
 
                 if (progressData) {
                     setProgress(progressData.map(p => p.video_id));
+                }
+
+                // Load unlocked reward videos
+                const { data: unlockedData } = await supabase
+                    .from('user_videos')
+                    .select('video_id')
+                    .eq('user_id', user.id);
+
+                if (unlockedData) {
+                    setUnlockedRewardVideoIds(unlockedData.map(uv => uv.video_id));
                 }
             } else {
                 // Guest user resets
                 setIsPremium(false);
                 setEnrollmentStatus(null);
                 setProgress([]);
+                setUnlockedRewardVideoIds([]);
             }
 
             // 2. Fetch course videos (public read access via RLS)
             const { data: videoData } = await supabase
-                .from('course_videos' as any)
+                .from('course_videos')
                 .select('*')
-                .order('order_index', { ascending: true });
+                .order('order_index', { ascending: true }) as { data: CourseVideo[] | null, error: unknown };
 
             if (videoData && videoData.length > 0) {
                 setVideos(videoData);
+            }
 
+            // 3. Fetch gamification reward videos
+            const { data: rewardData } = await supabase
+                .from('videos')
+                .select('*')
+                .order('created_at', { ascending: true }) as { data: RewardVideo[] | null, error: unknown };
+
+            if (rewardData) {
+                setRewardVideos(rewardData);
+            }
+
+            // Determine which video to show first
+            if (videoData && videoData.length > 0) {
                 // Allow direct linking to a lesson via ?lesson=ID
                 const requestedLesson = searchParams.get('lesson');
-                if (requestedLesson && videoData.find(v => v.id === requestedLesson)) {
-                    setActiveVideo(requestedLesson);
+                if (requestedLesson) {
+                    // Check if it's a standard lesson or a reward video
+                    if (videoData.find(v => v.id === requestedLesson) || rewardData?.find(r => r.id === requestedLesson)) {
+                        setActiveVideo(requestedLesson);
+                    }
                 } else {
                     const firstChordToneVideo = videoData.find(v => v.title.toLowerCase().includes('hit your first chord tone'));
                     setActiveVideo(firstChordToneVideo ? firstChordToneVideo.id : videoData[0].id);
@@ -176,16 +219,15 @@ export default function Course() {
         if (isCompleted) {
             // Remove completion
             const { error } = await supabase
-                .from('course_progress' as any)
+                .from('course_progress')
                 .delete()
-                .eq('user_id', user.id)
-                .eq('video_id', videoId);
+                .match({ user_id: user.id, video_id: videoId });
 
             if (!error) setProgress(prev => prev.filter(v => v !== videoId));
         } else {
             // Add completion
             const { error } = await supabase
-                .from('course_progress' as any)
+                .from('course_progress')
                 .insert({ user_id: user.id, video_id: videoId });
 
             if (!error) setProgress(prev => [...prev, videoId]);
@@ -225,29 +267,32 @@ export default function Course() {
             } else {
                 throw new Error('No checkout URL returned');
             }
-        } catch (err: any) {
-            console.error("Purchase error raw:", err);
-            if (err.context && typeof err.context.json === 'function') {
-                const body = await err.context.json().catch(() => ({}));
-                console.error("Purchase error body:", body);
-                toast({ title: "Checkout Error", description: body.error || err.message, variant: "destructive" });
-            } else {
-                toast({ title: "Checkout Error", description: err.message, variant: "destructive" });
+        } catch (err) {
+            console.error("Checkout error:", err);
+            if (typeof err === 'object' && err !== null && 'context' in err) {
+                const typedErr = err as { context: { json: () => Promise<{ error?: string }> } };
+                if (typeof typedErr.context.json === 'function') {
+                    const body = await typedErr.context.json().catch(() => ({} as { error?: string }));
+                    console.error("Purchase error body:", body);
+                    toast({ title: "Checkout Error", description: body.error || (err as Error).message, variant: "destructive" });
+                    return;
+                }
             }
+            toast({ title: "Checkout Error", description: (err as Error).message, variant: "destructive" });
         } finally {
             setIsBuyingCourse(false);
         }
     };
 
     const handleSubmitQuestion = async () => {
-        if (!user || !questionText.trim() || !activeVideoData) return;
+        if (!user || !questionText.trim() || !currentVideoTitle) return;
 
         setIsSubmittingQuestion(true);
         try {
             const { error } = await supabase.from('suggestions').insert({
                 content: questionText.trim(),
                 user_id: user.id,
-                source: `Course Video Question - ${activeVideoData.title}`
+                source: `Course Video Question - ${currentVideoTitle}`
             });
 
             if (error) throw error;
@@ -257,11 +302,11 @@ export default function Course() {
                 description: "Thanks for the question! I'll review it and get back to you.",
             });
             setQuestionText('');
-        } catch (error: any) {
-            console.error('Error submitting question:', error);
+        } catch (err) {
+            console.error("Error submitting question:", err);
             toast({
-                title: "Error",
-                description: "Failed to submit question. Please try again.",
+                title: "Error submitting question",
+                description: "Please try again later or contact support.",
                 variant: "destructive",
             });
         } finally {
@@ -275,15 +320,22 @@ export default function Course() {
 
         setIsSubmittingEmail(true);
         try {
-            const { error } = await supabase.from('email_subscribers').insert({
-                email: emailInput.trim(),
-                source: 'Course PDF Signup',
-                requested_resource: 'Hitting Chord Tones PDF',
-            });
+            const { error } = await supabase.from('email_subscribers').insert([
+                { email: emailInput, source: 'course_promo' }
+            ]);
 
-            // Note: Postgres will throw an error if the email violates the UNIQUE constraint.
-            // That's fine, we can either ignore or show "Already registered".
-            if (error && error.code !== '23505') throw error; // 23505 is unique violation
+            if (error) {
+                if (error.code === '23505') { // Unique violation
+                    toast({
+                        title: "Already Subscribed",
+                        description: "You're already on the list! Check your inbox for the PDF.",
+                    });
+                    setIsEmailSubmitted(true);
+                    setEmailInput('');
+                    return;
+                }
+                throw error;
+            }
 
             setIsEmailSubmitted(true);
             toast({
@@ -291,8 +343,6 @@ export default function Course() {
                 description: "Check your inbox for the Hitting Chord Tones PDF in the next few minutes.",
             });
             setEmailInput('');
-        } catch (error: any) {
-            console.error('Email sub error:', error);
             toast({
                 title: "Wait a second",
                 description: "We couldn't process your email right now. Try again?",
@@ -300,6 +350,60 @@ export default function Course() {
             });
         } finally {
             setIsSubmittingEmail(false);
+        }
+    };
+
+    const handleUnlockVideo = async (videoId: string, cost: number) => {
+        if (!user) return;
+
+        if (points < cost) {
+            toast({
+                title: "Not enough XP",
+                description: `You need ${cost} XP to unlock this video. Keep practicing!`,
+                variant: 'destructive'
+            });
+            return;
+        }
+
+        setIsUnlocking(true);
+        try {
+            // Optimistic update
+            setUnlockedRewardVideoIds(prev => [...prev, videoId]);
+
+            // Insert into user_videos
+            const { error: insertError } = await supabase
+                .from('user_videos')
+                .insert({ user_id: user.id, video_id: videoId });
+
+            if (insertError) throw insertError;
+
+            // Deduct points
+            const { error: updateError } = await supabase
+                .rpc('increment_user_points', {
+                    user_id_param: user.id,
+                    points_to_add: -cost // Subtract cost
+                });
+
+            if (updateError) throw updateError;
+
+            toast({
+                title: "Video Unlocked! 🎉",
+                description: "You've successfully unlocked this reward video.",
+            });
+
+            // Refresh global points
+            await refreshGamification();
+        } catch (err) {
+            console.error("Unlock error:", err);
+            // Revert optimistic update on failure
+            setUnlockedRewardVideoIds(prev => prev.filter(id => id !== videoId));
+            toast({
+                title: "Error",
+                description: "Failed to unlock video. Please try again.",
+                variant: 'destructive'
+            });
+        } finally {
+            setIsUnlocking(false);
         }
     };
 
@@ -313,7 +417,15 @@ export default function Course() {
     const completedCount = progress.length;
     const progressPercentage = videos.length > 0 ? Math.round((completedCount / videos.length) * 100) : 0;
 
-    const activeVideoData = videos.find(v => v.id === activeVideo);
+    const activeMainVideoData = videos.find(v => v.id === activeVideo);
+    const activeRewardVideoData = rewardVideos.find(v => v.id === activeVideo);
+    const isMainVideoActive = !!activeMainVideoData;
+
+    // Abstract the current video to make logic easier below
+    const currentVideoTitle = isMainVideoActive ? activeMainVideoData?.title : activeRewardVideoData?.title;
+    const currentVideoDesc = isMainVideoActive ? activeMainVideoData?.description : activeRewardVideoData?.description;
+    const currentVideoUrl = isMainVideoActive ? activeMainVideoData?.video_url : activeRewardVideoData?.url;
+    const isRewardUnlocked = user ? unlockedRewardVideoIds.includes(activeVideo || '') : false;
 
     return (
         <div className="container max-w-6xl mx-auto py-8 px-4">
@@ -430,8 +542,8 @@ export default function Course() {
                 {/* Main Video Area */}
                 <div className="lg:col-span-2 space-y-6">
                     <div className="aspect-video bg-[#0a0a0a] rounded-xl border-border border overflow-hidden relative shadow-2xl">
-                        {activeVideoData ? (
-                            activeVideoData.locked && enrollmentStatus !== 'verified' ? (
+                        {(isMainVideoActive || activeRewardVideoData) ? (
+                            isMainVideoActive && activeMainVideoData?.locked && enrollmentStatus !== 'verified' ? (
                                 enrollmentStatus === 'pending_verification' ? (
                                     <div className="absolute inset-0 bg-gradient-to-br from-slate-900 to-indigo-950 flex flex-col items-center justify-center text-center p-8">
                                         <Lock className="w-16 h-16 text-indigo-400 mb-4 opacity-50" />
@@ -455,10 +567,32 @@ export default function Course() {
                                         </div>
                                     </div>
                                 )
-                            ) : activeVideoData.video_url ? (
+                            ) : !isMainVideoActive && activeRewardVideoData && !isRewardUnlocked ? (
+                                <div className="absolute inset-0 bg-gradient-to-br from-slate-900 to-amber-950 flex flex-col items-center justify-center text-center p-8">
+                                    <Lock className="w-16 h-16 text-amber-500 mb-4 opacity-50" />
+                                    <h2 className="text-2xl font-bold mb-2">Bonus Reward Video</h2>
+                                    <p className="text-muted-foreground mb-6 max-w-md">Unlock this video using your earned XP! You currently have <strong>{points} XP</strong>.</p>
+
+                                    <Button
+                                        onClick={() => handleUnlockVideo(activeRewardVideoData.id, activeRewardVideoData.unlock_cost)}
+                                        disabled={isUnlocking || points < activeRewardVideoData.unlock_cost}
+                                        variant="default"
+                                        className="gap-2 bg-amber-600 hover:bg-amber-700 text-white"
+                                    >
+                                        {isUnlocking ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                                        Unlock for {activeRewardVideoData.unlock_cost} XP
+                                    </Button>
+
+                                    {points < activeRewardVideoData.unlock_cost && (
+                                        <p className="text-xs text-amber-500 mt-4 font-medium animate-pulse">
+                                            Need {activeRewardVideoData.unlock_cost - points} more XP
+                                        </p>
+                                    )}
+                                </div>
+                            ) : currentVideoUrl ? (
                                 <iframe
-                                    src={getEmbedUrl(activeVideoData.video_url)}
-                                    title={activeVideoData.title}
+                                    src={getEmbedUrl(currentVideoUrl)}
+                                    title={currentVideoTitle}
                                     className="w-full h-full border-0 absolute inset-0"
                                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                                     allowFullScreen
@@ -518,12 +652,12 @@ export default function Course() {
 
                     <div className="flex items-center justify-between mt-6">
                         <div>
-                            <h2 className="text-2xl font-bold">{activeVideoData?.title}</h2>
-                            {activeVideoData?.description && (
-                                <p className="text-muted-foreground mt-2">{activeVideoData.description}</p>
+                            <h2 className="text-2xl font-bold">{currentVideoTitle}</h2>
+                            {currentVideoDesc && (
+                                <p className="text-muted-foreground mt-2">{currentVideoDesc}</p>
                             )}
                         </div>
-                        {isPremium && (
+                        {isPremium && isMainVideoActive && (
                             <Button
                                 variant={progress.includes(activeVideo || '') ? "outline" : "default"}
                                 onClick={() => {
@@ -616,6 +750,56 @@ export default function Course() {
                             })}
                         </CardContent>
                     </Card>
+
+                    {/* Gamification Rewards Panel */}
+                    {(enrollmentStatus === 'verified' || enrollmentStatus === 'pending_verification') && rewardVideos.length > 0 && (
+                        <Card className="bg-[#1a1205] border-amber-900/40 shadow-lg shadow-amber-900/10">
+                            <CardHeader className="pb-4">
+                                <CardTitle className="text-lg text-amber-500 flex items-center justify-between">
+                                    <span>Bonus Rewards</span>
+                                    <span className="text-sm px-2 py-0.5 bg-amber-500/10 rounded-full">{points} XP</span>
+                                </CardTitle>
+                                <CardDescription className="text-xs text-amber-500/60">Unlock extra videos with your practice XP</CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                                {rewardVideos.map((video) => {
+                                    const isUnlocked = unlockedRewardVideoIds.includes(video.id);
+                                    const isPlaying = activeVideo === video.id;
+                                    const canAfford = points >= video.unlock_cost;
+
+                                    return (
+                                        <button
+                                            key={video.id}
+                                            onClick={() => setActiveVideo(video.id)}
+                                            className={`w-full flex items-center justify-between p-3 rounded-lg text-left transition-all duration-200
+                                                ${isPlaying ? 'bg-amber-500/20 border border-amber-500/40 shadow-sm' : 'border border-amber-500/10 hover:bg-amber-500/5 bg-black/40'}
+                                            `}
+                                        >
+                                            <div className="flex items-center gap-3 overflow-hidden">
+                                                <div className="flex-shrink-0">
+                                                    {isUnlocked ? (
+                                                        <PlayCircle className={`w-5 h-5 ${isPlaying ? 'text-amber-400' : 'text-amber-500/70'}`} />
+                                                    ) : (
+                                                        <Lock className="w-5 h-5 text-amber-900" />
+                                                    )}
+                                                </div>
+                                                <div className="overflow-hidden">
+                                                    <div className={`font-medium truncate text-sm ${isPlaying ? 'text-amber-400' : 'text-slate-200'}`}>
+                                                        {video.title}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {!isUnlocked && (
+                                                <div className={`text-xs ml-2 font-bold px-2 py-1 rounded shrink-0 ${canAfford ? 'bg-amber-500/20 text-amber-500' : 'bg-red-500/10 text-red-500'}`}>
+                                                    {video.unlock_cost} XP
+                                                </div>
+                                            )}
+                                        </button>
+                                    );
+                                })}
+                            </CardContent>
+                        </Card>
+                    )}
                 </div>
             </div>
         </div>

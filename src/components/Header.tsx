@@ -4,8 +4,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useRecital } from '@/contexts/RecitalContext';
 import { usePremiumStatus } from '@/hooks/usePremiumStatus';
+import { useGamification } from '@/hooks/useGamification';
 import { Button } from '@/components/ui/button';
-import { Music, Crown, LogIn, LogOut, Home, Menu, X, Radio, GraduationCap } from 'lucide-react';
+import { Music, Crown, LogIn, LogOut, Home, Menu, X, Radio, GraduationCap, Zap } from 'lucide-react';
 import { SuggestionBox } from '@/components/SuggestionBox';
 
 const Header = () => {
@@ -13,6 +14,7 @@ const Header = () => {
   const userRole = useUserRole();
   const { activeRecital } = useRecital();
   const { isTrialExpiringSoon, isEnrolled } = usePremiumStatus();
+  const { points, level } = useGamification();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -70,11 +72,17 @@ const Header = () => {
               </Button>
             </Link>
             {user && (
-              <Link to="/profile">
-                <Button variant="outline" className="flex items-center gap-2">
-                  Profile
-                </Button>
-              </Link>
+              <>
+                <div className="hidden md:flex items-center gap-1.5 px-3 bg-amber-500/10 border border-amber-500/20 text-amber-500 rounded-md text-sm font-bold" title={`Level ${level} - Keep practicing to earn more points!`}>
+                  <Zap className="w-4 h-4 fill-amber-500" />
+                  {points} XP
+                </div>
+                <Link to="/profile">
+                  <Button variant="outline" className="flex items-center gap-2">
+                    Profile
+                  </Button>
+                </Link>
+              </>
             )}
             {user ? (
               <Button
@@ -165,13 +173,19 @@ const Header = () => {
                 Course
               </Link>
               {user && (
-                <Link
-                  to="/profile"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="px-3 py-2 hover:bg-muted rounded-md text-sm"
-                >
-                  Profile
-                </Link>
+                <>
+                  <div className="px-3 py-2 text-sm flex items-center gap-2 text-amber-500 font-bold bg-amber-500/5 rounded-md mx-1">
+                    <Zap className="h-4 w-4 fill-amber-500" />
+                    {points} XP (Lvl {level})
+                  </div>
+                  <Link
+                    to="/profile"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="px-3 py-2 hover:bg-muted rounded-md text-sm"
+                  >
+                    Profile
+                  </Link>
+                </>
               )}
               {user ? (
                 <button

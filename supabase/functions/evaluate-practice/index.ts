@@ -96,9 +96,9 @@ serve(async (req) => {
       .eq("module_type", module_type)
       .single();
 
-    let systemPromptText = "You are a helpful AI guitar coach analyzing user performance.";
+    let systemPromptText = "You are a helpful AI guitar coach analyzing user performance. IMPORTANT: The performance data is captured in 30-second snippets. DO NOT complain that the practice session is too short or only 30 seconds long.";
     if (promptData && promptData.system_prompt) {
-      systemPromptText = promptData.system_prompt;
+      systemPromptText = promptData.system_prompt + "\n\nIMPORTANT: The performance data is captured in 30-second snippets. DO NOT complain that the practice session is too short or only 30 seconds long.";
     }
 
     // Format the MIDI and Context data into a readable string
@@ -144,7 +144,8 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        feedback: feedbackText
+        feedback: feedbackText,
+        db_error: insertError ? insertError.message : null
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

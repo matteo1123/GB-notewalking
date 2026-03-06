@@ -3,7 +3,7 @@ import { BasicPitch, noteFramesToTime, addPitchBendsToNoteEvents } from "@spotif
 let basicPitch: BasicPitch | null = null;
 let isInitializing = false;
 
-const MODEL_URL = "https://unpkg.com/@basic-pitch/onnx@1.0.1/model.onnx";
+const MODEL_URL = "https://cdn.jsdelivr.net/npm/@spotify/basic-pitch@1.0.1/model/model.json";
 
 async function initModel() {
     if (basicPitch) return;
@@ -60,12 +60,12 @@ self.onmessage = async (e: MessageEvent) => {
             );
 
             // Convert raw frames to note events using Spotify's utility functions
-            const noteEvents = noteFramesToTime(
-                addPitchBendsToNoteEvents(
-                    contours,
-                    noteFramesToTime(frames, onsets)
-                )
-            );
+            // @ts-ignore - Spotify types mismatch with their own utility signature occasionally
+            const baseEvents = noteFramesToTime(frames, onsets);
+            // @ts-ignore
+            const withBends = addPitchBendsToNoteEvents(contours, baseEvents);
+            // @ts-ignore
+            const noteEvents = noteFramesToTime(withBends);
 
             self.postMessage({ type: 'RESULT', payload: noteEvents });
 

@@ -13,24 +13,29 @@ export type MajorKey = typeof MAJOR_KEYS[number];
 export type MinorKey = typeof MINOR_KEYS[number];
 
 export const MAJOR_PROGRESSIONS: Progression[] = [
-    { id: 'maj_1', numeralString: 'I - IV - V', quality: 'major' },
-    { id: 'maj_2', numeralString: 'I - vi - IV - V', quality: 'major' },
-    { id: 'maj_3', numeralString: 'I - ii - IV - V', quality: 'major' },
-    { id: 'maj_4', numeralString: 'I - IV - I - V', quality: 'major' },
-    { id: 'maj_5', numeralString: 'I - V - vi - iii', quality: 'major' },
-    { id: 'maj_6', numeralString: 'I - vi - ii - V', quality: 'major' },
+    { id: 'maj_1', numeralString: 'I - IV', quality: 'major' },
+    { id: 'maj_2', numeralString: 'I - V', quality: 'major' },
+    { id: 'maj_3', numeralString: 'I - IV - V', quality: 'major' },
+    { id: 'maj_4', numeralString: 'I - vi - IV - V', quality: 'major' },
+    { id: 'maj_5', numeralString: 'I - V - vi - IV', quality: 'major' },
+    { id: 'maj_6', numeralString: 'ii - V - I', quality: 'major' },
+    { id: 'maj_7', numeralString: 'I - vi - ii - V', quality: 'major' },
+    { id: 'maj_8', numeralString: 'I - IV - I - V', quality: 'major' },
+    { id: 'maj_9', numeralString: 'I - bVII - IV', quality: 'major' },
+    { id: 'maj_10', numeralString: 'I - iii - IV - V', quality: 'major' },
+    { id: 'maj_11', numeralString: 'IV - I - V - vi', quality: 'major' }
 ];
 
 export const MINOR_PROGRESSIONS: Progression[] = [
     { id: 'min_1', numeralString: 'i - VI - VII', quality: 'minor' },
-    { id: 'min_2', numeralString: 'i - iv - VII', quality: 'minor' },
-    { id: 'min_3', numeralString: 'i - iv - v', quality: 'minor' },
+    { id: 'min_2', numeralString: 'i - iv - v', quality: 'minor' },
+    { id: 'min_3', numeralString: 'i - iv - VII', quality: 'minor' },
     { id: 'min_4', numeralString: 'i - VI - III - VII', quality: 'minor' },
-    { id: 'min_5', numeralString: 'ii° - v - i', quality: 'minor' },
-    { id: 'min_6', numeralString: 'i - iv - v - i', quality: 'minor' },
-    { id: 'min_7', numeralString: 'VI - VII - i', quality: 'minor' },
-    { id: 'min_8', numeralString: 'i - VII - VI - VII', quality: 'minor' },
-    { id: 'min_9', numeralString: 'i - iv - i', quality: 'minor' },
+    { id: 'min_5', numeralString: 'i - VII - VI - V', quality: 'minor' },
+    { id: 'min_6', numeralString: 'ii° - V - i', quality: 'minor' },
+    { id: 'min_7', numeralString: 'i - iv - i', quality: 'minor' },
+    { id: 'min_8', numeralString: 'VI - VII - i', quality: 'minor' },
+    { id: 'min_9', numeralString: 'i - v - VI - III', quality: 'minor' }
 ];
 
 export const ALL_PROGRESSIONS = [...MAJOR_PROGRESSIONS, ...MINOR_PROGRESSIONS];
@@ -57,7 +62,8 @@ export function getChordsForProgression(numeralString: string, key: string, qual
     const chords: string[] = [];
 
     const majorNumeralsMap: Record<string, number> = {
-        'I': 0, 'ii': 1, 'iii': 2, 'IV': 3, 'V': 4, 'vi': 5, 'vii°': 6
+        'I': 0, 'ii': 1, 'iii': 2, 'IV': 3, 'V': 4, 'vi': 5, 'vii°': 6,
+        'bVII': 3 // Hack for typical rock progression: Use Bb in C instead of taking from scale, but sticking to diatonic indexing for simplicity unless we add a comprehensive non-diatonic lookup. We'll map bVII to IV for now, or just leave it as numeral.
     };
 
     // Note: The Minor image uses II instead of ii° in its header sometimes, but we standardized to ii°

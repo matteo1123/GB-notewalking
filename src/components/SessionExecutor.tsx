@@ -28,7 +28,7 @@ function getModuleDisplayInfo(moduleType: ModuleType): { icon: string; title: st
         case 'notewalking':
             return { icon: '🎤', title: 'Note Walking', description: 'Chord progressions and ear training' };
         case 'chord_progressions':
-            return { icon: '🎼', title: 'Chord Changes', description: 'Practice chord transitions' };
+            return { icon: '🎼', title: 'Chord Progressions', description: 'Practice chord transitions' };
         case 'piece_mastery':
             return { icon: '🎸', title: 'Piece Mastery', description: 'Master your repertoire' };
         case 'riff':

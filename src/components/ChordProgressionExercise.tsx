@@ -17,7 +17,7 @@ import { DegreeTuner } from "./DegreeTuner";
 import { Switch } from "./ui/switch";
 import { Label } from "./ui/label";
 import { Button } from "./ui/button";
-import { Check, Guitar, Play, Pause, Volume2, VolumeX, Clock, SkipForward, X } from "lucide-react";
+import { Check, Settings, Guitar, Play, Pause, Volume2, VolumeX, Clock, SkipForward, X } from "lucide-react";
 import Fretboard from "./Fretboard";
 import { FretboardPainter } from "./FretboardPainter";
 import { useSession } from "@/contexts/SessionContext";
@@ -25,6 +25,7 @@ import { createDegreeMap, findAllNoteOccurrences } from "@/lib/musicTheory";
 import { getChordTones, calculateDegreeFromRoot, getChordInfo } from "@/lib/chordProgression";
 import { ChordNumeral } from "@/types/chords";
 import { ForceLandscapeWrapper } from "./ForceLandscapeWrapper";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import {
     Select,
     SelectContent,
@@ -33,6 +34,18 @@ import {
     SelectValue,
 } from "./ui/select";
 
+// Helpers for top banners & chord tracking
+const getFormattedChordName = (key: string, numeral: ChordNumeral) => {
+    const info = getChordInfo(key, numeral);
+    const isMinor = numeral.toLowerCase() === numeral && !numeral.endsWith('°');
+    const isDim = numeral.endsWith('°');
+    return `${info.rootNote}${isMinor ? 'm' : isDim ? 'dim' : ''}`;
+};
+
+const getFormattedChordTones = (numeral: ChordNumeral) => {
+    return getChordTones(numeral).join(", ");
+};
+
 const DEFAULT_SETTINGS: ChordProgressionSettings = {
     key: "C",
     selectedChords: ["I", "IV"],
@@ -40,7 +53,7 @@ const DEFAULT_SETTINGS: ChordProgressionSettings = {
     droneEnabled: true,
     droneVolume: 0.5,
     promptFretboardPainter: true,
-    droneMode: "pedal",
+    droneMode: "chord-major",
     scaleView: "major",
 };
 
@@ -545,6 +558,12 @@ export function ChordProgressionExercise({ autoStart = true, sessionId, onExit, 
         }
         newChords[activeSlot] = chord;
         handleSettingsChange({ selectedChords: newChords });
+
+        // Provide immediate audio feedback on the clicked chord
+        const info = getChordInfo(settings.key, chord);
+        const isMinor = chord.toLowerCase() === chord && !chord.endsWith('°');
+        const chordName = info.rootNote + (isMinor ? "m" : "");
+        playChord?.(chordName, settings.droneVolume);
     };
 
     const currentChordA = settings.selectedChords[0] || "I";
@@ -558,18 +577,6 @@ export function ChordProgressionExercise({ autoStart = true, sessionId, onExit, 
     const scaleDegree = detectedNote ? calculateDegreeFromRoot(detectedNote, settings.key) : null;
     const degreeColor = scaleDegree ? DEGREE_COLORS[scaleDegree] || "#666" : "#666";
 
-    // Helpers for top banners
-    const getFormattedChordName = (key: string, numeral: ChordNumeral) => {
-        const info = getChordInfo(key, numeral);
-        const isMinor = numeral.toLowerCase() === numeral && !numeral.endsWith('°');
-        const isDim = numeral.endsWith('°');
-        return `${info.rootNote}${isMinor ? 'm' : isDim ? 'dim' : ''}`;
-    };
-
-    const getFormattedChordTones = (numeral: ChordNumeral) => {
-        return getChordTones(numeral).join(", ");
-    };
-
     return (
         <>
             {/* @LANDSCAPE-LOCK: Do not remove ForceLandscapeWrapper — it forces landscape on mobile phones */}
@@ -578,8 +585,8 @@ export function ChordProgressionExercise({ autoStart = true, sessionId, onExit, 
                     {/* MOBILE LANDSCAPE LAYOUT - 3 Columns */}
                     <div className="flex-1 flex flex-row gap-1 p-1 min-h-0 overflow-hidden">
 
-                        {/* LEFT: Settings (15% width) */}
-                        <div className="w-1/5 min-w-[120px] max-w-[150px] flex-shrink-0 flex flex-col gap-1 overflow-hidden bg-card border rounded p-1">
+                        {/* LEFT: Settings (Desktop only, 15% width) */}
+                        <div className="hidden lg:flex w-1/5 min-w-[120px] max-w-[150px] flex-shrink-0 flex-col gap-1 overflow-hidden bg-card border rounded p-1">
                             {/* Key + Chords in minimal space */}
                             <div className="flex items-center gap-1">
                                 <span className="text-[10px] text-muted-foreground">Key</span>
@@ -592,8 +599,6 @@ export function ChordProgressionExercise({ autoStart = true, sessionId, onExit, 
                                     </SelectContent>
                                 </Select>
                             </div>
-
-                            {/* Chord Slots - Compact (REMOVED: Now handled by top banners) */}
 
                             {/* Chord Grid - 4 cols */}
                             <div className="grid grid-cols-4 gap-0.5 flex-1 overflow-y-auto">
@@ -632,7 +637,7 @@ export function ChordProgressionExercise({ autoStart = true, sessionId, onExit, 
                                     }}
                                     disabled={!settings.droneEnabled}
                                 >
-                                    <SelectTrigger className="h-6 text-[10px] px-1 w-20 bg-background">
+                                    <SelectTrigger className="h-6 text-[10px] px-1 w-20 bg-background text-left">
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -650,7 +655,7 @@ export function ChordProgressionExercise({ autoStart = true, sessionId, onExit, 
                                     value={settings.scaleView}
                                     onValueChange={(v: "major" | "minor" | "both") => handleSettingsChange({ scaleView: v })}
                                 >
-                                    <SelectTrigger className="h-6 text-[10px] px-1 w-20 bg-background">
+                                    <SelectTrigger className="h-6 text-[10px] px-1 w-20 bg-background text-left">
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -660,8 +665,6 @@ export function ChordProgressionExercise({ autoStart = true, sessionId, onExit, 
                                     </SelectContent>
                                 </Select>
                             </div>
-
-                            {/* Fretboard Button - Removed */}
                         </div>
 
                         {/* CENTER: Contextual Fretboard Area */}
@@ -685,7 +688,7 @@ export function ChordProgressionExercise({ autoStart = true, sessionId, onExit, 
                                         <div className="text-[8px] md:text-[9px] font-mono text-gray-500">Tones: {getFormattedChordTones(currentChordA as ChordNumeral)}</div>
                                     </div>
                                     <div className={`text-2xl md:text-3xl font-black ${currentChordIndex === 0 && isPlaying ? 'text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.6)]' :
-                                            activeSlot === 0 ? 'text-blue-400 drop-shadow-[0_0_8px_rgba(96,165,250,0.5)]' : 'text-gray-500'
+                                        activeSlot === 0 ? 'text-blue-400 drop-shadow-[0_0_8px_rgba(96,165,250,0.5)]' : 'text-gray-500'
                                         }`}
                                     >
                                         {currentChordA}
@@ -694,6 +697,82 @@ export function ChordProgressionExercise({ autoStart = true, sessionId, onExit, 
 
                                 {/* Floating Tiny Tuner */}
                                 <div className="w-[120px] shrink-0 border-l border-r border-gray-800 bg-black flex flex-col relative justify-center items-center z-10 shadow-xl">
+                                    <Popover>
+                                        <PopoverTrigger asChild>
+                                            <Button size="icon" variant="ghost" className="lg:hidden absolute top-1 left-1 h-6 w-6 bg-slate-800/80 hover:bg-slate-700 z-20 m-1 rounded border border-slate-600">
+                                                <Settings className="w-3 h-3 text-white" />
+                                            </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-64 p-2 bg-card border-slate-700 shadow-2xl" side="bottom" align="center">
+                                            {/* Mobile Settings Content inside Popover */}
+                                            <div className="flex flex-col gap-2">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-xs font-medium w-12">Key</span>
+                                                    <Select value={settings.key} onValueChange={(v) => handleSettingsChange({ key: v })}>
+                                                        <SelectTrigger className="h-8 text-xs flex-1"><SelectValue /></SelectTrigger>
+                                                        <SelectContent>{KEYS.map((k) => <SelectItem key={k.value} value={k.value}>{k.label}</SelectItem>)}</SelectContent>
+                                                    </Select>
+                                                </div>
+
+                                                <div className="grid grid-cols-4 gap-1 py-1">
+                                                    {DIATONIC_CHORDS.map((chord) => {
+                                                        const isSelected = (activeSlot === 0 && currentChordA === chord) || (activeSlot === 1 && currentChordB === chord);
+                                                        return (
+                                                            <button
+                                                                key={chord}
+                                                                className={`h-8 text-xs font-bold rounded ${isSelected ? "bg-primary text-white" : "bg-muted hover:bg-muted/80"}`}
+                                                                onClick={() => handleChordSelect(chord)}
+                                                            >
+                                                                {chord}
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+
+                                                <div className="flex items-center justify-between gap-2 bg-muted/30 p-1.5 rounded">
+                                                    <button
+                                                        className={`h-8 px-2 flex-1 text-xs rounded transition-colors ${settings.droneEnabled ? "bg-green-600 text-white" : "bg-muted"}`}
+                                                        onClick={() => handleSettingsChange({ droneEnabled: !settings.droneEnabled })}
+                                                    >
+                                                        {settings.droneEnabled ? "Audio ON" : "Audio OFF"}
+                                                    </button>
+                                                    <Select
+                                                        value={settings.droneMode}
+                                                        onValueChange={(v: "pedal" | "chord-major" | "chord-minor") => {
+                                                            const update: Partial<ChordProgressionSettings> = { droneMode: v };
+                                                            if (v === "chord-major") update.scaleView = "major";
+                                                            if (v === "chord-minor") update.scaleView = "minor";
+                                                            handleSettingsChange(update);
+                                                        }}
+                                                        disabled={!settings.droneEnabled}
+                                                    >
+                                                        <SelectTrigger className="h-8 text-xs flex-1"><SelectValue /></SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="pedal">Pedal</SelectItem>
+                                                            <SelectItem value="chord-major">Chord (Maj)</SelectItem>
+                                                            <SelectItem value="chord-minor">Chord (Min)</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+
+                                                <div className="flex items-center justify-between gap-2 overflow-hidden bg-muted/30 p-1.5 rounded">
+                                                    <span className="text-xs font-medium w-16">Scale</span>
+                                                    <Select
+                                                        value={settings.scaleView}
+                                                        onValueChange={(v: "major" | "minor" | "both") => handleSettingsChange({ scaleView: v })}
+                                                    >
+                                                        <SelectTrigger className="h-8 text-xs flex-1 text-left"><SelectValue /></SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="major">Major Scale</SelectItem>
+                                                            <SelectItem value="minor">Minor Scale</SelectItem>
+                                                            <SelectItem value="both">Both</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+                                            </div>
+                                        </PopoverContent>
+                                    </Popover>
+
                                     <div
                                         className="w-12 h-12 rounded-full flex items-center justify-center text-xl font-black shadow-lg border-2 z-10 bg-[#222]"
                                         style={{
@@ -728,7 +807,7 @@ export function ChordProgressionExercise({ autoStart = true, sessionId, onExit, 
                                         </div>
                                     )}
                                     <div className={`text-2xl md:text-3xl font-black ${currentChordIndex === 1 && isPlaying ? 'text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.6)]' :
-                                            activeSlot === 1 ? 'text-orange-400 drop-shadow-[0_0_8px_rgba(251,146,60,0.5)]' : 'text-gray-500'
+                                        activeSlot === 1 ? 'text-orange-400 drop-shadow-[0_0_8px_rgba(251,146,60,0.5)]' : 'text-gray-500'
                                         }`}
                                     >
                                         {currentChordB}
@@ -840,6 +919,7 @@ export function ChordProgressionExercise({ autoStart = true, sessionId, onExit, 
                                         measuresPerIncrement: 4,
                                         loop,
                                         progressiveStepBpm: 5,
+                                        drumBeat: moduleConfig?.metronome?.drum_beat || false,
                                     }}
                                     compact
                                 />
@@ -867,6 +947,7 @@ export function ChordProgressionExercise({ autoStart = true, sessionId, onExit, 
                     sessionKey={settings.key}
                     chordPair={settings.selectedChords}
                     revealedFrets={revealedFrets}
+                    aiFeedback={recording.feedback}
                     onSave={handlePainterDone}
                     onSkip={handlePainterDone}
                 />

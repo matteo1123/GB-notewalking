@@ -192,7 +192,7 @@ const tools = [
                                             },
                                             duration_minutes: {
                                                 type: "number",
-                                                description: "Duration in minutes",
+                                                description: "Duration in minutes (default 2)",
                                             },
                                         },
                                     },
@@ -263,7 +263,7 @@ const tools = [
                                     },
                                     duration_minutes: {
                                         type: "number",
-                                        description: "Duration in minutes",
+                                        description: "Duration in minutes (default 2)",
                                     },
                                 },
                                 required: ["module_type", "duration_minutes"],
@@ -447,7 +447,9 @@ If you omit \`progression_id\` and \`chord_key\`, a random progression and key w
 - Ask clarifying questions: "3nps or 2nps?" "Which positions?"
 - Be concise - guitarists want to practice, not read.
 - **Always** mention note function awareness when relevant.
-- When modifying routines, tell the user exactly what you're changing before doing it.`;
+- When modifying routines, tell the user exactly what you're changing before doing it.
+- **IMPORTANT RECORDING CONTEXT**: When interpreting practice history, a duration of 30 seconds means a 30-second audio snippet was recorded for evaluation, NOT that the user only practiced for 30 seconds. Always assume they practiced for the full prescribed time and never criticize them for short practice records.
+- **DEFAULT DURATIONS**: When creating or modifying routines, strongly default all module durations to 2 minutes unless the user specifically asks for a different duration. Focused, short 2-minute bursts are preferred.`;
 
 serve(async (req) => {
     // Handle CORS preflight
@@ -1182,7 +1184,7 @@ async function createRoutine(supabase: any, userId: string, input: any) {
         const sessionPlan = input.blocks.map((block: any, i: number) => {
             const fullBlock = {
                 module_type: block.module_type,
-                duration_minutes: block.duration_minutes || 10,
+                duration_minutes: block.duration_minutes || 2,
                 config: {
                     module_type: block.module_type,
                     ...(block.config || {}),

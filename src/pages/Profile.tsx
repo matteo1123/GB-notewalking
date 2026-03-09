@@ -20,6 +20,7 @@ type PracticeLogWithExercise = Tables<'practice_log'> & {
   module_type?: string | null;
   module_config?: Record<string, any> | null;
   exercise_category?: string | null;
+  practice_evaluations?: { ai_feedback: string }[] | null;
 };
 
 interface ProfileSettings {
@@ -73,7 +74,7 @@ const Profile = () => {
       if (user) {
         const { data, error } = await supabase
           .from('practice_log')
-          .select('*, exercises(name)')
+          .select('*, exercises(name), practice_evaluations(ai_feedback)')
           .eq('user_id', user.id)
           .order('created_at', { ascending: false });
 
@@ -595,6 +596,7 @@ const Profile = () => {
                     <TableHead>Exercise</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead>Recording</TableHead>
+                    <TableHead className="w-[40%] hidden md:table-cell">AI Feedback</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -606,15 +608,25 @@ const Profile = () => {
 
                     return (
                       <TableRow key={log.id} data-module-type={log.module_type || ''}>
-                        <TableCell>
-                          <span className="font-medium">{displayName}</span>
+                        <TableCell className="align-top font-medium">
+                          {displayName}
                         </TableCell>
-                        <TableCell>{new Date(log.created_at).toLocaleDateString()}</TableCell>
-                        <TableCell>
+                        <TableCell className="align-top">{new Date(log.created_at).toLocaleDateString()}</TableCell>
+                        <TableCell className="align-top">
                           {log.audio ? (
-                            <audio controls src={log.audio} className="h-8" />
+                            <audio controls src={log.audio} className="h-8 max-w-[200px]" />
                           ) : (
                             <span className="text-muted-foreground text-sm">No recording</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell align-top">
+                          {log.practice_evaluations?.[0]?.ai_feedback ? (
+                            <div className="text-xs text-purple-300 bg-purple-900/10 p-2 rounded border border-purple-500/20 whitespace-pre-wrap max-h-32 overflow-y-auto">
+                              <span className="font-bold text-purple-400">✨ AI Coach</span>
+                              <div className="mt-1">{log.practice_evaluations[0].ai_feedback}</div>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground text-xs italic">No feedback</span>
                           )}
                         </TableCell>
                       </TableRow>

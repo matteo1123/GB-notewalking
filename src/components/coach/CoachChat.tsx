@@ -11,6 +11,13 @@ import { toast } from 'sonner';
 import { RoutinePlanView } from './RoutinePlanView';
 import type { ModuleType, SessionBlock } from '@/types/practice';
 
+const generateId = () => {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+        return crypto.randomUUID();
+    }
+    return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+};
+
 interface ModuleConfig {
     module_type: string;
     priority_scale_shape_ids?: string[];
@@ -41,6 +48,7 @@ interface ToolCallResult {
         edits_applied?: string[];
         block_count?: number;
         total_duration_minutes?: number;
+        duration_minutes?: number;
         routines?: any[];
         count?: number;
         previous_session_plan?: any[];
@@ -95,7 +103,6 @@ export function CoachChat() {
     const { startSessionWithPlan } = useSession();
     const { createRoutine, updateRoutine: updateRoutineHook, duplicateRoutine } = useRoutines();
 
-    // Extract module config from tool calls if present
     const getModuleConfigFromToolCalls = (toolCalls?: ToolCallResult[]): { name: string; config: ModuleConfig; description?: string; duration?: number } | null => {
         if (!toolCalls) return null;
         const createCall = toolCalls.find(t => t.tool === 'create_module_config' && t.result?.success);
@@ -104,7 +111,7 @@ export function CoachChat() {
                 name: createCall.result.name || 'AI Created Module',
                 config: createCall.result.module_config,
                 description: createCall.result.description,
-                duration: createCall.result.shape_count ? 10 : undefined,
+                duration: createCall.result.duration_minutes || 2,
             };
         }
         return null;
@@ -169,26 +176,26 @@ export function CoachChat() {
     };
 
     // Start practicing with the AI-created module config
-    const handleStartPractice = (name: string, config: ModuleConfig) => {
+    const handleStartPractice = (name: string, config: ModuleConfig, duration?: number) => {
         const sessionBlock = {
             module_type: config.module_type as ModuleType,
             config: { ...config },
-            duration_minutes: 10,
+            duration_minutes: duration || 2,
             order: 0,
-            conceptId: `ai-coach-${crypto.randomUUID()}`,
+            conceptId: `ai-coach-${generateId()}`,
         } as SessionBlock;
 
         startSessionWithPlan(name, [sessionBlock]);
     };
 
     // Save the AI-created module as a routine
-    const handleSaveAsRoutine = async (name: string, config: ModuleConfig, description?: string) => {
+    const handleSaveAsRoutine = async (name: string, config: ModuleConfig, duration?: number, description?: string) => {
         const sessionBlock = {
             module_type: config.module_type as ModuleType,
             config: { ...config },
-            duration_minutes: 10,
+            duration_minutes: duration || 2,
             order: 0,
-            conceptId: `ai-coach-${crypto.randomUUID()}`,
+            conceptId: `ai-coach-${generateId()}`,
         } as SessionBlock;
 
         const routine = await createRoutine({
@@ -253,7 +260,7 @@ export function CoachChat() {
         setActiveTools([]);
 
         const userMessage: Message = {
-            id: crypto.randomUUID(),
+            id: generateId(),
             role: 'user',
             content: text,
             timestamp: new Date(),
@@ -276,7 +283,7 @@ export function CoachChat() {
             if (fnError) throw fnError;
 
             const assistantMessage: Message = {
-                id: crypto.randomUUID(),
+                id: generateId(),
                 role: 'assistant',
                 content: data.response || 'I apologize, but I encountered an issue processing your request.',
                 timestamp: new Date(),
@@ -289,7 +296,7 @@ export function CoachChat() {
             setError(err.message || 'Failed to get response from coach');
 
             const errorMessage: Message = {
-                id: crypto.randomUUID(),
+                id: generateId(),
                 role: 'assistant',
                 content: 'Sorry, I encountered an error. Please try again.',
                 timestamp: new Date(),
@@ -468,7 +475,7 @@ export function CoachChat() {
                                                                     config: b.config || { module_type: b.module_type },
                                                                     duration_minutes: b.duration_minutes || 10,
                                                                     order: i,
-                                                                    conceptId: `ai-routine-${crypto.randomUUID()}`,
+                                                                    conceptId: `ai-routine-${generateId()}`,
                                                                 }))
                                                             )}
                                                             className="gap-1"
@@ -493,7 +500,7 @@ export function CoachChat() {
                                             <div className="mt-3 pt-3 border-t border-border/50 flex flex-wrap gap-2">
                                                 <Button
                                                     size="sm"
-                                                    onClick={() => handleStartPractice(moduleData.name, moduleData.config)}
+                                                    onClick={() => handleStartPractice(moduleData.name, moduleData.config, moduleData.duration)}
                                                     className="gap-1"
                                                 >
                                                     <Play className="w-3 h-3" />
@@ -505,6 +512,7 @@ export function CoachChat() {
                                                     onClick={() => handleSaveAsRoutine(
                                                         moduleData.name,
                                                         moduleData.config,
+                                                        moduleData.duration,
                                                         moduleData.description
                                                     )}
                                                     className="gap-1"

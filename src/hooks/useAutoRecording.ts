@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import type { ModuleType, ModuleConfig, MetronomeConfig } from '@/types/practice';
+import { extractMonoFloat32Array, convertAudioToMidiInWorker } from '@/utils/audioProcessor';
 
 export interface AutoRecordingOptions {
     enabled: boolean;
@@ -13,6 +14,7 @@ export interface AutoRecordingOptions {
     maxClicksBeforeRecord?: number; // Max clicks before scheduling (default: 90)
     recordingDurationSeconds?: number; // How long to record (default: 30)
     existingMicStream?: MediaStream; // For modules already using mic (notewalking)
+    currentContext?: string | null; // Track current chord playing
 }
 
 export interface AutoRecordingState {
@@ -20,6 +22,8 @@ export interface AutoRecordingState {
     countdown: number | null; // Clicks until recording starts
     scheduledClickCount: number | null; // When recording will start
     hasRecorded: boolean;
+    isEvaluating: boolean;
+    feedback: string | null;
 }
 
 /**
@@ -55,6 +59,7 @@ export function useAutoRecording(options: AutoRecordingOptions) {
         maxClicksBeforeRecord = 90,
         recordingDurationSeconds = 30,
         existingMicStream,
+        currentContext = null,
     } = options;
 
     const { toast } = useToast();
@@ -64,11 +69,33 @@ export function useAutoRecording(options: AutoRecordingOptions) {
         countdown: null,
         scheduledClickCount: null,
         hasRecorded: false,
+        isEvaluating: false,
+        feedback: null,
     });
 
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const recordedChunksRef = useRef<Blob[]>([]);
     const recordingStreamRef = useRef<MediaStream | null>(null);
+    const recordingStartTimeRef = useRef<number>(0);
+    const contextHistoryRef = useRef<{ chord: string, startTime: number, endTime: number }[]>([]);
+    const lastContextRef = useRef<{ chord: string | null, startTime: number }>({ chord: null, startTime: 0 });
+
+    // Track context changes during recording
+    useEffect(() => {
+        if (state.isRecording) {
+            const now = Date.now();
+            if (lastContextRef.current.chord !== currentContext) {
+                if (lastContextRef.current.chord !== null && recordingStartTimeRef.current > 0) {
+                    contextHistoryRef.current.push({
+                        chord: lastContextRef.current.chord,
+                        startTime: (lastContextRef.current.startTime - recordingStartTimeRef.current) / 1000,
+                        endTime: (now - recordingStartTimeRef.current) / 1000
+                    });
+                }
+                lastContextRef.current = { chord: currentContext, startTime: now };
+            }
+        }
+    }, [currentContext, state.isRecording]);
 
     /**
      * Schedule when the recording will start (random time within range)
@@ -102,6 +129,9 @@ export function useAutoRecording(options: AutoRecordingOptions) {
                 }
                 stream = new MediaStream([audioTrack.clone()]);
             } else {
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    throw new Error("Microphone API not available. This might be because you are running locally without HTTPS.");
+                }
                 // Request new mic access
                 stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             }
@@ -119,16 +149,33 @@ export function useAutoRecording(options: AutoRecordingOptions) {
             };
 
             mediaRecorder.onstop = async () => {
-                await saveRecording();
+                // Finalize context history
+                if (lastContextRef.current.chord !== null && recordingStartTimeRef.current > 0) {
+                    contextHistoryRef.current.push({
+                        chord: lastContextRef.current.chord,
+                        startTime: (lastContextRef.current.startTime - recordingStartTimeRef.current) / 1000,
+                        endTime: (Date.now() - recordingStartTimeRef.current) / 1000
+                    });
+                }
+
+                const practiceLogId = await saveRecording();
 
                 // Clean up stream only if we created it (not if cloned from existing)
                 if (!existingMicStream && recordingStreamRef.current) {
                     recordingStreamRef.current.getTracks().forEach(track => track.stop());
                 }
                 recordingStreamRef.current = null;
+
+                // Kick off AI Evaluation if save was successful
+                if (practiceLogId && recordedChunksRef.current.length > 0) {
+                    evaluateRecording(practiceLogId);
+                }
             };
 
             mediaRecorder.start();
+            recordingStartTimeRef.current = Date.now();
+            contextHistoryRef.current = [];
+            lastContextRef.current = { chord: currentContext, startTime: Date.now() };
             setState(prev => ({ ...prev, isRecording: true, countdown: null }));
 
             toast({
@@ -181,17 +228,20 @@ export function useAutoRecording(options: AutoRecordingOptions) {
                 metronome: metronomeConfig,
             } : metronomeConfig ? { metronome: metronomeConfig } : undefined;
 
-            const { error: logError } = await supabase
+            const { data: logData, error: logError } = await supabase
                 .from('practice_log')
                 .insert({
                     user_id: user.id,
                     duration: recordingDurationSeconds,
                     audio: publicUrl,
                     module_type: moduleType,
-                    module_config: configWithMetronome,
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    module_config: configWithMetronome as any,
                     session_id: sessionId || null,
                     created_at: new Date().toISOString(),
-                });
+                })
+                .select('id')
+                .single();
 
             if (logError) throw logError;
 
@@ -206,6 +256,8 @@ export function useAutoRecording(options: AutoRecordingOptions) {
                 description: 'Your practice session has been recorded',
             });
 
+            return logData.id;
+
         } catch (error) {
             console.error('Failed to save recording:', error);
             toast({
@@ -216,7 +268,78 @@ export function useAutoRecording(options: AutoRecordingOptions) {
 
             setState(prev => ({ ...prev, isRecording: false }));
         }
-    }, [supabase, moduleType, moduleConfig, recordingDurationSeconds, toast]);
+    }, [supabase, moduleType, moduleConfig, sessionId, metronomeConfig, recordingDurationSeconds, toast]);
+
+    /**
+     * Evaluate recording internally
+     */
+    const evaluateRecording = useCallback(async (practiceLogId: number) => {
+        setState(prev => ({ ...prev, isEvaluating: true }));
+        try {
+            toast({
+                title: 'AI Analyzing',
+                description: 'Converting audio to MIDI and requesting AI feedback...',
+            });
+
+            // 1. Convert WebM Blob to Mono Float32Array
+            const blob = new Blob(recordedChunksRef.current, { type: 'audio/webm' });
+            const audioData = await extractMonoFloat32Array(blob);
+
+            // 2. Transcribe to MIDI Note Events using Web Worker
+            const noteEvents = await convertAudioToMidiInWorker(audioData);
+
+            // 3. Send to Edge Function
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) throw new Error("No active session");
+
+            const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/evaluate-practice`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.access_token}`
+                },
+                body: JSON.stringify({
+                    practice_log_id: practiceLogId,
+                    module_type: moduleType,
+                    midi_data: noteEvents,
+                    harmonic_context: contextHistoryRef.current
+                })
+            });
+
+            if (!response.ok) {
+                const errResult = await response.json();
+                throw new Error(errResult.error || "Edge function failed");
+            }
+
+            const resultData = await response.json();
+
+            setState(prev => ({ ...prev, feedback: resultData.feedback }));
+
+            if (resultData.db_error) {
+                console.error("Evaluation saved with DB error:", resultData.db_error);
+                toast({
+                    title: 'Evaluation Complete (Not Saved)',
+                    description: `The AI Coach provided feedback, but we couldn't save it: ${resultData.db_error}`,
+                    variant: 'destructive',
+                });
+            } else {
+                toast({
+                    title: 'Evaluation Complete',
+                    description: 'The AI Coach has provided feedback on your performance!',
+                });
+            }
+
+        } catch (err: any) {
+            console.error("Evaluation pipeline failed:", err);
+            toast({
+                title: 'Evaluation Failed',
+                description: err.message || 'Could not evaluate performance',
+                variant: 'destructive',
+            });
+        } finally {
+            setState(prev => ({ ...prev, isEvaluating: false }));
+        }
+    }, [moduleType, toast]);
 
     /**
      * Handle metronome tick - updates countdown and triggers recording
@@ -271,8 +394,12 @@ export function useAutoRecording(options: AutoRecordingOptions) {
             countdown: null,
             scheduledClickCount: null,
             hasRecorded: false,
+            isEvaluating: false,
+            feedback: null,
         });
         recordedChunksRef.current = [];
+        contextHistoryRef.current = [];
+        recordingStartTimeRef.current = 0;
     }, []);
 
     // Cleanup on unmount

@@ -1,0 +1,15 @@
+﻿
+C:\Users\matth\Documents\coding projects\August 25\tempo-trekker\src\pages\Course.tsx
+   87:81   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   97:94   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  124:100  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  134:99   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  222:44   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  231:44   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  271:23   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  303:25   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  337:25   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  389:23   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+Γ£û 10 problems (10 errors, 0 warnings)
+

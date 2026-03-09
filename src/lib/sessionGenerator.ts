@@ -208,8 +208,8 @@ function getModuleTitle(moduleType: ModuleType): string {
         rhythm: '🥁 Rhythm Training',
         scale: '🎵 Scale Practice',
         arpeggio: '🎹 Arpeggio Practice',
-        notewalking: '🎤 Ear Training',
-        chord_progressions: '🎼 Chord Changes',
+        notewalking: '🎤 Notewalking',
+        chord_progressions: '🎼 Chord Progressions',
         riff: '🎸 Repertoire',
     };
 

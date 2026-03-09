@@ -193,7 +193,7 @@ function formatModuleType(type: string): string {
         notewalking: 'Notewalking',
         arpeggio: 'Arpeggio Practice',
         riff: 'Riff Practice',
-        chord_progressions: 'Chord Changes',
+        chord_progressions: 'Chord Progressions',
     };
     return labels[type] || type;
 }

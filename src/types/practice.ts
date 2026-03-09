@@ -166,6 +166,8 @@ export interface ChordProgressionsModuleConfig {
   progression_id: string;
   key: string;
   target_bpm?: number;
+  auto_play_chords?: boolean; // When true, plays chord audio on beat 1 of each measure (for lead practice)
+  measures_per_chord?: number; // How many measures each chord plays for (default 1)
 }
 
 export interface ArpeggioModuleConfig {

@@ -173,7 +173,7 @@ export const MODULE_REGISTRY: Record<ModuleType, Omit<ModuleMetadata, 'progress'
 
     chord_progressions: {
         id: 'chord_progressions',
-        name: 'Chord Changes',
+        name: 'Chord Progressions',
         shortDescription: 'Smooth chord transitions & progressions',
         fullDescription: 'Practice common chord progressions and develop smooth, clean transitions between chord shapes.',
         icon: '🎼',

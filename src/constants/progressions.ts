@@ -58,12 +58,26 @@ export function getChordsForProgression(numeralString: string, key: string, qual
         'F#m': ['F#m', 'G#m7b5', 'A', 'Bm', 'C#m', 'D', 'E'],
     };
 
+    // bVII is a borrowed chord (flat 7th) - a major chord one whole step below the root
+    const flatSevenMap: Record<string, string> = {
+        'C': 'Bb',
+        'G': 'F',
+        'D': 'C',
+        'A': 'G',
+        'E': 'D',
+        'F': 'Eb',
+        'Am': 'G',
+        'Bm': 'A',
+        'Dm': 'C',
+        'Em': 'D',
+        'F#m': 'E',
+    };
+
     const numerals = numeralString.split('-').map(n => n.trim());
     const chords: string[] = [];
 
     const majorNumeralsMap: Record<string, number> = {
         'I': 0, 'ii': 1, 'iii': 2, 'IV': 3, 'V': 4, 'vi': 5, 'vii°': 6,
-        'bVII': 3 // Hack for typical rock progression: Use Bb in C instead of taking from scale, but sticking to diatonic indexing for simplicity unless we add a comprehensive non-diatonic lookup. We'll map bVII to IV for now, or just leave it as numeral.
     };
 
     // Note: The Minor image uses II instead of ii° in its header sometimes, but we standardized to ii°
@@ -77,11 +91,21 @@ export function getChordsForProgression(numeralString: string, key: string, qual
     if (!keyChords) return numerals; // fallback if key not found
 
     for (const numeral of numerals) {
-        const index = mapToUse[numeral];
-        if (index !== undefined && keyChords[index]) {
-            chords.push(keyChords[index]);
+        // Handle bVII (flat 7th) - a borrowed chord that's a whole step below the root
+        if (numeral === 'bVII') {
+            const flatSevenChord = flatSevenMap[key];
+            if (flatSevenChord) {
+                chords.push(flatSevenChord);
+            } else {
+                chords.push(numeral); // fallback
+            }
         } else {
-            chords.push(numeral); // fallback to just returning the numeral if not found
+            const index = mapToUse[numeral];
+            if (index !== undefined && keyChords[index]) {
+                chords.push(keyChords[index]);
+            } else {
+                chords.push(numeral); // fallback to just returning the numeral if not found
+            }
         }
     }
 

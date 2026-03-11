@@ -167,6 +167,40 @@ export function ChordProgressionExercise({ autoStart = true, sessionId, onExit, 
     const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
     const [tickCount, setTickCount] = useState(0);
     const [activeSlot, setActiveSlot] = useState<0 | 1>(0);
+    const [coachAdvice, setCoachAdvice] = useState<string | null>(null);
+    const [isLoadingAdvice, setIsLoadingAdvice] = useState<boolean>(true);
+
+    // Fetch pre-session coach advice
+    useEffect(() => {
+        const fetchAdvice = async () => {
+            setIsLoadingAdvice(true);
+            try {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (!session) return;
+
+                const SUPABASE_URL = "https://idsufbsfywgmcrhldqxq.supabase.co";
+                const response = await fetch(`${SUPABASE_URL}/functions/v1/generate-coach-focus`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${session.access_token}`
+                    },
+                    body: JSON.stringify({ module_type: 'notewalking' })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.advice) setCoachAdvice(data.advice);
+                }
+            } catch (err) {
+                console.error("Error fetching coach advice:", err);
+            } finally {
+                setIsLoadingAdvice(false);
+            }
+        };
+
+        fetchAdvice();
+    }, []);
 
     let sessionContext: any = null;
     try {
@@ -490,6 +524,11 @@ export function ChordProgressionExercise({ autoStart = true, sessionId, onExit, 
         sensitivity: 0.7,
     });
 
+    // Build current context string for AI feedback (e.g., "C major - I chord")
+    const currentContextString = currentChord
+        ? `${currentChord.rootNote} (${settings.selectedChords[currentChordIndex]} in key of ${settings.key})`
+        : null;
+
     const recording = useAutoRecording({
         enabled: autoRecordEnabled && isPlaying,
         moduleType: 'notewalking',
@@ -501,6 +540,9 @@ export function ChordProgressionExercise({ autoStart = true, sessionId, onExit, 
             measures_per_chord: settings.measuresPerChord,
         },
         existingMicStream: pitchDetection.audioStream || undefined,
+        currentContext: currentContextString, // Track chord changes for AI feedback
+        currentPitch: detectedPitch || null, // Track pitch changes for AI feedback
+        coachAdvice: coachAdvice, // Pass advice for contextual evaluation
     });
 
     const handleSettingsChange = useCallback(
@@ -582,6 +624,16 @@ export function ChordProgressionExercise({ autoStart = true, sessionId, onExit, 
             {/* @LANDSCAPE-LOCK: Do not remove ForceLandscapeWrapper — it forces landscape on mobile phones */}
             <ForceLandscapeWrapper>
                 <div className="flex flex-col h-full w-full bpm-control-area overflow-hidden">
+                    {/* Coach Advice Banner */}
+                    {coachAdvice && (
+                        <div className="bg-blue-900/40 border-b border-blue-500/30 px-3 py-1.5 flex items-center gap-2 text-xs md:text-sm shadow-md z-10 shrink-0">
+                            <span className="text-xl">🎸</span>
+                            <div className="flex-1 font-medium text-blue-100 italic">
+                                "{coachAdvice}"
+                            </div>
+                        </div>
+                    )}
+
                     {/* MOBILE LANDSCAPE LAYOUT - 3 Columns */}
                     <div className="flex-1 flex flex-row gap-1 p-1 min-h-0 overflow-hidden">
 

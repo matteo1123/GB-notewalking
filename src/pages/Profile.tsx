@@ -27,6 +27,10 @@ interface ProfileSettings {
   autoRecordEnabled?: boolean;
 }
 
+interface ProfileWithGoal extends Tables<'profiles'> {
+  instrument_goal?: string | null;
+}
+
 // Updated Stripe Price ID ($29.99/mo)
 const STRIPE_PRICE_ID = "price_1T3lcJEOnRZP4MxPepztrhp6";
 // Course Purchase Price ID ($1.00 Test)
@@ -35,7 +39,7 @@ const STRIPE_COURSE_PRICE_ID = "price_1T5sGBEOnRZP4MxPZp5xxScj";
 const Profile = () => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [profile, setProfile] = useState<Tables<'profiles'> | null>(null);
+  const [profile, setProfile] = useState<ProfileWithGoal | null>(null);
   const [practiceLog, setPracticeLog] = useState<PracticeLogWithExercise[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSubscribing, setIsSubscribing] = useState(false); // State for sub button
@@ -283,6 +287,16 @@ const Profile = () => {
                 value={user?.email || ''}
                 disabled
                 className="bg-muted"
+              />
+            </div>
+            <div>
+              <Label htmlFor="instrument_goal">Current Music Goal <span className="text-muted-foreground text-xs">(Helps the AI Coach tailor advice)</span></Label>
+              <Input
+                id="instrument_goal"
+                type="text"
+                value={profile?.instrument_goal || ''}
+                onChange={(e) => setProfile(prev => ({ ...prev, id: user!.id, instrument_goal: e.target.value } as any))}
+                placeholder="e.g. Learn to solo over changes, master fingerpicking, etc."
               />
             </div>
             <div>

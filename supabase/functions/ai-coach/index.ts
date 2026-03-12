@@ -483,6 +483,16 @@ serve(async (req) => {
             );
         }
 
+        // Fetch user's instrument goal to provide context to the coach
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('instrument_goal')
+            .eq('id', user.id)
+            .single();
+            
+        const userGoal = profile?.instrument_goal || "general improvement";
+        const finalSystemPrompt = `${SYSTEM_PROMPT}\n\n## USER PRIMARY GOAL\nThe student's overarching musical goal is: "${userGoal}". Keep this in mind and lightly tailor your advice and module suggestions (especially when creating routines) to help them achieve this goal.`;
+
         // Parse request
         const { message, conversationHistory = [] } = await req.json();
 
@@ -527,7 +537,7 @@ serve(async (req) => {
                 body: JSON.stringify({
                     contents,
                     tools,
-                    systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+                    systemInstruction: { parts: [{ text: finalSystemPrompt }] },
                     generationConfig: {
                         temperature: 0.7,
                         maxOutputTokens: 4096,

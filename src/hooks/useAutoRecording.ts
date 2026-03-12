@@ -59,7 +59,9 @@ export function useAutoRecording(options: AutoRecordingOptions) {
         metronomeConfig,
         sessionId,
         minClicksBeforeRecord = 30,
+        maxClicksBeforeRecord = 90,
         recordingDurationSeconds = 30, // Default duration of 30s
+        existingMicStream,
         currentContext = null,
     } = options;
 

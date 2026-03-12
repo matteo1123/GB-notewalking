@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { ChordProgressionSettings } from "@/types/chords";
 import { NotewalkingModuleConfig } from "@/types/practice";
 import { useMetronome, MetronomeSettings } from "@/hooks/useMetronome";
@@ -462,8 +462,11 @@ export function ChordProgressionExercise({ autoStart = true, sessionId, onExit, 
 
     const metronome = useMetronome(metronomeSettings);
 
+    const hasAutoStarted = useRef(false);
+
     useEffect(() => {
-        if (autoStart && metronome) {
+        if (autoStart && metronome && !hasAutoStarted.current) {
+            hasAutoStarted.current = true;
             const timer = setTimeout(() => {
                 if (metronome.audioContext.state === 'suspended') {
                     metronome.audioContext.resume();

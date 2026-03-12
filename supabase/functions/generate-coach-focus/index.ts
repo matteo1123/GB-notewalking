@@ -15,14 +15,20 @@ async function callAIFocus(userMessage: string, moduleType: string): Promise<str
     throw new Error("GEMINI_API_KEY not configured.");
   }
 
-  let moduleContext = "";
+  let moduleContextText = "";
   if (moduleType === 'notewalking') {
-    moduleContext = "\n\nMODULE CONTEXT (Notewalking): The student plays over a slow progression that switches between two chords. One measure before each chord change, the upcoming chord's tones are highlighted on their fretboard to help them prepare. Your advice should be simple and encourage them to use those highlights to land on a solid chord tone when the change happens.";
+    moduleContextText = "\n\nMODULE CONTEXT (Notewalking): The student plays over a slow progression that switches between two chords. One measure before each chord change, the upcoming chord's tones are highlighted on their fretboard to help them prepare. Your advice should be simple and encourage them to use those highlights to land on a solid chord tone when the change happens.";
   }
+  
+  const moduleContext = { goal: moduleType, text: moduleContextText }; // Overwritten later
+
 
   const systemPrompt = `You are a helpful AI guitar coach. Your job is to give a short (1-2 sentences), encouraging piece of advice for the student's upcoming practice session based on their recent feedback history. Use simple, friendly words. 
   
-  If they have no history, default to encouraging them to hit chord tones. If they have history, see what they succeeded at last time and gently nudge them to try something new (e.g. if they hit chord tones well, suggest trying some scale notes for tension). Keep it brief, conversational, and motivating. IMPORTANT: Always finish your sentence completely.${moduleContext}`;
+  If they have no history, default to encouraging them to hit chord tones. If they have history, see what they succeeded at last time and gently nudge them to try something new (e.g. if they hit chord tones well, suggest trying some scale notes for tension). Keep it brief, conversational, and motivating. IMPORTANT: Always finish your sentence completely.
+  
+  The student's overarching musical goal is: "${moduleContext.goal || "general improvement"}". Try to lightly frame your advice in the context of this goal if it makes sense.
+  ${moduleContext.text}`;
 
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=${geminiKey}`,
@@ -124,7 +130,13 @@ serve(async (req) => {
         recentFeedbackText = "This is the student's first time practicing this module. Encourage them to hit chord tones and get a feel for the progression.";
     }
 
-    const focusAdvice = await callAIFocus(recentFeedbackText, module_type);
+    const { data: focusProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('instrument_goal')
+      .eq('id', user.id)
+      .single();
+
+    const focusAdvice = await callAIFocus(recentFeedbackText, { goal: focusProfile?.instrument_goal || "general improvement", text: module_type === 'notewalking' ? "\n\nMODULE CONTEXT (Notewalking): The student plays over a slow progression that switches between two chords. One measure before each chord change, the upcoming chord's tones are highlighted on their fretboard to help them prepare. Your advice should be simple and encourage them to use those highlights to land on a solid chord tone when the change happens." : "" } as any);
 
     return new Response(
       JSON.stringify({ advice: focusAdvice }),

@@ -155,21 +155,29 @@ serve(async (req) => {
 
     if (midi_data && midi_data.length > 0) {
       performanceDataString += "My Performance (Notes Played):\n";
-      midi_data.forEach((note: any) => {
-        // Handle both raw string pitches like "E4" or MIDI numbers
-        let noteString = note.pitch;
-        if (typeof note.pitch === 'number') {
-          const pitchMap = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
-          const pitchName = pitchMap[note.pitch % 12];
-          const octave = Math.floor(note.pitch / 12) - 1;
-          noteString = `${pitchName}${octave} (MIDI: ${note.pitch})`;
-        }
-        const endTime = note.endTime || (note.startTime + (note.duration || 0));
-        performanceDataString += `- ${note.startTime.toFixed(2)}s to ${endTime.toFixed(2)}s: Note ${noteString}\n`;
-      });
+      
+      const totalDuration = midi_data.reduce((sum: number, n: any) => sum + (n.duration || 0), 0);
+      
+      if (midi_data.length === 1 && totalDuration > 10) {
+        performanceDataString += `[SYSTEM NOTE] Anomalous Input Detected: The student held a single note (${midi_data[0].pitch}) for over ${totalDuration.toFixed(1)} seconds. This is almost certainly an error, the mic picking up background noise, or them just testing the mic. DO NOT analyze this as a deliberate creative choice. Playfully acknowledge they held one note the whole time but keep it short.\n`;
+      } else {
+        midi_data.forEach((note: any) => {
+          // Handle both raw string pitches like "E4" or MIDI numbers
+          let noteString = note.pitch;
+          if (typeof note.pitch === 'number') {
+            const pitchMap = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+            const pitchName = pitchMap[note.pitch % 12];
+            const octave = Math.floor(note.pitch / 12) - 1;
+            noteString = `${pitchName}${octave} (MIDI: ${note.pitch})`;
+          }
+          const endTime = note.endTime || (note.startTime + (note.duration || 0));
+          performanceDataString += `- ${note.startTime.toFixed(2)}s to ${endTime.toFixed(2)}s: Note ${noteString}\n`;
+        });
+      }
       console.log("[evaluate-practice] MIDI notes formatted:", midi_data.length);
     } else {
       performanceDataString += "No notes were detected during this recording.\n";
+      performanceDataString += "[SYSTEM NOTE] The student didn't play anything. Playfully encourage them to play next time.\n";
       console.log("[evaluate-practice] No MIDI data to format");
     }
 

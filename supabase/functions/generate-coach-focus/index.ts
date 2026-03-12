@@ -22,7 +22,7 @@ async function callAIFocus(userMessage: string, moduleType: string): Promise<str
 
   const systemPrompt = `You are a helpful AI guitar coach. Your job is to give a short (1-2 sentences), encouraging piece of advice for the student's upcoming practice session based on their recent feedback history. Use simple, friendly words. 
   
-  If they have no history, default to encouraging them to hit chord tones. If they have history, see what they succeeded at last time and gently nudge them to try something new (e.g. if they hit chord tones well, suggest trying some scale notes for tension). Keep it brief, conversational, and motivating.${moduleContext}`;
+  If they have no history, default to encouraging them to hit chord tones. If they have history, see what they succeeded at last time and gently nudge them to try something new (e.g. if they hit chord tones well, suggest trying some scale notes for tension). Keep it brief, conversational, and motivating. IMPORTANT: Always finish your sentence completely.${moduleContext}`;
 
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=${geminiKey}`,
@@ -36,7 +36,7 @@ async function callAIFocus(userMessage: string, moduleType: string): Promise<str
         systemInstruction: { parts: [{ text: systemPrompt }] },
         generationConfig: {
           temperature: 0.7,
-          maxOutputTokens: 150,
+          maxOutputTokens: 250,
         },
       }),
     }

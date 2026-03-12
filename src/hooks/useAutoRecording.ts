@@ -59,9 +59,7 @@ export function useAutoRecording(options: AutoRecordingOptions) {
         metronomeConfig,
         sessionId,
         minClicksBeforeRecord = 30,
-        maxClicksBeforeRecord = 90,
-        recordingDurationSeconds = 15, // Limited to 15s because Basic Pitch struggles with longer audio
-        existingMicStream,
+        recordingDurationSeconds = 30, // Default duration of 30s
         currentContext = null,
     } = options;
 

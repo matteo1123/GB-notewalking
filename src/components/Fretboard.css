@@ -292,6 +292,10 @@
   overflow-x: auto;
 }
 
+.notewalking-fretboard-override .fretboard-area {
+  justify-content: flex-start !important;
+}
+
 .notewalking-fretboard-override .fretboard,
 .notewalking-fretboard-override .fretboard-container {
   min-width: min(100%, 600px);

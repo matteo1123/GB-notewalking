@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useToast } from "@/hooks/use-toast";
 
 interface PitchDetectionResult {
   frequency: number;
@@ -147,6 +148,7 @@ export const usePitchDetection = ({
   onPitchUpdate,
   sensitivity = 0.7,
 }: UsePitchDetectionProps) => {
+  const { toast } = useToast();
   const [isListening, setIsListening] = useState(false);
   const [currentNote, setCurrentNote] = useState<PitchDetectionResult | null>(
     null
@@ -279,13 +281,18 @@ export const usePitchDetection = ({
 
       setIsListening(true);
       console.log("Pitch detection started successfully");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error accessing microphone:", error);
       console.error(
         "Make sure to allow microphone permissions in your browser"
       );
+      toast({
+        title: "Microphone Access Denied",
+        description: error.message || "Please allow microphone access to use Pitch Detection. This also requires a secure (HTTPS) or localhost connection on mobile.",
+        variant: "destructive",
+      });
     }
-  }, []);
+  }, [toast]);
 
   const stopListening = useCallback(() => {
     if (animationFrameRef.current) {

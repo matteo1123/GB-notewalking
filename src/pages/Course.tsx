@@ -24,6 +24,10 @@ export interface CourseVideo {
     duration: string | null;
     order_index: number;
     locked: boolean;
+    unlock_cost: number;
+    grid_row: number;
+    grid_column: number;
+    prerequisite_ids: string[];
 }
 
 export interface RewardVideo {
@@ -48,6 +52,7 @@ export default function Course() {
     const [videos, setVideos] = useState<CourseVideo[]>([]);
     const [rewardVideos, setRewardVideos] = useState<RewardVideo[]>([]);
     const [unlockedRewardVideoIds, setUnlockedRewardVideoIds] = useState<string[]>([]);
+    const [unlockedCourseVideoIds, setUnlockedCourseVideoIds] = useState<string[]>([]);
     const [activeVideo, setActiveVideo] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [isHowItWorksOpen, setIsHowItWorksOpen] = useState(false);
@@ -109,12 +114,23 @@ export default function Course() {
                 if (unlockedData) {
                     setUnlockedRewardVideoIds(unlockedData.map(uv => uv.video_id));
                 }
+
+                // Load unlocked course videos
+                const { data: courseUnlockData } = await supabase
+                    .from('user_course_unlocks')
+                    .select('video_id')
+                    .eq('user_id', user.id);
+                
+                if (courseUnlockData) {
+                    setUnlockedCourseVideoIds(courseUnlockData.map(uv => uv.video_id));
+                }
             } else {
                 // Guest user resets
                 setIsPremium(false);
                 setEnrollmentStatus(null);
                 setProgress([]);
                 setUnlockedRewardVideoIds([]);
+                setUnlockedCourseVideoIds([]);
             }
 
             // 2. Fetch course videos (public read access via RLS)
@@ -407,6 +423,60 @@ export default function Course() {
         }
     };
 
+    const handleUnlockCourseVideo = async (videoId: string, cost: number) => {
+        if (!user) return;
+
+        if (points < cost) {
+            toast({
+                title: "Not enough XP",
+                description: `You need ${cost} XP to unlock this skill. Keep practicing!`,
+                variant: 'destructive'
+            });
+            return;
+        }
+
+        setIsUnlocking(true);
+        try {
+            // Optimistic update
+            setUnlockedCourseVideoIds(prev => [...prev, videoId]);
+
+            // Insert into user_course_unlocks
+            const { error: insertError } = await supabase
+                .from('user_course_unlocks')
+                .insert({ user_id: user.id, video_id: videoId });
+
+            if (insertError) throw insertError;
+
+            // Deduct points
+            const { error: updateError } = await supabase
+                .rpc('increment_user_points', {
+                    user_id_param: user.id,
+                    points_to_add: -cost // Subtract cost
+                });
+
+            if (updateError) throw updateError;
+
+            toast({
+                title: "Skill Unlocked! 🎉",
+                description: "You've successfully unlocked this new ability.",
+            });
+
+            // Refresh global points
+            await refreshGamification();
+        } catch (err) {
+            console.error("Unlock error:", err);
+            // Revert optimistic update on failure
+            setUnlockedCourseVideoIds(prev => prev.filter(id => id !== videoId));
+            toast({
+                title: "Error",
+                description: "Failed to unlock skill. Please try again.",
+                variant: 'destructive'
+            });
+        } finally {
+            setIsUnlocking(false);
+        }
+    };
+
     if (loading) return (
         <div className="p-8 flex flex-col items-center justify-center min-h-[50vh] text-muted-foreground">
             <Loader2 className="w-8 h-8 animate-spin mb-4" />
@@ -416,6 +486,9 @@ export default function Course() {
 
     const completedCount = progress.length;
     const progressPercentage = videos.length > 0 ? Math.round((completedCount / videos.length) * 100) : 0;
+
+    const maxRow = Math.max(...videos.map(v => v.grid_row ?? 0), 0);
+    const maxCol = Math.max(...videos.map(v => v.grid_column ?? 0), 0);
 
     const activeMainVideoData = videos.find(v => v.id === activeVideo);
     const activeRewardVideoData = rewardVideos.find(v => v.id === activeVideo);
@@ -703,51 +776,93 @@ export default function Course() {
 
                 {/* Sidebar Navigation */}
                 <div className="space-y-6">
-                    <Card className="bg-[#0f0f13] border-gray-800">
-                        <CardHeader className="pb-4">
-                            <CardTitle className="text-lg">Curriculum</CardTitle>
-                            <CardDescription className="text-xs">{completedCount} of {videos.length} lessons completed</CardDescription>
-                            <Progress value={progressPercentage} className="mt-3 h-2" />
+                    <Card className="bg-[#0f0f13] border-gray-800 overflow-hidden flex flex-col h-[600px]">
+                        <CardHeader className="pb-4 shrink-0 px-6 pt-6 bg-gradient-to-b from-indigo-950/20 to-transparent">
+                            <CardTitle className="text-xl font-black text-indigo-400">Skill Tree</CardTitle>
+                            <CardDescription className="text-sm font-medium">{completedCount} of {videos.length} skills mastered</CardDescription>
+                            <Progress value={progressPercentage} className="mt-4 h-2 bg-indigo-950/50" />
                         </CardHeader>
-                        <CardContent className="space-y-1.5 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
-                            {videos.length === 0 ? (
-                                <p className="text-sm text-muted-foreground italic text-center py-4">No lessons available yet.</p>
-                            ) : videos.map((video, idx) => {
-                                const isCompleted = progress.includes(video.id);
-                                const isPlaying = activeVideo === video.id;
-                                const isAvailable = enrollmentStatus === 'verified' || !video.locked;
+                        <CardContent className="flex-1 overflow-auto p-8 custom-scrollbar bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-[#0a0a0a] to-[#050505] relative">
+                            <div 
+                                className="relative grid gap-12 place-items-center mx-auto" 
+                                style={{
+                                    gridTemplateColumns: `repeat(${maxCol + 1}, minmax(130px, 1fr))`,
+                                    gridTemplateRows: `repeat(${maxRow + 1}, minmax(130px, auto))`
+                                }}
+                            >
+                                {videos.length === 0 ? (
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                        <p className="text-sm text-muted-foreground italic text-center py-4">No skills available yet.</p>
+                                    </div>
+                                ) : videos.map((video) => {
+                                    const isCompleted = progress.includes(video.id);
+                                    const isUnlocked = video.unlock_cost === 0 || unlockedCourseVideoIds.includes(video.id);
+                                    
+                                    const hasPrereqs = video.prerequisite_ids && video.prerequisite_ids.length > 0;
+                                    // Prereq met if all required prereqs are completed (in progress array)
+                                    const prereqsMet = !hasPrereqs || video.prerequisite_ids.every(pid => progress.includes(pid));
+                                    
+                                    const isAvailable = (enrollmentStatus === 'verified' || !video.locked) && prereqsMet;
+                                    const isPlaying = activeVideo === video.id;
+                                    const canAfford = points >= (video.unlock_cost || 0);
+                                    const requiresPurchase = isAvailable && !isUnlocked && video.unlock_cost > 0;
 
-                                return (
-                                    <button
-                                        key={video.id}
-                                        onClick={() => setActiveVideo(video.id)}
-                                        className={`w-full flex items-center gap-3 p-3 rounded-lg text-left transition-all duration-200
-                                            ${isPlaying ? 'bg-primary/10 border border-primary/20 shadow-sm' : 'border border-transparent hover:bg-muted'}
-                                            ${!isAvailable && !isPlaying ? 'opacity-70' : ''}
-                                        `}
-                                    >
-                                        <div className="flex-shrink-0">
-                                            {isCompleted ? (
-                                                <CheckCircle className="w-5 h-5 text-green-500" />
-                                            ) : isAvailable ? (
-                                                <div className="w-5 h-5 rounded-full border-2 border-muted-foreground/30 flex items-center justify-center">
-                                                    <span className="text-[10px] text-muted-foreground font-bold">{idx + 1}</span>
+                                    return (
+                                        <div 
+                                            key={video.id}
+                                            className="relative flex flex-col items-center group transition-all"
+                                            style={{
+                                                gridRow: (video.grid_row ?? 0) + 1,
+                                                gridColumn: (video.grid_column ?? 0) + 1
+                                            }}
+                                        >
+                                            <button
+                                                onClick={() => {
+                                                    if (requiresPurchase) {
+                                                        handleUnlockCourseVideo(video.id, video.unlock_cost);
+                                                    } else if (isAvailable && isUnlocked) {
+                                                        setActiveVideo(video.id);
+                                                    }
+                                                }}
+                                                disabled={!isAvailable && !isUnlocked && !requiresPurchase}
+                                                className={`w-20 h-20 rounded-2xl flex flex-col items-center justify-center border-4 transition-all duration-300 relative shadow-xl z-20 outline-none
+                                                    ${isPlaying ? 'bg-indigo-900 border-indigo-400 ring-4 ring-indigo-500/30 scale-110 shadow-indigo-900/50' : 
+                                                      isCompleted ? 'bg-emerald-950 border-emerald-500 hover:border-emerald-400 hover:bg-emerald-900 shadow-emerald-900/30' :
+                                                      (isAvailable && isUnlocked) ? 'bg-slate-800 border-slate-600 hover:border-indigo-400 hover:bg-slate-700 cursor-pointer' : 
+                                                      requiresPurchase ? 'bg-amber-950 border-amber-600 hover:bg-amber-900 hover:border-amber-400 cursor-pointer shadow-amber-900/30' :
+                                                      'bg-black border-slate-800 opacity-40 cursor-not-allowed'
+                                                    }
+                                                `}
+                                            >
+                                                {isCompleted ? (
+                                                    <CheckCircle className="w-8 h-8 text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
+                                                ) : requiresPurchase ? (
+                                                    <div className="flex flex-col items-center drop-shadow-[0_0_5px_rgba(245,158,11,0.5)]">
+                                                        <Lock className={`w-6 h-6 mb-1 ${canAfford ? 'text-amber-400' : 'text-slate-500'}`} />
+                                                        <span className={`text-[10px] font-black tracking-wider ${canAfford ? 'text-amber-400' : 'text-red-400/80'}`}>{video.unlock_cost} XP</span>
+                                                    </div>
+                                                ) : (isAvailable && isUnlocked) ? (
+                                                    <PlayCircle className={`w-8 h-8 ${isPlaying ? 'text-white' : 'text-indigo-400'}`} />
+                                                ) : (
+                                                    <Lock className="w-6 h-6 text-slate-600" />
+                                                )}
+                                            </button>
+                                            
+                                            {!isAvailable && hasPrereqs && (
+                                                <div className="absolute top-1/2 -translate-y-1/2 left-full ml-2 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity bg-black border border-red-900/50 text-[10px] px-2 py-1 rounded text-red-500 font-bold z-30 pointer-events-none shadow-lg">
+                                                    Requires previous skill
                                                 </div>
-                                            ) : (
-                                                <Lock className="w-5 h-5 text-muted-foreground" />
                                             )}
-                                        </div>
-                                        <div className="flex-1 overflow-hidden">
-                                            <div className={`font-medium truncate ${isPlaying ? 'text-primary' : ''}`}>
-                                                {video.title}
+
+                                            <div className="text-center mt-3 w-[120px] z-10">
+                                                <p className={`text-xs font-bold leading-tight drop-shadow-md ${isPlaying ? 'text-indigo-300' : isCompleted ? 'text-emerald-400' : isAvailable ? 'text-slate-200' : 'text-slate-500'}`}>
+                                                    {video.title}
+                                                </p>
                                             </div>
-                                            {video.duration && (
-                                                <div className="text-xs text-muted-foreground">{video.duration}</div>
-                                            )}
                                         </div>
-                                    </button>
-                                );
-                            })}
+                                    );
+                                })}
+                            </div>
                         </CardContent>
                     </Card>
 

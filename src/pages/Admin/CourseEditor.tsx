@@ -17,6 +17,10 @@ interface CourseVideo {
     duration: string | null;
     order_index: number;
     locked: boolean;
+    unlock_cost: number;
+    grid_row: number;
+    grid_column: number;
+    prerequisite_ids: string[];
 }
 
 export default function CourseEditor() {
@@ -33,13 +37,17 @@ export default function CourseEditor() {
         video_url: '',
         duration: '',
         locked: true,
-        order_index: 0
+        order_index: 0,
+        unlock_cost: 0,
+        grid_row: 0,
+        grid_column: 0,
+        prerequisite_ids: []
     });
 
     const loadVideos = async () => {
         setLoading(true);
         const { data, error } = await supabase
-            .from('course_videos' as any)
+            .from('course_videos')
             .select('*')
             .order('order_index', { ascending: true });
 
@@ -63,7 +71,11 @@ export default function CourseEditor() {
             video_url: '',
             duration: '',
             locked: true,
-            order_index: videos.length // Default to end of list
+            order_index: videos.length, // Default to end of list
+            unlock_cost: 0,
+            grid_row: 0,
+            grid_column: 0,
+            prerequisite_ids: []
         });
     };
 
@@ -78,15 +90,19 @@ export default function CourseEditor() {
         try {
             if (isEditing) {
                 const { error } = await supabase
-                    .from('course_videos' as any)
+                    .from('course_videos')
                     .update(formData)
                     .eq('id', isEditing);
                 if (error) throw error;
                 toast({ title: 'Video Updated', description: 'The video has been successfully updated.' });
             } else {
                 const { error } = await supabase
-                    .from('course_videos' as any)
-                    .insert([formData]);
+                    .from('course_videos')
+                    .insert([{
+                        ...formData,
+                        title: formData.title!,
+                        video_url: formData.video_url!
+                    }]);
                 if (error) throw error;
                 toast({ title: 'Video Added', description: 'The new video has been added to the course.' });
             }
@@ -107,7 +123,11 @@ export default function CourseEditor() {
             video_url: video.video_url,
             duration: video.duration || '',
             locked: video.locked,
-            order_index: video.order_index
+            order_index: video.order_index,
+            unlock_cost: video.unlock_cost || 0,
+            grid_row: video.grid_row || 0,
+            grid_column: video.grid_column || 0,
+            prerequisite_ids: video.prerequisite_ids || []
         });
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
@@ -117,7 +137,7 @@ export default function CourseEditor() {
 
         try {
             const { error } = await supabase
-                .from('course_videos' as any)
+                .from('course_videos')
                 .delete()
                 .eq('id', id);
 
@@ -154,7 +174,7 @@ export default function CourseEditor() {
         // Save to DB
         try {
             const { error } = await supabase
-                .from('course_videos' as any)
+                .from('course_videos')
                 .upsert(updates);
 
             if (error) throw error;
@@ -220,6 +240,69 @@ export default function CourseEditor() {
                                         value={formData.order_index}
                                         onChange={e => setFormData({ ...formData, order_index: parseInt(e.target.value) || 0 })}
                                     />
+                                </div>
+                            </div>
+                            
+                            <div className="grid grid-cols-3 gap-4 border p-4 bg-muted/10 rounded-lg">
+                                <div className="space-y-2">
+                                    <Label htmlFor="unlock_cost">Unlock Cost (XP)</Label>
+                                    <Input
+                                        id="unlock_cost"
+                                        type="number"
+                                        value={formData.unlock_cost}
+                                        onChange={e => setFormData({ ...formData, unlock_cost: parseInt(e.target.value) || 0 })}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="grid_row">Grid Row (Y)</Label>
+                                    <Input
+                                        id="grid_row"
+                                        type="number"
+                                        value={formData.grid_row}
+                                        onChange={e => setFormData({ ...formData, grid_row: parseInt(e.target.value) || 0 })}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="grid_column">Grid Column (X)</Label>
+                                    <Input
+                                        id="grid_column"
+                                        type="number"
+                                        value={formData.grid_column}
+                                        onChange={e => setFormData({ ...formData, grid_column: parseInt(e.target.value) || 0 })}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="space-y-2 p-4 border rounded-lg bg-muted/10">
+                                <Label>Prerequisites</Label>
+                                <p className="text-xs text-muted-foreground mb-2">Select the videos that must be completed/unlocked before this one.</p>
+                                <div className="max-h-40 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
+                                    {videos.filter(v => v.id !== isEditing).map(video => (
+                                        <div key={video.id} className="flex items-center space-x-2">
+                                            <input
+                                                type="checkbox"
+                                                id={`prereq-${video.id}`}
+                                                checked={formData.prerequisite_ids?.includes(video.id)}
+                                                onChange={(e) => {
+                                                    const checked = e.target.checked;
+                                                    setFormData(prev => {
+                                                        const current = prev.prerequisite_ids || [];
+                                                        return {
+                                                            ...prev,
+                                                            prerequisite_ids: checked 
+                                                                ? [...current, video.id]
+                                                                : current.filter(id => id !== video.id)
+                                                        };
+                                                    })
+                                                }}
+                                                className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-600"
+                                            />
+                                            <Label htmlFor={`prereq-${video.id}`} className="text-sm font-normal truncate">
+                                                {video.title} <span className="text-muted-foreground text-xs">({video.grid_column}, {video.grid_row})</span>
+                                            </Label>
+                                        </div>
+                                    ))}
+                                    {videos.length <= 1 && <span className="text-xs text-muted-foreground italic">Add more videos first.</span>}
                                 </div>
                             </div>
 

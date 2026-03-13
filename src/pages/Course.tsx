@@ -58,6 +58,8 @@ export default function Course() {
     const [activeVideo, setActiveVideo] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [isHowItWorksOpen, setIsHowItWorksOpen] = useState(false);
+    const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
+    const mapRef = React.useRef<HTMLDivElement>(null);
 
     // Gamification Hook
     const { points, level, refresh: refreshGamification } = useGamification();
@@ -175,6 +177,19 @@ export default function Course() {
         };
         loadCourseData();
     }, [user, navigate, searchParams]);
+
+    // Center map on hub (0,0) after loading
+    useEffect(() => {
+        if (!loading && mapRef.current) {
+            const container = mapRef.current.parentElement;
+            if (container) {
+                const centerX = (totalCols * gap + 80) / 2 - container.clientWidth / 2;
+                const centerY = (totalRows * gap + 80) / 2 - container.clientHeight / 2;
+                container.scrollLeft = centerX;
+                container.scrollTop = centerY;
+            }
+        }
+    }, [loading, videos]);
 
     // Format standard YouTube URLs or Bunny Stream URLs to Embed URLs
     const getEmbedUrl = (url: string) => {
@@ -555,428 +570,195 @@ export default function Course() {
                 })}
             </svg>
         );
-    };
-
-    return (
-        <div className="container max-w-6xl mx-auto py-8 px-4">
-            <div className="mb-8 flex flex-col md:flex-row md:items-start justify-between gap-4">
-                <div>
-                    <h1 className="text-4xl font-black text-primary mb-2">The 90-Day Guitar Challenge</h1>
-                    <p className="text-xl text-muted-foreground max-w-2xl">
-                        What would happen if for the next 90 days, you focused on all the most important pillars of musicianship in an organized, progressive way?
-                    </p>
-                </div>
-
-                <Dialog open={isHowItWorksOpen} onOpenChange={setIsHowItWorksOpen}>
-                    <DialogTrigger asChild>
-                        <Button variant="outline" className="gap-2 shrink-0 border-primary/20 hover:bg-primary/5">
-                            <Info className="w-4 h-4 text-primary" />
-                            How the Challenge Works
-                        </Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-[600px] bg-slate-900 border-slate-800 text-slate-100">
-                        <DialogHeader>
-                            <DialogTitle className="text-2xl font-black text-center text-white mb-4">
-                                The 90-Day Guitar Challenge
-                            </DialogTitle>
-                        </DialogHeader>
-
-                        <div className="space-y-6 py-4">
-                            <p className="text-center text-lg text-slate-300">
-                                Commit to daily, focused practice across all pillars of musicianship for 90 days. Track your progress in detail and watch your playing transform.
-                            </p>
-
-                            <div className="grid gap-6">
-                                <div className="flex gap-4">
-                                    <div className="mt-1 bg-indigo-500/20 p-2 rounded-full h-fit">
-                                        <Target className="w-6 h-6 text-indigo-400" />
-                                    </div>
-                                    <div>
-                                        <h3 className="font-bold text-lg text-white">The Guided Curriculum</h3>
-                                        <p className="text-slate-400">Lifetime access to the video lessons detailing exactly <em className="text-slate-300">how</em> and <em className="text-slate-300">what</em> to practice.</p>
-                                    </div>
-                                </div>
-
-                                <div className="flex gap-4">
-                                    <div className="mt-1 bg-orange-500/20 p-2 rounded-full h-fit">
-                                        <LineChart className="w-6 h-6 text-orange-400" />
-                                    </div>
-                                    <div>
-                                        <h3 className="font-bold text-lg text-white">The Tools & Tracking</h3>
-                                        <p className="text-slate-400">90 Days of Guitar Brain Premium included. We track every note you play, every session you log, and push you with tools like the Speed Trainer.</p>
-                                    </div>
-                                </div>
-
-                                <div className="flex gap-4">
-                                    <div className="mt-1 bg-green-500/20 p-2 rounded-full h-fit">
-                                        <Calendar className="w-6 h-6 text-green-400" />
-                                    </div>
-                                    <div>
-                                        <h3 className="font-bold text-lg text-white">The Execution</h3>
-                                        <p className="text-slate-400">Show up. Build your custom routines. Let the AI Coach guide your priorities based on real data.</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="pt-6 border-t border-slate-800 text-center">
-                                {enrollmentStatus !== 'verified' && enrollmentStatus !== 'pending_verification' && (
-                                    <>
-                                        <Button
-                                            onClick={() => {
-                                                setIsHowItWorksOpen(false);
-                                                handleBuyCourse();
-                                            }}
-                                            disabled={isBuyingCourse}
-                                            className="w-full sm:w-auto bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white text-lg py-6 px-8 rounded-xl shadow-lg hover:shadow-indigo-500/25 transition-all"
-                                        >
-                                            {isBuyingCourse ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
-                                            Join the Challenge ($199.99)
-                                        </Button>
-                                        <p className="text-xs text-slate-500 mt-4">One-time payment grants lifetime course access and 90 days of Premium.</p>
-                                    </>
-                                )}
-                                <div className="mt-6 p-4 bg-indigo-950/30 border border-indigo-500/20 rounded-xl text-left">
-                                    <h4 className="font-bold text-white mb-2 flex items-center gap-2">
-                                        <CheckCircle className="w-5 h-5 text-indigo-400" />
-                                        The 90-Day Guarantee
-                                    </h4>
-                                    <p className="text-sm text-slate-400">
-                                        If you do a 15-minute practice every day for 30 days and don't have:
-                                    </p>
-                                    <ol className="list-decimal list-inside text-sm text-slate-400 mt-2 space-y-1 ml-2">
-                                        <li>A better ear</li>
-                                        <li>Faster playing</li>
-                                        <li>Better ability to play chord tones over chord changes</li>
-                                    </ol>
-                                    <p className="text-sm text-slate-400 mt-2">
-                                        I will give you your money back and you can still keep the service for the full 90 days free of charge.
-                                    </p>
-                                </div>
-                            </div>
+        return (
+        <div className="min-h-screen bg-[#050505] text-slate-100 overflow-hidden flex flex-col">
+            {/* Immersive Header - Floating */}
+            <div className="absolute top-0 left-0 right-0 z-50 p-6 pointer-events-none flex justify-between items-start">
+                <div className="pointer-events-auto bg-black/40 backdrop-blur-md border border-white/5 p-4 rounded-2xl">
+                    <h1 className="text-2xl font-black bg-gradient-to-r from-white to-slate-500 bg-clip-text text-transparent">THE 90-DAY CHALLENGE</h1>
+                    <div className="flex items-center gap-4 mt-1">
+                        <div className="flex items-center gap-1.5">
+                            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{completedCount}/{videos.length} Skills</span>
                         </div>
-                    </DialogContent>
-                </Dialog>
-            </div>
-
-            {enrollmentStatus === 'pending_verification' && (
-                <div className="bg-orange-500/10 border border-orange-500/50 p-4 rounded-xl mb-8 flex items-center justify-between">
-                    <div>
-                        <h3 className="font-bold text-orange-500">Trial Grace Period Active</h3>
-                        <p className="text-sm">We're verifying your course purchase. Enjoy your 14-day free pass in the meantime!</p>
+                        <Progress value={progressPercentage} className="w-24 h-1 bg-white/5" />
                     </div>
                 </div>
-            )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
+                <div className="flex gap-2 pointer-events-auto">
+                    <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => setIsHowItWorksOpen(true)}
+                        className="bg-black/40 backdrop-blur-md border-white/5 hover:bg-white/10 text-xs font-bold"
+                    >
+                        <Info className="w-3.5 h-3.5 mr-2" />
+                        Guide
+                    </Button>
+                    {user && (
+                        <div className="bg-indigo-600/20 backdrop-blur-md border border-indigo-500/30 px-4 py-1.5 rounded-full flex items-center gap-2">
+                             <Crown className="w-3.5 h-3.5 text-indigo-400" />
+                             <span className="text-xs font-black text-indigo-300">{points} XP</span>
+                        </div>
+                    )}
+                </div>
+            </div>
 
-                {/* Main Video Area */}
-                <div className="lg:col-span-2 space-y-6">
-                    <div className="aspect-video bg-[#0a0a0a] rounded-xl border-border border overflow-hidden relative shadow-2xl">
-                        {(isMainVideoActive || activeRewardVideoData) ? (
-                            isMainVideoActive && activeMainVideoData?.locked && enrollmentStatus !== 'verified' ? (
-                                enrollmentStatus === 'pending_verification' ? (
-                                    <div className="absolute inset-0 bg-gradient-to-br from-slate-900 to-indigo-950 flex flex-col items-center justify-center text-center p-8">
-                                        <Lock className="w-16 h-16 text-indigo-400 mb-4 opacity-50" />
-                                        <h2 className="text-2xl font-bold mb-2">Verifying Purchase</h2>
-                                        <p className="text-muted-foreground mb-6 max-w-md">Your course purchase is currently pending verification. This usually takes just a few moments.</p>
-                                    </div>
-                                ) : (
-                                    <div className="absolute inset-0 bg-gradient-to-br from-slate-900 to-indigo-950 flex flex-col items-center justify-center text-center p-8">
-                                        <Lock className="w-16 h-16 text-indigo-400 mb-4 opacity-50" />
-                                        <h2 className="text-2xl font-bold mb-2">Challenge Lesson</h2>
-                                        <p className="text-muted-foreground mb-6 max-w-md">Join the 90-Day Challenge to unlock all lessons and instantly get <strong>90 Days of Premium</strong> tools to track your progress.</p>
+            {/* Immersive Map Container */}
+            <div className="flex-1 overflow-auto relative custom-scrollbar select-none bg-grid-white/[0.02]" style={{ perspective: '1000px' }}>
+                <div 
+                    ref={mapRef}
+                    className="relative transition-all duration-1000 ease-in-out" 
+                    style={{
+                        width: totalCols * gap + 200,
+                        height: totalRows * gap + 200,
+                        padding: '100px'
+                    }}
+                >
+                    {/* Artistic Background Effects */}
+                    <div className="absolute inset-0 bg-gradient-to-tr from-indigo-950/10 via-transparent to-purple-950/10 pointer-events-none" />
+                    
+                    {renderConnectionLines()}
 
-                                        <div className="flex flex-col sm:flex-row gap-4 items-center">
-                                            <Button onClick={handleBuyCourse} disabled={isBuyingCourse} variant="default" className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white">
-                                                {isBuyingCourse ? <Loader2 className="w-4 h-4 animate-spin" /> : <Crown className="w-4 h-4" />}
-                                                Join Challenge ($199.99)
-                                            </Button>
-                                            <Button variant="link" className="text-indigo-400 hover:text-indigo-300" onClick={() => setIsHowItWorksOpen(true)}>
-                                                How does this work?
-                                            </Button>
+                    {videos.map((video) => {
+                        const isCompleted = progress.includes(video.id);
+                        const isUnlocked = video.unlock_cost === 0 || unlockedCourseVideoIds.includes(video.id);
+                        
+                        const hasPrereqs = video.prerequisite_ids && video.prerequisite_ids.length > 0;
+                        const prereqsMet = !hasPrereqs || video.prerequisite_ids.every(pid => progress.includes(pid));
+                        
+                        const isAvailable = (enrollmentStatus === 'verified' || !video.locked) && prereqsMet;
+                        const isPlaying = activeVideo === video.id;
+                        const canAfford = points >= (video.unlock_cost || 0);
+                        const requiresPurchase = isAvailable && !isUnlocked && video.unlock_cost > 0;
+
+                        return (
+                            <div 
+                                key={video.id}
+                                className="absolute flex flex-col items-center group"
+                                style={{
+                                    left: getX(video.grid_column) + 100,
+                                    top: getY(video.grid_row) + 100,
+                                    width: nodeSize
+                                }}
+                            >
+                                <button
+                                    onClick={() => {
+                                        if (requiresPurchase) {
+                                            handleUnlockCourseVideo(video.id, video.unlock_cost);
+                                        } else if (isAvailable && isUnlocked) {
+                                            setActiveVideo(video.id);
+                                            setIsVideoModalOpen(true);
+                                        } else if (!isAvailable && !isUnlocked && !requiresPurchase) {
+                                            toast({
+                                                title: "Skill Locked",
+                                                description: "Complete the previous skills to unlock this path.",
+                                                variant: "destructive"
+                                            });
+                                        }
+                                    }}
+                                    className={`w-20 h-20 rounded-2xl flex flex-col items-center justify-center border-2 transition-all duration-500 relative shadow-2xl z-20 hover:scale-110 active:scale-95
+                                        ${isPlaying ? 'bg-indigo-600 border-white shadow-[0_0_30px_rgba(79,70,229,0.5)]' : 
+                                          isCompleted ? 'bg-emerald-500/20 border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.2)]' :
+                                          (isAvailable && isUnlocked) ? 'bg-slate-800/80 border-slate-600 hover:border-indigo-400' : 
+                                          requiresPurchase ? 'bg-amber-950/40 border-amber-600 hover:border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.1)]' :
+                                          'bg-black/40 border-slate-800 opacity-30 cursor-not-allowed grayscale'
+                                        }
+                                    `}
+                                >
+                                    {isCompleted ? (
+                                        <CheckCircle className="w-10 h-10 text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
+                                    ) : requiresPurchase ? (
+                                        <div className="flex flex-col items-center">
+                                            <Lock className={`w-6 h-6 mb-1 ${canAfford ? 'text-amber-400' : 'text-slate-500'}`} />
+                                            <span className={`text-[10px] font-black tracking-widest ${canAfford ? 'text-amber-400' : 'text-red-400/80'}`}>{video.unlock_cost} XP</span>
                                         </div>
-                                    </div>
-                                )
-                            ) : !isMainVideoActive && activeRewardVideoData && !isRewardUnlocked ? (
-                                <div className="absolute inset-0 bg-gradient-to-br from-slate-900 to-amber-950 flex flex-col items-center justify-center text-center p-8">
-                                    <Lock className="w-16 h-16 text-amber-500 mb-4 opacity-50" />
-                                    <h2 className="text-2xl font-bold mb-2">Bonus Reward Video</h2>
-                                    <p className="text-muted-foreground mb-6 max-w-md">Unlock this video using your earned XP! You currently have <strong>{points} XP</strong>.</p>
-
-                                    <Button
-                                        onClick={() => handleUnlockVideo(activeRewardVideoData.id, activeRewardVideoData.unlock_cost)}
-                                        disabled={isUnlocking || points < activeRewardVideoData.unlock_cost}
-                                        variant="default"
-                                        className="gap-2 bg-amber-600 hover:bg-amber-700 text-white"
-                                    >
-                                        {isUnlocking ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
-                                        Unlock for {activeRewardVideoData.unlock_cost} XP
-                                    </Button>
-
-                                    {points < activeRewardVideoData.unlock_cost && (
-                                        <p className="text-xs text-amber-500 mt-4 font-medium animate-pulse">
-                                            Need {activeRewardVideoData.unlock_cost - points} more XP
-                                        </p>
+                                    ) : (isAvailable && isUnlocked) ? (
+                                        <PlayCircle className={`w-10 h-10 ${isPlaying ? 'text-white' : 'text-indigo-400 group-hover:text-white'}`} />
+                                    ) : (
+                                        <Lock className="w-8 h-8 text-slate-600" />
                                     )}
+
+                                    {/* Particle Effect for Completed Nodes */}
+                                    {isCompleted && (
+                                        <div className="absolute inset-0 rounded-2xl border-emerald-500/50 animate-ping opacity-20" />
+                                    )}
+                                </button>
+                                
+                                <div className="text-center mt-3 w-[120px] z-10">
+                                    <p className={`text-[11px] font-black uppercase tracking-tighter leading-none drop-shadow-lg line-clamp-2 transition-colors duration-300 ${isPlaying ? 'text-white' : isCompleted ? 'text-emerald-400' : isAvailable ? 'text-slate-200' : 'text-slate-500'}`}>
+                                        {video.title}
+                                    </p>
                                 </div>
-                            ) : currentVideoUrl ? (
+
+                                {video.title.startsWith('Pillars -') && (
+                                    <div className="absolute -top-10 left-1/2 -translate-x-1/2 whitespace-nowrap">
+                                        <span className="text-[12px] font-black text-indigo-400 uppercase tracking-[0.3em] bg-indigo-500/10 px-3 py-1 rounded-full border border-indigo-500/20 backdrop-blur-sm">
+                                            {video.title.replace('Pillars - ', '')}
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+
+            {/* Video Player Modal */}
+            <Dialog open={isVideoModalOpen} onOpenChange={setIsVideoModalOpen}>
+                <DialogContent className="max-w-5xl p-0 bg-black border-white/10 overflow-hidden">
+                    <div className="flex flex-col h-[90vh]">
+                        <div className="aspect-video relative bg-slate-950">
+                            {currentVideoUrl ? (
                                 <iframe
                                     src={getEmbedUrl(currentVideoUrl)}
                                     title={currentVideoTitle}
-                                    className="w-full h-full border-0 absolute inset-0"
+                                    className="w-full h-full border-0"
                                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                                     allowFullScreen
                                 />
                             ) : (
-                                <div className="absolute inset-0 bg-gradient-to-br from-slate-900 to-indigo-950 flex flex-col items-center justify-center text-center p-8">
+                                <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-8">
                                     <PlayCircle className="w-16 h-16 text-indigo-400 mb-4 opacity-50" />
                                     <h2 className="text-2xl font-bold mb-2">Video Unavailable</h2>
-                                    <p className="text-muted-foreground text-sm">No video URL has been linked to this lesson yet.</p>
                                 </div>
-                            )
-                        ) : (
-                            <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-8">
-                                <PlayCircle className="w-16 h-16 text-muted-foreground mb-4 opacity-20" />
-                            </div>
-                        )}
-                    </div>
-
-                    {!user && (
-                        <div className="mt-8 bg-gradient-to-br from-indigo-900/40 to-slate-900 border border-indigo-500/20 rounded-xl overflow-hidden relative shadow-lg">
-                            <div className="p-6 md:p-8 flex flex-col md:flex-row items-center gap-6 relative z-10">
-                                <div className="flex-1 text-center md:text-left">
-                                    <h3 className="text-2xl font-black text-white mb-2 flex flex-row justify-center md:justify-start items-center gap-2">
-                                        <Target className="w-6 h-6 text-indigo-400" />
-                                        Free Practice Aid PDF
-                                    </h3>
-                                    <p className="text-slate-300 text-sm max-w-md mx-auto md:mx-0">
-                                        Having trouble getting to the chord tones in time? Get the free <strong>Hitting Chord Tones PDF</strong> guide sent straight to your inbox to study offline.
-                                    </p>
-                                </div>
-                                <div className="w-full md:w-auto min-w-[300px]">
-                                    {isEmailSubmitted ? (
-                                        <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4 text-center">
-                                            <CheckCircle className="w-8 h-8 text-green-400 mx-auto mb-2" />
-                                            <p className="text-green-300 font-bold text-sm">Perfect. PDF is on the way!</p>
-                                        </div>
-                                    ) : (
-                                        <form onSubmit={handleEmailSubmit} className="flex flex-col gap-3">
-                                            <input
-                                                type="email"
-                                                placeholder="Enter your email address..."
-                                                value={emailInput}
-                                                onChange={(e) => setEmailInput(e.target.value)}
-                                                required
-                                                className="w-full bg-black/40 border border-slate-700 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-lg px-4 py-3 text-white placeholder-slate-500"
-                                            />
-                                            <Button type="submit" disabled={isSubmittingEmail || !emailInput} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-6">
-                                                {isSubmittingEmail ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Send className="w-5 h-5 mr-2" />}
-                                                Send me the Free PDF
-                                            </Button>
-                                        </form>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    <div className="flex items-center justify-between mt-6">
-                        <div>
-                            <h2 className="text-2xl font-bold">{currentVideoTitle}</h2>
-                            {currentVideoDesc && (
-                                <p className="text-muted-foreground mt-2">{currentVideoDesc}</p>
                             )}
                         </div>
-                        {isPremium && isMainVideoActive && (
-                            <Button
-                                variant={progress.includes(activeVideo || '') ? "outline" : "default"}
-                                onClick={() => {
-                                    if (activeVideo) {
-                                        toggleProgress(activeVideo, progress.includes(activeVideo))
-                                    }
-                                }}
-                                className="gap-2"
-                            >
-                                {progress.includes(activeVideo || '') ? <CheckCircle className="w-4 h-4 text-green-500" /> : <Circle className="w-4 h-4" />}
-                                {progress.includes(activeVideo || '') ? 'Completed' : 'Mark Complete'}
-                            </Button>
-                        )}
-                    </div>
-
-                    {user && (enrollmentStatus === 'verified' || enrollmentStatus === 'pending_verification') && (
-                        <div className="mt-8 border-t border-border/50 pt-8">
-                            <h3 className="text-lg font-bold flex items-center gap-2 mb-2">
-                                <MessageCircleQuestion className="w-5 h-5 text-indigo-400" />
-                                Ask a Question
-                            </h3>
-                            <p className="text-sm text-muted-foreground mb-4">
-                                Have a question about this lesson? I read every submission and often update lessons or create new ones to answer them!
-                            </p>
-                            <div className="flex gap-4">
-                                <Textarea
-                                    placeholder="What confused you about this lesson?"
-                                    value={questionText}
-                                    onChange={(e) => setQuestionText(e.target.value)}
-                                    className="resize-none min-h-[50px] bg-background border-border/50 focus-visible:ring-indigo-500/50"
-                                />
-                                <Button
-                                    onClick={handleSubmitQuestion}
-                                    disabled={!questionText.trim() || isSubmittingQuestion}
-                                    className="h-auto shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white"
-                                >
-                                    {isSubmittingQuestion ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                                </Button>
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                {/* Sidebar Navigation */}
-                <div className="space-y-6">
-                    <Card className="bg-[#0f0f13] border-gray-800 overflow-hidden flex flex-col h-[600px]">
-                        <CardHeader className="pb-4 shrink-0 px-6 pt-6 bg-gradient-to-b from-indigo-950/20 to-transparent">
-                            <CardTitle className="text-xl font-black text-indigo-400">Skill Tree</CardTitle>
-                            <CardDescription className="text-sm font-medium">{completedCount} of {videos.length} skills mastered</CardDescription>
-                            
-                            <div className="flex items-center justify-between mt-2">
-                                <span className="text-[10px] text-indigo-300/60 uppercase font-black tracking-widest">Mastery Level</span>
-                                <span className="text-[10px] text-indigo-400 font-black">{progressPercentage}%</span>
-                            </div>
-                            
-                            <Progress value={progressPercentage} className="mt-4 h-2 bg-indigo-950/50" />
-                        </CardHeader>
-                        <CardContent className="flex-1 overflow-auto p-4 custom-scrollbar bg-[#050505] relative cursor-grab active:cursor-grabbing">
-                            {/* SVG Background Grid Pattern */}
-                            <div className="absolute inset-0 opacity-[0.03] pointer-events-none" 
-                                style={{ 
-                                    backgroundImage: 'radial-gradient(#4f46e5 1px, transparent 1px)', 
-                                    backgroundSize: '40px 40px' 
-                                }} 
-                            />
-
-                            <div 
-                                className="relative transition-all duration-500 ease-out" 
-                                style={{
-                                    width: totalCols * gap + 80,
-                                    height: totalRows * gap + 80,
-                                    minWidth: '100%',
-                                    minHeight: '100%'
-                                }}
-                            >
-                                {renderConnectionLines()}
-
-                                {videos.map((video) => {
-                                    const isCompleted = progress.includes(video.id);
-                                    const isUnlocked = video.unlock_cost === 0 || unlockedCourseVideoIds.includes(video.id);
+                        
+                        <div className="flex-1 overflow-auto p-8 bg-[#0a0a0f] border-t border-white/5">
+                            <div className="flex items-start justify-between gap-6">
+                                <div className="space-y-4 max-w-2xl">
+                                    <h2 className="text-4xl font-black">{currentVideoTitle}</h2>
+                                    <p className="text-slate-400 text-lg leading-relaxed">{currentVideoDesc}</p>
                                     
-                                    const hasPrereqs = video.prerequisite_ids && video.prerequisite_ids.length > 0;
-                                    const prereqsMet = !hasPrereqs || video.prerequisite_ids.every(pid => progress.includes(pid));
-                                    
-                                    const isAvailable = (enrollmentStatus === 'verified' || !video.locked) && prereqsMet;
-                                    const isPlaying = activeVideo === video.id;
-                                    const canAfford = points >= (video.unlock_cost || 0);
-                                    const requiresPurchase = isAvailable && !isUnlocked && video.unlock_cost > 0;
+                                    {!user && !activeMainVideoData?.locked && (
+                                        <div className="mt-8 p-6 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl">
+                                            <h4 className="font-bold text-indigo-300 mb-2 flex items-center gap-2">
+                                                <Info className="w-5 h-5" />
+                                                Ready for the full experience?
+                                            </h4>
+                                            <p className="text-sm text-slate-400 mb-4">You're watching a preview! Sign up to unlock the full skill tree and track your progress.</p>
+                                            <Button onClick={() => navigate('/auth')} className="bg-indigo-600 hover:bg-indigo-700">Create Free Account</Button>
+                                        </div>
+                                    )}
 
-                                    return (
-                                        <div 
-                                            key={video.id}
-                                            className="absolute flex flex-col items-center group transition-all"
-                                            style={{
-                                                left: getX(video.grid_column),
-                                                top: getY(video.grid_row),
-                                                width: nodeSize
-                                            }}
-                                        >
-                                            <button
+                                    {user && isMainVideoActive && (
+                                        <div className="pt-8">
+                                            <Button
+                                                variant={progress.includes(activeVideo || '') ? "outline" : "default"}
+                                                size="lg"
                                                 onClick={() => {
-                                                    if (requiresPurchase) {
-                                                        handleUnlockCourseVideo(video.id, video.unlock_cost);
-                                                    } else if (isAvailable && isUnlocked) {
-                                                        setActiveVideo(video.id);
+                                                    if (activeVideo) {
+                                                        toggleProgress(activeVideo, progress.includes(activeVideo))
                                                     }
                                                 }}
-                                                disabled={!isAvailable && !isUnlocked && !requiresPurchase}
-                                                className={`w-16 h-16 sm:w-20 sm:h-20 rounded-2xl flex flex-col items-center justify-center border-4 transition-all duration-300 relative shadow-xl z-20 outline-none
-                                                    ${isPlaying ? 'bg-indigo-900 border-indigo-400 ring-4 ring-indigo-500/30 scale-110 shadow-indigo-900/50' : 
-                                                      isCompleted ? 'bg-emerald-950 border-emerald-500 hover:border-emerald-400 hover:bg-emerald-900 shadow-emerald-900/30' :
-                                                      (isAvailable && isUnlocked) ? 'bg-slate-800 border-slate-600 hover:border-indigo-400 hover:bg-slate-700 cursor-pointer' : 
-                                                      requiresPurchase ? 'bg-amber-950 border-amber-600 hover:bg-amber-900 hover:border-amber-400 cursor-pointer shadow-amber-900/30' :
-                                                      'bg-black border-slate-800 opacity-40 cursor-not-allowed'
-                                                    }
-                                                `}
+                                                className={`gap-3 text-lg py-6 px-8 rounded-xl transition-all ${!progress.includes(activeVideo || '') ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'border-emerald-500/50 text-emerald-400'}`}
                                             >
-                                                {isCompleted ? (
-                                                    <CheckCircle className="w-8 h-8 text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
-                                                ) : requiresPurchase ? (
-                                                    <div className="flex flex-col items-center drop-shadow-[0_0_5px_rgba(245,158,11,0.5)]">
-                                                        <Lock className={`w-5 h-5 mb-0.5 ${canAfford ? 'text-amber-400' : 'text-slate-500'}`} />
-                                                        <span className={`text-[8px] font-black tracking-wider ${canAfford ? 'text-amber-400' : 'text-red-400/80'}`}>{video.unlock_cost} XP</span>
-                                                    </div>
-                                                ) : (isAvailable && isUnlocked) ? (
-                                                    <PlayCircle className={`w-8 h-8 ${isPlaying ? 'text-white' : 'text-indigo-400'}`} />
+                                                {progress.includes(activeVideo || '') ? (
+                                                    <><CheckCircle className="w-6 h-6" /> Mastery Confirmed</>
                                                 ) : (
-                                                    <Lock className="w-6 h-6 text-slate-600" />
+                                                    <><Circle className="w-6 h-6" /> Complete Skill</>
                                                 )}
-                                            </button>
-                                            
-                                            <div className="text-center mt-2 w-[100px] z-10">
-                                                <p className={`text-[10px] font-bold leading-tight drop-shadow-md line-clamp-2 ${isPlaying ? 'text-indigo-300' : isCompleted ? 'text-emerald-400' : isAvailable ? 'text-slate-200' : 'text-slate-500'}`}>
-                                                    {video.title}
-                                                </p>
-                                            </div>
-
-                                            {/* Pillar Label - Show only for pillar starts */}
-                                            {video.title.startsWith('Pillars -') && (
-                                                <div className="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap">
-                                                    <span className="text-[10px] font-black text-indigo-500/60 uppercase tracking-[0.2em]">
-                                                        {video.title.replace('Pillars - ', '')}
-                                                    </span>
-                                                </div>
-                                            )}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* Gamification Rewards Panel */}
-                    {(enrollmentStatus === 'verified' || enrollmentStatus === 'pending_verification') && rewardVideos.length > 0 && (
-                        <Card className="bg-[#1a1205] border-amber-900/40 shadow-lg shadow-amber-900/10">
-                            <CardHeader className="pb-4">
-                                <CardTitle className="text-lg text-amber-500 flex items-center justify-between">
-                                    <span>Bonus Rewards</span>
-                                    <span className="text-sm px-2 py-0.5 bg-amber-500/10 rounded-full">{points} XP</span>
-                                </CardTitle>
-                                <CardDescription className="text-xs text-amber-500/60">Unlock extra videos with your practice XP</CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-                                {rewardVideos.map((video) => {
-                                    const isUnlocked = unlockedRewardVideoIds.includes(video.id);
-                                    const isPlaying = activeVideo === video.id;
-                                    const canAfford = points >= video.unlock_cost;
-
-                                    return (
-                                        <button
-                                            key={video.id}
-                                            onClick={() => setActiveVideo(video.id)}
-                                            className={`w-full flex items-center justify-between p-3 rounded-lg text-left transition-all duration-200
-                                                ${isPlaying ? 'bg-amber-500/20 border border-amber-500/40 shadow-sm' : 'border border-amber-500/10 hover:bg-amber-500/5 bg-black/40'}
-                                            `}
-                                        >
-                                            <div className="flex items-center gap-3 overflow-hidden">
-                                                <div className="flex-shrink-0">
-                                                    {isUnlocked ? (
-                                                        <PlayCircle className={`w-5 h-5 ${isPlaying ? 'text-amber-400' : 'text-amber-500/70'}`} />
-                                                    ) : (
-                                                        <Lock className="w-5 h-5 text-amber-900" />
-                                                    )}
-                                                </div>
-                                                <div className="overflow-hidden">
-                                                    <div className={`font-medium truncate text-sm ${isPlaying ? 'text-amber-400' : 'text-slate-200'}`}>
-                                                        {video.title}
-                                                    </div>
-                                                </div>
                                             </div>
                                             {!isUnlocked && (
                                                 <div className={`text-xs ml-2 font-bold px-2 py-1 rounded shrink-0 ${canAfford ? 'bg-amber-500/20 text-amber-500' : 'bg-red-500/10 text-red-500'}`}>

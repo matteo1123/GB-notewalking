@@ -49,6 +49,7 @@ export default function Course() {
     const [isPremium, setIsPremium] = useState(false);
     const [isBuyingCourse, setIsBuyingCourse] = useState(false);
     const [enrollmentStatus, setEnrollmentStatus] = useState<string | null>(null);
+    // Unified RPG Skill Tree Map state
     const [progress, setProgress] = useState<string[]>([]);
     const [videos, setVideos] = useState<CourseVideo[]>([]);
     const [rewardVideos, setRewardVideos] = useState<RewardVideo[]>([]);
@@ -57,10 +58,6 @@ export default function Course() {
     const [activeVideo, setActiveVideo] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [isHowItWorksOpen, setIsHowItWorksOpen] = useState(false);
-    
-    // Categories for the Skill Tree
-    const categories = ['Rhythm', 'Chord Tones', 'Fretboard Mastery', 'Ear', 'Technique'];
-    const [selectedCategory, setSelectedCategory] = useState('Rhythm');
 
     // Gamification Hook
     const { points, level, refresh: refreshGamification } = useGamification();
@@ -171,11 +168,6 @@ export default function Course() {
                     const firstChordToneVideo = videoData.find(v => v.title.toLowerCase().includes('hit your first chord tone'));
                     const firstVideo = firstChordToneVideo || videoData[0];
                     setActiveVideo(firstVideo.id);
-                    
-                    // Set category based on initial video
-                    if (firstVideo.category) {
-                        setSelectedCategory(firstVideo.category);
-                    }
                 }
             }
 
@@ -500,10 +492,6 @@ export default function Course() {
     const completedCount = progress.length;
     const progressPercentage = videos.length > 0 ? Math.round((completedCount / videos.length) * 100) : 0;
 
-    const filteredVideos = videos.filter(v => (v.category || 'Rhythm') === selectedCategory);
-    const maxRow = Math.max(...filteredVideos.map(v => v.grid_row ?? 0), 0);
-    const maxCol = Math.max(...filteredVideos.map(v => v.grid_column ?? 0), 0);
-
     const activeMainVideoData = videos.find(v => v.id === activeVideo);
     const activeRewardVideoData = rewardVideos.find(v => v.id === activeVideo);
     const isMainVideoActive = !!activeMainVideoData;
@@ -513,6 +501,61 @@ export default function Course() {
     const currentVideoDesc = isMainVideoActive ? activeMainVideoData?.description : activeRewardVideoData?.description;
     const currentVideoUrl = isMainVideoActive ? activeMainVideoData?.video_url : activeRewardVideoData?.url;
     const isRewardUnlocked = user ? unlockedRewardVideoIds.includes(activeVideo || '') : false;
+
+    // Map sizing and coordinate logic
+    const nodeSize = 80;
+    const gap = 120;
+    
+    const minRow = Math.min(...videos.map(v => v.grid_row ?? 0), 0);
+    const maxRow = Math.max(...videos.map(v => v.grid_row ?? 0), 0);
+    const minCol = Math.min(...videos.map(v => v.grid_column ?? 0), 0);
+    const maxCol = Math.max(...videos.map(v => v.grid_column ?? 0), 0);
+
+    const totalRows = maxRow - minRow + 1;
+    const totalCols = maxCol - minCol + 1;
+
+    const getX = (col: number) => (col - minCol) * gap + 40;
+    const getY = (row: number) => (row - minRow) * gap + 40;
+
+    const renderConnectionLines = () => {
+        return (
+            <svg 
+                className="absolute inset-0 pointer-events-none opacity-40" 
+                width={totalCols * gap + 80} 
+                height={totalRows * gap + 80}
+            >
+                {videos.map(video => {
+                    if (!video.prerequisite_ids || video.prerequisite_ids.length === 0) return null;
+                    
+                    return video.prerequisite_ids.map(prereqId => {
+                        const prereq = videos.find(v => v.id === prereqId);
+                        if (!prereq) return null;
+
+                        const startX = getX(prereq.grid_column) + nodeSize / 2;
+                        const startY = getY(prereq.grid_row) + nodeSize / 2;
+                        const endX = getX(video.grid_column) + nodeSize / 2;
+                        const endY = getY(video.grid_row) + nodeSize / 2;
+
+                        const isMet = progress.includes(prereqId);
+
+                        return (
+                            <line
+                                key={`${prereqId}-${video.id}`}
+                                x1={startX}
+                                y1={startY}
+                                x2={endX}
+                                y2={endY}
+                                stroke={isMet ? "#10b981" : "#4f46e5"}
+                                strokeWidth="3"
+                                strokeDasharray={isMet ? "0" : "6,4"}
+                                className="transition-all duration-1000"
+                            />
+                        );
+                    });
+                })}
+            </svg>
+        );
+    };
 
     return (
         <div className="container max-w-6xl mx-auto py-8 px-4">
@@ -795,40 +838,38 @@ export default function Course() {
                             <CardTitle className="text-xl font-black text-indigo-400">Skill Tree</CardTitle>
                             <CardDescription className="text-sm font-medium">{completedCount} of {videos.length} skills mastered</CardDescription>
                             
-                            <div className="flex flex-wrap gap-2 mt-4">
-                                {categories.map(cat => (
-                                    <Button
-                                        key={cat}
-                                        variant={selectedCategory === cat ? "default" : "outline"}
-                                        size="sm"
-                                        onClick={() => setSelectedCategory(cat)}
-                                        className={`text-[10px] sm:text-xs h-7 px-2 sm:px-3 ${selectedCategory === cat ? 'bg-indigo-600 hover:bg-indigo-700' : 'border-indigo-500/20 text-indigo-300/60 hover:bg-indigo-500/10'}`}
-                                    >
-                                        {cat}
-                                    </Button>
-                                ))}
+                            <div className="flex items-center justify-between mt-2">
+                                <span className="text-[10px] text-indigo-300/60 uppercase font-black tracking-widest">Mastery Level</span>
+                                <span className="text-[10px] text-indigo-400 font-black">{progressPercentage}%</span>
                             </div>
                             
                             <Progress value={progressPercentage} className="mt-4 h-2 bg-indigo-950/50" />
                         </CardHeader>
-                        <CardContent className="flex-1 overflow-auto p-8 custom-scrollbar bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-[#0a0a0a] to-[#050505] relative">
+                        <CardContent className="flex-1 overflow-auto p-4 custom-scrollbar bg-[#050505] relative cursor-grab active:cursor-grabbing">
+                            {/* SVG Background Grid Pattern */}
+                            <div className="absolute inset-0 opacity-[0.03] pointer-events-none" 
+                                style={{ 
+                                    backgroundImage: 'radial-gradient(#4f46e5 1px, transparent 1px)', 
+                                    backgroundSize: '40px 40px' 
+                                }} 
+                            />
+
                             <div 
-                                className="relative grid gap-12 place-items-center mx-auto" 
+                                className="relative transition-all duration-500 ease-out" 
                                 style={{
-                                    gridTemplateColumns: `repeat(${maxCol + 1}, minmax(130px, 1fr))`,
-                                    gridTemplateRows: `repeat(${maxRow + 1}, minmax(130px, auto))`
+                                    width: totalCols * gap + 80,
+                                    height: totalRows * gap + 80,
+                                    minWidth: '100%',
+                                    minHeight: '100%'
                                 }}
                             >
-                                {filteredVideos.length === 0 ? (
-                                    <div className="absolute inset-0 flex items-center justify-center">
-                                        <p className="text-sm text-muted-foreground italic text-center py-4">No skills in this category yet.</p>
-                                    </div>
-                                ) : filteredVideos.map((video) => {
+                                {renderConnectionLines()}
+
+                                {videos.map((video) => {
                                     const isCompleted = progress.includes(video.id);
                                     const isUnlocked = video.unlock_cost === 0 || unlockedCourseVideoIds.includes(video.id);
                                     
                                     const hasPrereqs = video.prerequisite_ids && video.prerequisite_ids.length > 0;
-                                    // Prereq met if all required prereqs are completed (in progress array)
                                     const prereqsMet = !hasPrereqs || video.prerequisite_ids.every(pid => progress.includes(pid));
                                     
                                     const isAvailable = (enrollmentStatus === 'verified' || !video.locked) && prereqsMet;
@@ -839,10 +880,11 @@ export default function Course() {
                                     return (
                                         <div 
                                             key={video.id}
-                                            className="relative flex flex-col items-center group transition-all"
+                                            className="absolute flex flex-col items-center group transition-all"
                                             style={{
-                                                gridRow: (video.grid_row ?? 0) + 1,
-                                                gridColumn: (video.grid_column ?? 0) + 1
+                                                left: getX(video.grid_column),
+                                                top: getY(video.grid_row),
+                                                width: nodeSize
                                             }}
                                         >
                                             <button
@@ -854,7 +896,7 @@ export default function Course() {
                                                     }
                                                 }}
                                                 disabled={!isAvailable && !isUnlocked && !requiresPurchase}
-                                                className={`w-20 h-20 rounded-2xl flex flex-col items-center justify-center border-4 transition-all duration-300 relative shadow-xl z-20 outline-none
+                                                className={`w-16 h-16 sm:w-20 sm:h-20 rounded-2xl flex flex-col items-center justify-center border-4 transition-all duration-300 relative shadow-xl z-20 outline-none
                                                     ${isPlaying ? 'bg-indigo-900 border-indigo-400 ring-4 ring-indigo-500/30 scale-110 shadow-indigo-900/50' : 
                                                       isCompleted ? 'bg-emerald-950 border-emerald-500 hover:border-emerald-400 hover:bg-emerald-900 shadow-emerald-900/30' :
                                                       (isAvailable && isUnlocked) ? 'bg-slate-800 border-slate-600 hover:border-indigo-400 hover:bg-slate-700 cursor-pointer' : 
@@ -867,8 +909,8 @@ export default function Course() {
                                                     <CheckCircle className="w-8 h-8 text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
                                                 ) : requiresPurchase ? (
                                                     <div className="flex flex-col items-center drop-shadow-[0_0_5px_rgba(245,158,11,0.5)]">
-                                                        <Lock className={`w-6 h-6 mb-1 ${canAfford ? 'text-amber-400' : 'text-slate-500'}`} />
-                                                        <span className={`text-[10px] font-black tracking-wider ${canAfford ? 'text-amber-400' : 'text-red-400/80'}`}>{video.unlock_cost} XP</span>
+                                                        <Lock className={`w-5 h-5 mb-0.5 ${canAfford ? 'text-amber-400' : 'text-slate-500'}`} />
+                                                        <span className={`text-[8px] font-black tracking-wider ${canAfford ? 'text-amber-400' : 'text-red-400/80'}`}>{video.unlock_cost} XP</span>
                                                     </div>
                                                 ) : (isAvailable && isUnlocked) ? (
                                                     <PlayCircle className={`w-8 h-8 ${isPlaying ? 'text-white' : 'text-indigo-400'}`} />
@@ -877,17 +919,20 @@ export default function Course() {
                                                 )}
                                             </button>
                                             
-                                            {!isAvailable && hasPrereqs && (
-                                                <div className="absolute top-1/2 -translate-y-1/2 left-full ml-2 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity bg-black border border-red-900/50 text-[10px] px-2 py-1 rounded text-red-500 font-bold z-30 pointer-events-none shadow-lg">
-                                                    Requires previous skill
-                                                </div>
-                                            )}
-
-                                            <div className="text-center mt-3 w-[120px] z-10">
-                                                <p className={`text-xs font-bold leading-tight drop-shadow-md ${isPlaying ? 'text-indigo-300' : isCompleted ? 'text-emerald-400' : isAvailable ? 'text-slate-200' : 'text-slate-500'}`}>
+                                            <div className="text-center mt-2 w-[100px] z-10">
+                                                <p className={`text-[10px] font-bold leading-tight drop-shadow-md line-clamp-2 ${isPlaying ? 'text-indigo-300' : isCompleted ? 'text-emerald-400' : isAvailable ? 'text-slate-200' : 'text-slate-500'}`}>
                                                     {video.title}
                                                 </p>
                                             </div>
+
+                                            {/* Pillar Label - Show only for pillar starts */}
+                                            {video.title.startsWith('Pillars -') && (
+                                                <div className="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap">
+                                                    <span className="text-[10px] font-black text-indigo-500/60 uppercase tracking-[0.2em]">
+                                                        {video.title.replace('Pillars - ', '')}
+                                                    </span>
+                                                </div>
+                                            )}
                                         </div>
                                     );
                                 })}

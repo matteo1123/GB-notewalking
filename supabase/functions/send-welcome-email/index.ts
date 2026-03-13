@@ -37,7 +37,7 @@ serve(async (req) => {
           <p><strong>Download your PDF here:</strong><br />
           <a href="https://idsufbsfywgmcrhldqxq.supabase.co/storage/v1/object/public/other/Guitarbrain%20Chord%20tones.pdf" style="display: inline-block; padding: 12px 24px; background-color: #4f46e5; color: white; text-decoration: none; rounded: 8px; margin-top: 10px;">Hitting Chord Tones PDF</a></p>
 
-          <p>By the way, this isn't AI generated or anything—this is handwritten from me, the developer of Guitar Brain. I'm very serious about making this the best possible platform for helping people skill up on guitar as fast as possible. The system isn't really "ready" for paying customers yet because I'm still perfecting it, so please enjoy the 30-day free trial on me once you create an account.</p>
+          <p>I'm very serious about making this the best possible platform for helping people skill up on guitar as fast as possible. The system isn't really "ready" for paying customers yet because I'm still perfecting it, so please enjoy the 30-day free trial on me once you create an account.</p>
 
           <p>Please let me know if you have any suggestions, feedback, or requests. It's definitely still a work in progress, and I'd love to hear from you.</p>
 

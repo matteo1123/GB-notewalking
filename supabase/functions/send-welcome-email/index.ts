@@ -1,7 +1,12 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "npm:resend@2.0.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
+const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+
+const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -17,12 +22,13 @@ serve(async (req) => {
     const payload = await req.json();
     const { record } = payload; // Webhook payload from email_subscribers INSERT
     const email = record.email;
+    const subscriberId = record.id;
 
     if (!email) {
       throw new Error("No email found in payload");
     }
 
-    const { data, error } = await resend.emails.send({
+    const { data, error: resendError } = await resend.emails.send({
       from: "Matthew from Guitar Brain <matt@guitarbrain.org>",
       to: [email],
       subject: "Your Hitting Chord Tones PDF (and a personal note)",
@@ -35,7 +41,7 @@ serve(async (req) => {
           <p>As a thank you for being an early adopter, I want to invite you to try the full app for free for 30 days. I’ve attached the resource below aimed at making chord tones as easy as humanly possible. It will definitely help, but the <strong>NoteWalking</strong> module in the app is really the "secret weapon" for building this skill quickly.</p>
 
           <p><strong>Download your PDF here:</strong><br />
-          <a href="https://idsufbsfywgmcrhldqxq.supabase.co/storage/v1/object/public/other/Guitarbrain%20Chord%20tones.pdf" style="display: inline-block; padding: 12px 24px; background-color: #4f46e5; color: white; text-decoration: none; rounded: 8px; margin-top: 10px;">Hitting Chord Tones PDF</a></p>
+          <a href="https://idsufbsfywgmcrhldqxq.supabase.co/storage/v1/object/public/other/Guitarbrain%20Chord%20tones.pdf" style="display: inline-block; padding: 12px 24px; background-color: #4f46e5; color: white; text-decoration: none; border-radius: 8px; margin-top: 10px;">Hitting Chord Tones PDF</a></p>
 
           <p>I'm very serious about making this the best possible platform for helping people skill up on guitar as fast as possible. The system isn't really "ready" for paying customers yet because I'm still perfecting it, so please enjoy the 30-day free trial on me once you create an account.</p>
 
@@ -51,12 +57,24 @@ serve(async (req) => {
       `,
     });
 
-    if (error) {
-      console.error("Resend error:", error);
-      return new Response(JSON.stringify({ error: error.message }), {
+    if (resendError) {
+      console.error("Resend error:", resendError);
+      return new Response(JSON.stringify({ error: resendError.message }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    // Update database to mark as fulfilled
+    if (subscriberId) {
+      const { error: dbError } = await supabase
+        .from("email_subscribers")
+        .update({ fulfilled: true })
+        .eq("id", subscriberId);
+      
+      if (dbError) {
+        console.error("DB Update error:", dbError);
+      }
     }
 
     return new Response(JSON.stringify(data), {

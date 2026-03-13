@@ -570,16 +570,16 @@ export default function Course() {
                 })}
             </svg>
         );
-        return (
-        <div className="min-h-screen bg-[#050505] text-slate-100 overflow-hidden flex flex-col">
+    return (
+        <div className="min-h-screen bg-[#050505] text-slate-100 overflow-hidden flex flex-col relative">
             {/* Immersive Header - Floating */}
             <div className="absolute top-0 left-0 right-0 z-50 p-6 pointer-events-none flex justify-between items-start">
-                <div className="pointer-events-auto bg-black/40 backdrop-blur-md border border-white/5 p-4 rounded-2xl">
+                <div className="pointer-events-auto bg-black/40 backdrop-blur-md border border-white/5 p-4 rounded-2xl shadow-2xl">
                     <h1 className="text-2xl font-black bg-gradient-to-r from-white to-slate-500 bg-clip-text text-transparent">THE 90-DAY CHALLENGE</h1>
                     <div className="flex items-center gap-4 mt-1">
                         <div className="flex items-center gap-1.5">
                             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{completedCount}/{videos.length} Skills</span>
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{completedCount}/{videos.length} Skills Mastered</span>
                         </div>
                         <Progress value={progressPercentage} className="w-24 h-1 bg-white/5" />
                     </div>
@@ -590,29 +590,28 @@ export default function Course() {
                         variant="outline" 
                         size="sm"
                         onClick={() => setIsHowItWorksOpen(true)}
-                        className="bg-black/40 backdrop-blur-md border-white/5 hover:bg-white/10 text-xs font-bold"
+                        className="bg-black/40 backdrop-blur-md border-white/5 hover:bg-white/10 text-xs font-bold rounded-full px-4"
                     >
-                        <Info className="w-3.5 h-3.5 mr-2" />
-                        Guide
+                        <Info className="w-4 h-4 mr-2" />
+                        Protocol
                     </Button>
                     {user && (
-                        <div className="bg-indigo-600/20 backdrop-blur-md border border-indigo-500/30 px-4 py-1.5 rounded-full flex items-center gap-2">
-                             <Crown className="w-3.5 h-3.5 text-indigo-400" />
-                             <span className="text-xs font-black text-indigo-300">{points} XP</span>
+                        <div className="bg-indigo-600/20 backdrop-blur-md border border-indigo-500/30 px-5 py-1.5 rounded-full flex items-center gap-2 shadow-lg shadow-indigo-500/10">
+                             <Crown className="w-4 h-4 text-indigo-400" />
+                             <span className="text-xs font-black text-indigo-300 tracking-wider">{points} XP</span>
                         </div>
                     )}
                 </div>
             </div>
 
             {/* Immersive Map Container */}
-            <div className="flex-1 overflow-auto relative custom-scrollbar select-none bg-grid-white/[0.02]" style={{ perspective: '1000px' }}>
+            <div className="flex-1 overflow-auto relative select-none bg-grid-white/[0.02] cursor-grab active:cursor-grabbing">
                 <div 
                     ref={mapRef}
-                    className="relative transition-all duration-1000 ease-in-out" 
+                    className="relative p-[500px]" // Massive padding to allow huge scroll area
                     style={{
-                        width: totalCols * gap + 200,
-                        height: totalRows * gap + 200,
-                        padding: '100px'
+                        width: totalCols * gap + 1000,
+                        height: totalRows * gap + 1000,
                     }}
                 >
                     {/* Artistic Background Effects */}
@@ -637,8 +636,8 @@ export default function Course() {
                                 key={video.id}
                                 className="absolute flex flex-col items-center group"
                                 style={{
-                                    left: getX(video.grid_column) + 100,
-                                    top: getY(video.grid_row) + 100,
+                                    left: getX(video.grid_column) + 500,
+                                    top: getY(video.grid_row) + 500,
                                     width: nodeSize
                                 }}
                             >
@@ -651,14 +650,14 @@ export default function Course() {
                                             setIsVideoModalOpen(true);
                                         } else if (!isAvailable && !isUnlocked && !requiresPurchase) {
                                             toast({
-                                                title: "Skill Locked",
-                                                description: "Complete the previous skills to unlock this path.",
+                                                title: "Protocol Interrupted",
+                                                description: "The previous prerequisites must be completed first.",
                                                 variant: "destructive"
                                             });
                                         }
                                     }}
-                                    className={`w-20 h-20 rounded-2xl flex flex-col items-center justify-center border-2 transition-all duration-500 relative shadow-2xl z-20 hover:scale-110 active:scale-95
-                                        ${isPlaying ? 'bg-indigo-600 border-white shadow-[0_0_30px_rgba(79,70,229,0.5)]' : 
+                                    className={`w-20 h-20 sm:w-24 sm:h-24 rounded-3xl flex flex-col items-center justify-center border-2 transition-all duration-500 relative shadow-2xl z-20 hover:scale-110 active:scale-95
+                                        ${isPlaying ? 'bg-indigo-600 border-white shadow-[0_0_40px_rgba(79,70,229,0.5)]' : 
                                           isCompleted ? 'bg-emerald-500/20 border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.2)]' :
                                           (isAvailable && isUnlocked) ? 'bg-slate-800/80 border-slate-600 hover:border-indigo-400' : 
                                           requiresPurchase ? 'bg-amber-950/40 border-amber-600 hover:border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.1)]' :
@@ -667,33 +666,33 @@ export default function Course() {
                                     `}
                                 >
                                     {isCompleted ? (
-                                        <CheckCircle className="w-10 h-10 text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
+                                        <CheckCircle className="w-12 h-12 text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
                                     ) : requiresPurchase ? (
                                         <div className="flex flex-col items-center">
-                                            <Lock className={`w-6 h-6 mb-1 ${canAfford ? 'text-amber-400' : 'text-slate-500'}`} />
+                                            <Lock className={`w-7 h-7 mb-1 ${canAfford ? 'text-amber-400' : 'text-slate-500'}`} />
                                             <span className={`text-[10px] font-black tracking-widest ${canAfford ? 'text-amber-400' : 'text-red-400/80'}`}>{video.unlock_cost} XP</span>
                                         </div>
                                     ) : (isAvailable && isUnlocked) ? (
-                                        <PlayCircle className={`w-10 h-10 ${isPlaying ? 'text-white' : 'text-indigo-400 group-hover:text-white'}`} />
+                                        <PlayCircle className={`w-12 h-12 ${isPlaying ? 'text-white' : 'text-indigo-400 group-hover:text-white group-hover:drop-shadow-[0_0_10px_rgba(79,70,229,0.8)]'}`} />
                                     ) : (
-                                        <Lock className="w-8 h-8 text-slate-600" />
+                                        <Lock className="w-8 h-8 text-slate-700" />
                                     )}
 
-                                    {/* Particle Effect for Completed Nodes */}
+                                    {/* Ripple Effect for Completed Nodes */}
                                     {isCompleted && (
-                                        <div className="absolute inset-0 rounded-2xl border-emerald-500/50 animate-ping opacity-20" />
+                                        <div className="absolute inset-0 rounded-3xl border-emerald-500/50 animate-ping opacity-20 pointer-events-none" />
                                     )}
                                 </button>
                                 
-                                <div className="text-center mt-3 w-[120px] z-10">
-                                    <p className={`text-[11px] font-black uppercase tracking-tighter leading-none drop-shadow-lg line-clamp-2 transition-colors duration-300 ${isPlaying ? 'text-white' : isCompleted ? 'text-emerald-400' : isAvailable ? 'text-slate-200' : 'text-slate-500'}`}>
+                                <div className="text-center mt-4 w-[140px] z-10">
+                                    <p className={`text-[11px] font-black uppercase tracking-widest leading-tight drop-shadow-lg transition-colors duration-300 ${isPlaying ? 'text-white' : isCompleted ? 'text-emerald-400' : isAvailable ? 'text-slate-300' : 'text-slate-600'}`}>
                                         {video.title}
                                     </p>
                                 </div>
 
                                 {video.title.startsWith('Pillars -') && (
-                                    <div className="absolute -top-10 left-1/2 -translate-x-1/2 whitespace-nowrap">
-                                        <span className="text-[12px] font-black text-indigo-400 uppercase tracking-[0.3em] bg-indigo-500/10 px-3 py-1 rounded-full border border-indigo-500/20 backdrop-blur-sm">
+                                    <div className="absolute -top-12 left-1/2 -translate-x-1/2 whitespace-nowrap">
+                                        <span className="text-[13px] font-black text-indigo-400 uppercase tracking-[0.4em] bg-indigo-500/10 px-4 py-1.5 rounded-full border border-indigo-500/20 backdrop-blur-md shadow-xl shadow-indigo-900/20">
                                             {video.title.replace('Pillars - ', '')}
                                         </span>
                                     </div>
@@ -706,9 +705,9 @@ export default function Course() {
 
             {/* Video Player Modal */}
             <Dialog open={isVideoModalOpen} onOpenChange={setIsVideoModalOpen}>
-                <DialogContent className="max-w-5xl p-0 bg-black border-white/10 overflow-hidden">
+                <DialogContent className="max-w-6xl p-0 bg-black border-white/10 overflow-hidden shadow-[0_0_100px_rgba(0,0,0,0.8)]">
                     <div className="flex flex-col h-[90vh]">
-                        <div className="aspect-video relative bg-slate-950">
+                        <div className="aspect-video relative bg-slate-950 group">
                             {currentVideoUrl ? (
                                 <iframe
                                     src={getEmbedUrl(currentVideoUrl)}
@@ -720,25 +719,38 @@ export default function Course() {
                             ) : (
                                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-8">
                                     <PlayCircle className="w-16 h-16 text-indigo-400 mb-4 opacity-50" />
-                                    <h2 className="text-2xl font-bold mb-2">Video Unavailable</h2>
+                                    <h2 className="text-2xl font-bold mb-2">Transmission Lost</h2>
+                                    <p className="text-slate-500">No video data found for this skill node.</p>
                                 </div>
                             )}
                         </div>
                         
-                        <div className="flex-1 overflow-auto p-8 bg-[#0a0a0f] border-t border-white/5">
-                            <div className="flex items-start justify-between gap-6">
-                                <div className="space-y-4 max-w-2xl">
-                                    <h2 className="text-4xl font-black">{currentVideoTitle}</h2>
-                                    <p className="text-slate-400 text-lg leading-relaxed">{currentVideoDesc}</p>
+                        <div className="flex-1 overflow-auto p-10 bg-gradient-to-b from-[#0a0a0f] to-black border-t border-white/5">
+                            <div className="flex flex-col lg:flex-row items-start justify-between gap-10">
+                                <div className="space-y-6 flex-1">
+                                    <div className="space-y-2">
+                                        <h2 className="text-5xl font-black tracking-tighter text-white">{currentVideoTitle}</h2>
+                                        <div className="flex items-center gap-4 text-slate-500 font-bold text-xs uppercase tracking-widest">
+                                            <span className="bg-white/5 px-2 py-1 rounded">Rank: Master</span>
+                                            <span>Difficulty: Adaptive</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <p className="text-slate-400 text-xl leading-relaxed font-medium">{currentVideoDesc}</p>
                                     
                                     {!user && !activeMainVideoData?.locked && (
-                                        <div className="mt-8 p-6 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl">
-                                            <h4 className="font-bold text-indigo-300 mb-2 flex items-center gap-2">
-                                                <Info className="w-5 h-5" />
-                                                Ready for the full experience?
-                                            </h4>
-                                            <p className="text-sm text-slate-400 mb-4">You're watching a preview! Sign up to unlock the full skill tree and track your progress.</p>
-                                            <Button onClick={() => navigate('/auth')} className="bg-indigo-600 hover:bg-indigo-700">Create Free Account</Button>
+                                        <div className="mt-8 p-8 bg-indigo-500/10 border border-indigo-500/20 rounded-3xl relative overflow-hidden group">
+                                            <div className="absolute -right-10 -top-10 w-40 h-40 bg-indigo-500/10 rounded-full blur-3xl group-hover:scale-150 transition-transform duration-1000" />
+                                            <div className="relative z-10">
+                                                <h4 className="text-2xl font-black text-indigo-100 mb-3 flex items-center gap-3">
+                                                    <Target className="w-8 h-8 text-indigo-400" />
+                                                    Unlock Full Mastery
+                                                </h4>
+                                                <p className="text-slate-300 text-lg mb-6 max-w-xl">You're exploring a preview node. Sign up to unlock the entire 90-Day Skill Tree, track your XP, and gain access to the AI Coach.</p>
+                                                <Button onClick={() => navigate('/auth')} size="lg" className="bg-indigo-600 hover:bg-indigo-500 text-lg px-8 py-7 rounded-2xl shadow-xl shadow-indigo-600/20">
+                                                    Initialize Master Account
+                                                </Button>
+                                            </div>
                                         </div>
                                     )}
 
@@ -752,27 +764,121 @@ export default function Course() {
                                                         toggleProgress(activeVideo, progress.includes(activeVideo))
                                                     }
                                                 }}
-                                                className={`gap-3 text-lg py-6 px-8 rounded-xl transition-all ${!progress.includes(activeVideo || '') ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'border-emerald-500/50 text-emerald-400'}`}
+                                                className={`gap-4 text-xl py-8 px-10 rounded-2xl transition-all duration-300 ${!progress.includes(activeVideo || '') ? 'bg-emerald-600 hover:bg-emerald-500 hover:scale-105 text-white shadow-2xl shadow-emerald-600/20' : 'border-emerald-500/50 text-emerald-400'}`}
                                             >
                                                 {progress.includes(activeVideo || '') ? (
-                                                    <><CheckCircle className="w-6 h-6" /> Mastery Confirmed</>
+                                                    <><CheckCircle className="w-8 h-8" /> Skill Mastered</>
                                                 ) : (
-                                                    <><Circle className="w-6 h-6" /> Complete Skill</>
+                                                    <><Circle className="w-8 h-8" /> Confirm Mastery</>
                                                 )}
-                                            </div>
-                                            {!isUnlocked && (
-                                                <div className={`text-xs ml-2 font-bold px-2 py-1 rounded shrink-0 ${canAfford ? 'bg-amber-500/20 text-amber-500' : 'bg-red-500/10 text-red-500'}`}>
-                                                    {video.unlock_cost} XP
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="w-full lg:w-80 space-y-8">
+                                    <div className="p-6 bg-white/5 rounded-3xl border border-white/5 backdrop-blur-sm">
+                                        <h4 className="font-black text-xs uppercase tracking-[0.2em] text-slate-500 mb-6 flex items-center gap-2">
+                                            <Crown className="w-3.5 h-3.5 text-amber-500" />
+                                            Premium Rewards
+                                        </h4>
+                                        <div className="space-y-4">
+                                            {rewardVideos.slice(0, 3).map(reward => (
+                                                <div 
+                                                    key={reward.id} 
+                                                    className="flex items-center gap-4 group cursor-pointer p-2 rounded-xl hover:bg-white/5 transition-all" 
+                                                    onClick={() => { setActiveVideo(reward.id); setIsVideoModalOpen(true); }}
+                                                >
+                                                    <div className="w-16 h-10 bg-slate-900 rounded-lg border border-white/5 overflow-hidden flex items-center justify-center shrink-0 group-hover:border-indigo-500/30">
+                                                        <PlayCircle className="w-6 h-6 text-slate-700 group-hover:text-indigo-500 transition-colors" />
+                                                    </div>
+                                                    <div className="overflow-hidden">
+                                                        <p className="text-xs font-black text-slate-300 truncate group-hover:text-white transition-colors uppercase tracking-tight">{reward.title}</p>
+                                                        <p className="text-[10px] font-bold text-amber-600 tracking-widest">{reward.unlock_cost} XP</p>
+                                                    </div>
                                                 </div>
-                                            )}
-                                        </button>
-                                    );
-                                })}
-                            </CardContent>
-                        </Card>
-                    )}
-                </div>
-            </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="p-6 bg-indigo-900/10 rounded-3xl border border-indigo-500/10">
+                                        <h4 className="font-black text-[10px] uppercase tracking-widest text-indigo-400 mb-2">System Status</h4>
+                                        <div className="space-y-1">
+                                            <div className="flex justify-between text-[10px] font-bold">
+                                                <span className="text-slate-500">Node ID</span>
+                                                <span className="text-slate-300 font-mono">{activeVideo?.substring(0, 8)}</span>
+                                            </div>
+                                            <div className="flex justify-between text-[10px] font-bold">
+                                                <span className="text-slate-500">Security</span>
+                                                <span className="text-emerald-500">Verified</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Protocol/Guide Modal */}
+            <Dialog open={isHowItWorksOpen} onOpenChange={setIsHowItWorksOpen}>
+                <DialogContent className="sm:max-w-[650px] bg-slate-950 border-white/10 text-slate-100 p-0 overflow-hidden rounded-[40px]">
+                    <div className="p-12 space-y-8">
+                        <DialogHeader>
+                            <DialogTitle className="text-4xl font-black text-center text-white mb-2 tracking-tighter">
+                                CHALLENGE PROTOCOL
+                            </DialogTitle>
+                            <p className="text-center text-slate-400 font-medium text-lg leading-relaxed">
+                                Transform your playing in 90 days through structured immersion in the five pillars of musicianship.
+                            </p>
+                        </DialogHeader>
+                        
+                        <div className="grid gap-4">
+                            {[
+                                { icon: Target, title: 'PHASE 1: IMMERSION', color: 'text-indigo-400', desc: 'Unlock over 30 core training videos branching from the central hub.' },
+                                { icon: LineChart, title: 'PHASE 2: TRACKING', color: 'text-orange-400', desc: 'Every note is logged. Your mastery level grows with every practice minute.' },
+                                { icon: Calendar, title: 'PHASE 3: MASTERY', color: 'text-green-400', desc: 'Complete branches to unlock legendary rewards and custom AI routines.' }
+                            ].map((item, i) => (
+                                <div key={i} className="flex gap-6 p-6 bg-white/5 rounded-[30px] border border-white/5 hover:bg-white/[0.07] transition-colors group">
+                                    <div className="shrink-0 p-4 bg-black/40 rounded-2xl group-hover:scale-110 transition-transform">
+                                        <item.icon className={`w-8 h-8 ${item.color}`} />
+                                    </div>
+                                    <div>
+                                        <h4 className="font-black text-white text-lg tracking-tight mb-1">{item.title}</h4>
+                                        <p className="text-sm text-slate-400 font-medium leading-relaxed">{item.desc}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="pt-4 flex flex-col items-center gap-6">
+                            {enrollmentStatus !== 'verified' ? (
+                                <div className="w-full space-y-4">
+                                    <Button onClick={handleBuyCourse} className="w-full bg-indigo-600 hover:bg-indigo-500 py-8 text-xl font-black tracking-widest rounded-2xl shadow-2xl shadow-indigo-600/30">
+                                        INITIALIZE CHALLENGE — $199.99
+                                    </Button>
+                                    <p className="text-[10px] text-center text-slate-600 font-black tracking-[0.2em] uppercase">Lifetime Access Granted Upon Initialization</p>
+                                </div>
+                            ) : (
+                                <Button onClick={() => setIsHowItWorksOpen(false)} variant="outline" className="w-full border-white/10 py-6 font-black tracking-widest uppercase rounded-2xl">
+                                    Continue Mission
+                                </Button>
+                            )}
+
+                            <div className="p-6 bg-indigo-500/5 border border-indigo-500/10 rounded-3xl w-full">
+                                <h5 className="font-black text-xs text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                    <Info className="w-4 h-4" />
+                                    The 90-Day Guarantee
+                                </h5>
+                                <p className="text-[11px] text-slate-500 font-bold leading-relaxed">
+                                    Complete 15 minutes of daily practice for 30 days. If your ear, speed, and accuracy haven't transformed, we'll issue a full refund. No questions asked.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

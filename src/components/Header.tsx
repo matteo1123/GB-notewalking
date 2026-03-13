@@ -27,12 +27,12 @@ const Header = () => {
           </div>
 
           {/* Center: Logo - smaller on mobile */}
-          <div className="flex items-center gap-2 sm:gap-3">
-            <Music className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
+          <Link to="/" className="flex items-center gap-2 sm:gap-3">
+            <img src="/logo.png" alt="Guitar Brain Logo" className="h-10 w-10 sm:h-14 sm:w-14 object-contain" />
             <h1 className="text-2xl sm:text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-              <Link to="/">Guitar Brain</Link>
+              Guitar Brain
             </h1>
-          </div>
+          </Link>
 
           {/* Right: Desktop nav buttons */}
           <div className="flex-1 hidden sm:flex justify-end gap-2">

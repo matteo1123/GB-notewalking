@@ -28,6 +28,7 @@ export interface CourseVideo {
     grid_row: number;
     grid_column: number;
     prerequisite_ids: string[];
+    category: string | null;
 }
 
 export interface RewardVideo {
@@ -56,6 +57,10 @@ export default function Course() {
     const [activeVideo, setActiveVideo] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [isHowItWorksOpen, setIsHowItWorksOpen] = useState(false);
+    
+    // Categories for the Skill Tree
+    const categories = ['Rhythm', 'Chord Tones', 'Fretboard Mastery', 'Ear', 'Technique'];
+    const [selectedCategory, setSelectedCategory] = useState('Rhythm');
 
     // Gamification Hook
     const { points, level, refresh: refreshGamification } = useGamification();
@@ -106,20 +111,20 @@ export default function Course() {
                 }
 
                 // Load unlocked reward videos
-                const { data: unlockedData } = await supabase
-                    .from('user_videos')
+                const { data: unlockedData } = await (supabase
+                    .from('user_videos' as any)
                     .select('video_id')
-                    .eq('user_id', user.id);
+                    .eq('user_id', user.id) as any);
 
                 if (unlockedData) {
                     setUnlockedRewardVideoIds(unlockedData.map(uv => uv.video_id));
                 }
 
                 // Load unlocked course videos
-                const { data: courseUnlockData } = await supabase
-                    .from('user_course_unlocks')
+                const { data: courseUnlockData } = await (supabase
+                    .from('user_course_unlocks' as any)
                     .select('video_id')
-                    .eq('user_id', user.id);
+                    .eq('user_id', user.id) as any);
                 
                 if (courseUnlockData) {
                     setUnlockedCourseVideoIds(courseUnlockData.map(uv => uv.video_id));
@@ -144,10 +149,10 @@ export default function Course() {
             }
 
             // 3. Fetch gamification reward videos
-            const { data: rewardData } = await supabase
-                .from('videos')
+            const { data: rewardData } = await (supabase
+                .from('videos' as any)
                 .select('*')
-                .order('created_at', { ascending: true }) as { data: RewardVideo[] | null, error: unknown };
+                .order('created_at', { ascending: true }) as any);
 
             if (rewardData) {
                 setRewardVideos(rewardData);
@@ -164,7 +169,13 @@ export default function Course() {
                     }
                 } else {
                     const firstChordToneVideo = videoData.find(v => v.title.toLowerCase().includes('hit your first chord tone'));
-                    setActiveVideo(firstChordToneVideo ? firstChordToneVideo.id : videoData[0].id);
+                    const firstVideo = firstChordToneVideo || videoData[0];
+                    setActiveVideo(firstVideo.id);
+                    
+                    // Set category based on initial video
+                    if (firstVideo.category) {
+                        setSelectedCategory(firstVideo.category);
+                    }
                 }
             }
 
@@ -305,13 +316,15 @@ export default function Course() {
 
         setIsSubmittingQuestion(true);
         try {
-            const { error } = await supabase.from('suggestions').insert({
-                content: questionText.trim(),
-                user_id: user.id,
-                source: `Course Video Question - ${currentVideoTitle}`
-            });
+            const { error: questionError } = await (supabase
+                .from('suggestions' as any)
+                .insert([{
+                    content: questionText,
+                    user_id: user?.id,
+                    source: 'course_video_question'
+                }]) as any);
 
-            if (error) throw error;
+            if (questionError) throw questionError;
 
             toast({
                 title: "Question Submitted",
@@ -487,8 +500,9 @@ export default function Course() {
     const completedCount = progress.length;
     const progressPercentage = videos.length > 0 ? Math.round((completedCount / videos.length) * 100) : 0;
 
-    const maxRow = Math.max(...videos.map(v => v.grid_row ?? 0), 0);
-    const maxCol = Math.max(...videos.map(v => v.grid_column ?? 0), 0);
+    const filteredVideos = videos.filter(v => (v.category || 'Rhythm') === selectedCategory);
+    const maxRow = Math.max(...filteredVideos.map(v => v.grid_row ?? 0), 0);
+    const maxCol = Math.max(...filteredVideos.map(v => v.grid_column ?? 0), 0);
 
     const activeMainVideoData = videos.find(v => v.id === activeVideo);
     const activeRewardVideoData = rewardVideos.find(v => v.id === activeVideo);
@@ -780,6 +794,21 @@ export default function Course() {
                         <CardHeader className="pb-4 shrink-0 px-6 pt-6 bg-gradient-to-b from-indigo-950/20 to-transparent">
                             <CardTitle className="text-xl font-black text-indigo-400">Skill Tree</CardTitle>
                             <CardDescription className="text-sm font-medium">{completedCount} of {videos.length} skills mastered</CardDescription>
+                            
+                            <div className="flex flex-wrap gap-2 mt-4">
+                                {categories.map(cat => (
+                                    <Button
+                                        key={cat}
+                                        variant={selectedCategory === cat ? "default" : "outline"}
+                                        size="sm"
+                                        onClick={() => setSelectedCategory(cat)}
+                                        className={`text-[10px] sm:text-xs h-7 px-2 sm:px-3 ${selectedCategory === cat ? 'bg-indigo-600 hover:bg-indigo-700' : 'border-indigo-500/20 text-indigo-300/60 hover:bg-indigo-500/10'}`}
+                                    >
+                                        {cat}
+                                    </Button>
+                                ))}
+                            </div>
+                            
                             <Progress value={progressPercentage} className="mt-4 h-2 bg-indigo-950/50" />
                         </CardHeader>
                         <CardContent className="flex-1 overflow-auto p-8 custom-scrollbar bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-[#0a0a0a] to-[#050505] relative">
@@ -790,11 +819,11 @@ export default function Course() {
                                     gridTemplateRows: `repeat(${maxRow + 1}, minmax(130px, auto))`
                                 }}
                             >
-                                {videos.length === 0 ? (
+                                {filteredVideos.length === 0 ? (
                                     <div className="absolute inset-0 flex items-center justify-center">
-                                        <p className="text-sm text-muted-foreground italic text-center py-4">No skills available yet.</p>
+                                        <p className="text-sm text-muted-foreground italic text-center py-4">No skills in this category yet.</p>
                                     </div>
-                                ) : videos.map((video) => {
+                                ) : filteredVideos.map((video) => {
                                     const isCompleted = progress.includes(video.id);
                                     const isUnlocked = video.unlock_cost === 0 || unlockedCourseVideoIds.includes(video.id);
                                     

@@ -21,6 +21,7 @@ interface CourseVideo {
     grid_row: number;
     grid_column: number;
     prerequisite_ids: string[];
+    category: string | null;
 }
 
 export default function CourseEditor() {
@@ -29,6 +30,9 @@ export default function CourseEditor() {
     const [loading, setLoading] = useState(true);
     const [isEditing, setIsEditing] = useState<string | null>(null);
     const [formLoading, setFormLoading] = useState(false);
+    
+    // Categories constant
+    const categories = ['Rhythm', 'Chord Tones', 'Fretboard Mastery', 'Ear', 'Technique'];
 
     // Form state
     const [formData, setFormData] = useState<Partial<CourseVideo>>({
@@ -41,7 +45,8 @@ export default function CourseEditor() {
         unlock_cost: 0,
         grid_row: 0,
         grid_column: 0,
-        prerequisite_ids: []
+        prerequisite_ids: [],
+        category: 'Rhythm'
     });
 
     const loadVideos = async () => {
@@ -75,7 +80,8 @@ export default function CourseEditor() {
             unlock_cost: 0,
             grid_row: 0,
             grid_column: 0,
-            prerequisite_ids: []
+            prerequisite_ids: [],
+            category: 'Rhythm'
         });
     };
 
@@ -108,8 +114,9 @@ export default function CourseEditor() {
             }
             loadVideos();
             resetForm();
-        } catch (err: any) {
-            toast({ title: 'Database Error', description: err.message, variant: 'destructive' });
+        } catch (err) {
+            const error = err as Error;
+            toast({ title: 'Database Error', description: error.message, variant: 'destructive' });
         } finally {
             setFormLoading(false);
         }
@@ -127,7 +134,8 @@ export default function CourseEditor() {
             unlock_cost: video.unlock_cost || 0,
             grid_row: video.grid_row || 0,
             grid_column: video.grid_column || 0,
-            prerequisite_ids: video.prerequisite_ids || []
+            prerequisite_ids: video.prerequisite_ids || [],
+            category: video.category || 'Rhythm'
         });
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
@@ -241,6 +249,20 @@ export default function CourseEditor() {
                                         onChange={e => setFormData({ ...formData, order_index: parseInt(e.target.value) || 0 })}
                                     />
                                 </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="category">Pillar Category</Label>
+                                <select
+                                    id="category"
+                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                    value={formData.category}
+                                    onChange={e => setFormData({ ...formData, category: e.target.value })}
+                                >
+                                    {categories.map(cat => (
+                                        <option key={cat} value={cat}>{cat}</option>
+                                    ))}
+                                </select>
                             </div>
                             
                             <div className="grid grid-cols-3 gap-4 border p-4 bg-muted/10 rounded-lg">
@@ -390,6 +412,7 @@ export default function CourseEditor() {
                                     </div>
                                     <p className="text-xs text-muted-foreground truncate">{video.video_url}</p>
                                     <div className="flex gap-4 mt-2 text-xs">
+                                        <span className="bg-indigo-500/10 text-indigo-400 px-2 py-1 rounded font-bold">{video.category || 'Rhythm'}</span>
                                         <span className="bg-muted px-2 py-1 rounded">Duration: {video.duration || 'N/A'}</span>
                                     </div>
                                 </div>

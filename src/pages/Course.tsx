@@ -57,7 +57,6 @@ export default function Course() {
     const [unlockedCourseVideoIds, setUnlockedCourseVideoIds] = useState<string[]>([]);
     const [activeVideo, setActiveVideo] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
-    const [isHowItWorksOpen, setIsHowItWorksOpen] = useState(false);
     const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
     const mapRef = React.useRef<HTMLDivElement>(null);
 
@@ -180,13 +179,15 @@ export default function Course() {
 
     // Center map on hub (0,0) after loading
     useEffect(() => {
-        if (!loading && mapRef.current) {
+        if (!loading && mapRef.current && videos.length > 0) {
             const container = mapRef.current.parentElement;
             if (container) {
-                const centerX = (totalCols * gap + 80) / 2 - container.clientWidth / 2;
-                const centerY = (totalRows * gap + 80) / 2 - container.clientHeight / 2;
-                container.scrollLeft = centerX;
-                container.scrollTop = centerY;
+                // Precise centering on the hub (0,0)
+                const hubX = getX(0) + 500 + nodeSize / 2;
+                const hubY = getY(0) + 500 + nodeSize / 2;
+                
+                container.scrollLeft = hubX - container.clientWidth / 2;
+                container.scrollTop = hubY - container.clientHeight / 2;
             }
         }
     }, [loading, videos]);
@@ -517,14 +518,24 @@ export default function Course() {
     const currentVideoUrl = isMainVideoActive ? activeMainVideoData?.video_url : activeRewardVideoData?.url;
     const isRewardUnlocked = user ? unlockedRewardVideoIds.includes(activeVideo || '') : false;
 
+    const getCategoryTheme = (video: CourseVideo) => {
+        const text = ((video.category || "") + " " + (video.title || "")).toLowerCase();
+        if (text.includes('rhythm')) return { id: 'rhythm', color: '#3b82f6', bg: 'bg-blue-600', border: 'border-blue-500', glow: 'shadow-[0_0_50px_rgba(59,130,246,0.6)]', text: 'text-blue-400', label: 'Rhythm Realm' };
+        if (text.includes('ear')) return { id: 'ear', color: '#a855f7', bg: 'bg-purple-600', border: 'border-purple-500', glow: 'shadow-[0_0_50px_rgba(168,85,247,0.6)]', text: 'text-purple-400', label: 'Ear Training Void' };
+        if (text.includes('chord')) return { id: 'chord', color: '#f59e0b', bg: 'bg-amber-600', border: 'border-amber-500', glow: 'shadow-[0_0_50px_rgba(245,158,11,0.6)]', text: 'text-amber-400', label: 'Chord Tone Territory' };
+        if (text.includes('technique')) return { id: 'tech', color: '#ef4444', bg: 'bg-red-600', border: 'border-red-500', glow: 'shadow-[0_0_50px_rgba(239,68,68,0.6)]', text: 'text-red-400', label: 'Technique Temple' };
+        if (text.includes('fretboard') || text.includes('spire')) return { id: 'fret', color: '#10b981', bg: 'bg-emerald-600', border: 'border-emerald-500', glow: 'shadow-[0_0_50px_rgba(16,185,129,0.6)]', text: 'text-emerald-400', label: 'Fretboard Spire' };
+        return { id: 'main', color: '#4f46e5', bg: 'bg-indigo-600', border: 'border-indigo-500', glow: 'shadow-[0_0_50px_rgba(79,70,229,0.6)]', text: 'text-indigo-400', label: 'Core Hub' };
+    };
+
     // Map sizing and coordinate logic
     const nodeSize = 80;
-    const gap = 120;
+    const gap = 250; // Increased spacing for clear "sections"
     
-    const minRow = Math.min(...videos.map(v => v.grid_row ?? 0), 0);
-    const maxRow = Math.max(...videos.map(v => v.grid_row ?? 0), 0);
-    const minCol = Math.min(...videos.map(v => v.grid_column ?? 0), 0);
-    const maxCol = Math.max(...videos.map(v => v.grid_column ?? 0), 0);
+    const minRow = Math.min(...videos.map(v => v.grid_row ?? 0), -2);
+    const maxRow = Math.max(...videos.map(v => v.grid_row ?? 0), 2);
+    const minCol = Math.min(...videos.map(v => v.grid_column ?? 0), -2);
+    const maxCol = Math.max(...videos.map(v => v.grid_column ?? 0), 2);
 
     const totalRows = maxRow - minRow + 1;
     const totalCols = maxCol - minCol + 1;
@@ -535,10 +546,37 @@ export default function Course() {
     const renderConnectionLines = () => {
         return (
             <svg 
-                className="absolute inset-0 pointer-events-none opacity-40" 
-                width={totalCols * gap + 80} 
-                height={totalRows * gap + 80}
+                className="absolute inset-0 pointer-events-none z-10" 
+                width={totalCols * gap + 1000} 
+                height={totalRows * gap + 1000}
             >
+                <defs>
+                    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+                        <feGaussianBlur stdDeviation="3" result="blur" />
+                        <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                    </filter>
+                    <linearGradient id="line-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stopColor="#4f46e5" />
+                        <stop offset="100%" stopColor="#10b981" />
+                    </linearGradient>
+
+                    {/* Thematic Gradients */}
+                    <linearGradient id="grad-rhythm" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stopColor="#3b82f6" /><stop offset="100%" stopColor="#60a5fa" /></linearGradient>
+                    <linearGradient id="grad-ear" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stopColor="#a855f7" /><stop offset="100%" stopColor="#c084fc" /></linearGradient>
+                    <linearGradient id="grad-chord" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stopColor="#f59e0b" /><stop offset="100%" stopColor="#fbbf24" /></linearGradient>
+                    <linearGradient id="grad-tech" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stopColor="#ef4444" /><stop offset="100%" stopColor="#f87171" /></linearGradient>
+                    <linearGradient id="grad-fret" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stopColor="#10b981" /><stop offset="100%" stopColor="#34d399" /></linearGradient>
+                    <linearGradient id="grad-main" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stopColor="#4f46e5" /><stop offset="100%" stopColor="#818cf8" /></linearGradient>
+                </defs>
+                
+                {/* Region Labels Labels (Large Themed Background Text) */}
+                <g className="opacity-[0.05] select-none pointer-events-none font-black uppercase tracking-[0.5em]">
+                    <text x={getX(0.5) + 500} y={getY(-3.5) + 500} textAnchor="middle" fontSize="160" fill="#3b82f6">Rhythm Realm</text>
+                    <text x={getX(4) + 500} y={getY(0) + 500} textAnchor="middle" fontSize="160" fill="#f59e0b" transform={`rotate(90, ${getX(4) + 500}, ${getY(0) + 500})`}>Chord Tone Territory</text>
+                    <text x={getX(-4) + 500} y={getY(0.5) + 500} textAnchor="middle" fontSize="160" fill="#a855f7" transform={`rotate(-90, ${getX(-4) + 500}, ${getY(0.5) + 500})`}>Ear Training Void</text>
+                    <text x={getX(-0.5) + 500} y={getY(4.5) + 500} textAnchor="middle" fontSize="160" fill="#ef4444">Technique Temple</text>
+                    <text x={getX(3) + 500} y={getY(-3) + 500} textAnchor="middle" fontSize="160" fill="#10b981" transform={`rotate(-45, ${getX(3) + 500}, ${getY(-3) + 500})`}>Fretboard Spire</text>
+                </g>
                 {videos.map(video => {
                     if (!video.prerequisite_ids || video.prerequisite_ids.length === 0) return null;
                     
@@ -552,6 +590,7 @@ export default function Course() {
                         const endY = getY(video.grid_row) + nodeSize / 2;
 
                         const isMet = progress.includes(prereqId);
+                        const theme = getCategoryTheme(video);
 
                         return (
                             <line
@@ -560,18 +599,29 @@ export default function Course() {
                                 y1={startY}
                                 x2={endX}
                                 y2={endY}
-                                stroke={isMet ? "#10b981" : "#4f46e5"}
-                                strokeWidth="3"
-                                strokeDasharray={isMet ? "0" : "6,4"}
-                                className="transition-all duration-1000"
+                                stroke={isMet ? `url(#grad-${theme.id})` : "#1e1b4b"}
+                                strokeWidth={isMet ? "4" : "2"}
+                                strokeDasharray={isMet ? "0" : "8,6"}
+                                filter={isMet ? "url(#glow)" : "none"}
+                                className="transition-all duration-1000 ease-in-out"
                             />
                         );
                     });
                 })}
             </svg>
         );
+    };
+
     return (
-        <div className="min-h-screen bg-[#050505] text-slate-100 overflow-hidden flex flex-col relative">
+        <div className="min-h-screen bg-[#050505] text-slate-100 overflow-hidden flex flex-col relative font-sans">
+            {/* Cosmic Background Layer */}
+            <div className="fixed inset-0 z-0 pointer-events-none">
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,#1e1b4b_0%,#020617_100%)] opacity-40" />
+                <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-20 animate-pulse" />
+                <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-indigo-500/10 rounded-full blur-[120px] animate-pulse" />
+                <div className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-purple-500/5 rounded-full blur-[150px] animate-bounce-slow" />
+            </div>
+
             {/* Immersive Header - Floating */}
             <div className="absolute top-0 left-0 right-0 z-50 p-6 pointer-events-none flex justify-between items-start">
                 <div className="pointer-events-auto bg-black/40 backdrop-blur-md border border-white/5 p-4 rounded-2xl shadow-2xl">
@@ -586,15 +636,6 @@ export default function Course() {
                 </div>
 
                 <div className="flex gap-2 pointer-events-auto">
-                    <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => setIsHowItWorksOpen(true)}
-                        className="bg-black/40 backdrop-blur-md border-white/5 hover:bg-white/10 text-xs font-bold rounded-full px-4"
-                    >
-                        <Info className="w-4 h-4 mr-2" />
-                        Protocol
-                    </Button>
                     {user && (
                         <div className="bg-indigo-600/20 backdrop-blur-md border border-indigo-500/30 px-5 py-1.5 rounded-full flex items-center gap-2 shadow-lg shadow-indigo-500/10">
                              <Crown className="w-4 h-4 text-indigo-400" />
@@ -631,6 +672,8 @@ export default function Course() {
                         const canAfford = points >= (video.unlock_cost || 0);
                         const requiresPurchase = isAvailable && !isUnlocked && video.unlock_cost > 0;
 
+                        const theme = getCategoryTheme(video);
+
                         return (
                             <div 
                                 key={video.id}
@@ -656,45 +699,46 @@ export default function Course() {
                                             });
                                         }
                                     }}
-                                    className={`w-20 h-20 sm:w-24 sm:h-24 rounded-3xl flex flex-col items-center justify-center border-2 transition-all duration-500 relative shadow-2xl z-20 hover:scale-110 active:scale-95
-                                        ${isPlaying ? 'bg-indigo-600 border-white shadow-[0_0_40px_rgba(79,70,229,0.5)]' : 
-                                          isCompleted ? 'bg-emerald-500/20 border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.2)]' :
-                                          (isAvailable && isUnlocked) ? 'bg-slate-800/80 border-slate-600 hover:border-indigo-400' : 
-                                          requiresPurchase ? 'bg-amber-950/40 border-amber-600 hover:border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.1)]' :
-                                          'bg-black/40 border-slate-800 opacity-30 cursor-not-allowed grayscale'
+                                    className={`w-24 h-24 sm:w-28 sm:h-28 rounded-full flex flex-col items-center justify-center border-2 transition-all duration-700 relative shadow-2xl z-20 hover:scale-110 active:scale-95 group/node
+                                        ${isPlaying ? `${theme.bg} border-white ${theme.glow}` : 
+                                          isCompleted ? 'bg-emerald-500/20 border-emerald-500 shadow-[0_0_30px_rgba(16,185,129,0.4)]' :
+                                          (isAvailable && isUnlocked) ? `bg-slate-800/80 ${theme.border} hover:border-white hover:${theme.glow}` : 
+                                          requiresPurchase ? 'bg-amber-950/40 border-amber-600 hover:border-amber-400 shadow-[0_0_30px_rgba(245,158,11,0.2)]' :
+                                          'bg-black/60 border-slate-800 opacity-20 cursor-not-allowed grayscale'
                                         }
                                     `}
                                 >
                                     {isCompleted ? (
-                                        <CheckCircle className="w-12 h-12 text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
+                                        <CheckCircle className="w-14 h-14 text-emerald-400 drop-shadow-[0_0_12px_rgba(52,211,153,0.8)]" />
                                     ) : requiresPurchase ? (
-                                        <div className="flex flex-col items-center">
-                                            <Lock className={`w-7 h-7 mb-1 ${canAfford ? 'text-amber-400' : 'text-slate-500'}`} />
-                                            <span className={`text-[10px] font-black tracking-widest ${canAfford ? 'text-amber-400' : 'text-red-400/80'}`}>{video.unlock_cost} XP</span>
+                                        <div className="flex flex-col items-center animate-pulse">
+                                            <Lock className={`w-8 h-8 mb-1 ${canAfford ? 'text-amber-400' : 'text-slate-500'}`} />
+                                            <span className={`text-[11px] font-black tracking-widest ${canAfford ? 'text-amber-400' : 'text-red-400/80'}`}>{video.unlock_cost} XP</span>
                                         </div>
                                     ) : (isAvailable && isUnlocked) ? (
-                                        <PlayCircle className={`w-12 h-12 ${isPlaying ? 'text-white' : 'text-indigo-400 group-hover:text-white group-hover:drop-shadow-[0_0_10px_rgba(79,70,229,0.8)]'}`} />
+                                        <PlayCircle className={`w-14 h-14 ${isPlaying ? 'text-white' : 'text-indigo-400 group-hover/node:text-white group-hover/node:drop-shadow-[0_0_15px_rgba(79,70,229,0.9)] transition-all animate-float'}`} />
                                     ) : (
-                                        <Lock className="w-8 h-8 text-slate-700" />
+                                        <Lock className="w-10 h-10 text-slate-700" />
                                     )}
 
-                                    {/* Ripple Effect for Completed Nodes */}
-                                    {isCompleted && (
-                                        <div className="absolute inset-0 rounded-3xl border-emerald-500/50 animate-ping opacity-20 pointer-events-none" />
+                                    {/* Pulse Effect for Unlocked nodes */}
+                                    {isAvailable && isUnlocked && !isCompleted && (
+                                        <div className="absolute inset-0 rounded-full border-indigo-500/30 animate-ping opacity-20 pointer-events-none" />
                                     )}
                                 </button>
                                 
-                                <div className="text-center mt-4 w-[140px] z-10">
-                                    <p className={`text-[11px] font-black uppercase tracking-widest leading-tight drop-shadow-lg transition-colors duration-300 ${isPlaying ? 'text-white' : isCompleted ? 'text-emerald-400' : isAvailable ? 'text-slate-300' : 'text-slate-600'}`}>
-                                        {video.title}
+                                <div className="text-center mt-5 w-[160px] z-10 px-2">
+                                    <p className={`text-[12px] font-black uppercase tracking-widest leading-tight drop-shadow-xl transition-colors duration-300 ${isPlaying ? 'text-white' : isCompleted ? 'text-emerald-400' : isAvailable ? theme.text : 'text-slate-600'}`}>
+                                        {video.title.replace('Pillars - ', '').replace('Modules - ', '')}
                                     </p>
                                 </div>
 
                                 {video.title.startsWith('Pillars -') && (
-                                    <div className="absolute -top-12 left-1/2 -translate-x-1/2 whitespace-nowrap">
-                                        <span className="text-[13px] font-black text-indigo-400 uppercase tracking-[0.4em] bg-indigo-500/10 px-4 py-1.5 rounded-full border border-indigo-500/20 backdrop-blur-md shadow-xl shadow-indigo-900/20">
+                                    <div className="absolute -top-16 left-1/2 -translate-x-1/2 whitespace-nowrap pointer-events-none">
+                                        <span className="text-[14px] font-black text-white uppercase tracking-[0.5em] opacity-40 group-hover:opacity-100 transition-opacity translate-y-2 group-hover:translate-y-0 duration-500">
                                             {video.title.replace('Pillars - ', '')}
                                         </span>
+                                        <div className="h-[2px] w-0 group-hover:w-full bg-gradient-to-r from-transparent via-indigo-500 to-transparent transition-all duration-700 mt-1 mx-auto" />
                                     </div>
                                 )}
                             </div>
@@ -815,65 +859,6 @@ export default function Course() {
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                        </div>
-                    </div>
-                </DialogContent>
-            </Dialog>
-
-            {/* Protocol/Guide Modal */}
-            <Dialog open={isHowItWorksOpen} onOpenChange={setIsHowItWorksOpen}>
-                <DialogContent className="sm:max-w-[650px] bg-slate-950 border-white/10 text-slate-100 p-0 overflow-hidden rounded-[40px]">
-                    <div className="p-12 space-y-8">
-                        <DialogHeader>
-                            <DialogTitle className="text-4xl font-black text-center text-white mb-2 tracking-tighter">
-                                CHALLENGE PROTOCOL
-                            </DialogTitle>
-                            <p className="text-center text-slate-400 font-medium text-lg leading-relaxed">
-                                Transform your playing in 90 days through structured immersion in the five pillars of musicianship.
-                            </p>
-                        </DialogHeader>
-                        
-                        <div className="grid gap-4">
-                            {[
-                                { icon: Target, title: 'PHASE 1: IMMERSION', color: 'text-indigo-400', desc: 'Unlock over 30 core training videos branching from the central hub.' },
-                                { icon: LineChart, title: 'PHASE 2: TRACKING', color: 'text-orange-400', desc: 'Every note is logged. Your mastery level grows with every practice minute.' },
-                                { icon: Calendar, title: 'PHASE 3: MASTERY', color: 'text-green-400', desc: 'Complete branches to unlock legendary rewards and custom AI routines.' }
-                            ].map((item, i) => (
-                                <div key={i} className="flex gap-6 p-6 bg-white/5 rounded-[30px] border border-white/5 hover:bg-white/[0.07] transition-colors group">
-                                    <div className="shrink-0 p-4 bg-black/40 rounded-2xl group-hover:scale-110 transition-transform">
-                                        <item.icon className={`w-8 h-8 ${item.color}`} />
-                                    </div>
-                                    <div>
-                                        <h4 className="font-black text-white text-lg tracking-tight mb-1">{item.title}</h4>
-                                        <p className="text-sm text-slate-400 font-medium leading-relaxed">{item.desc}</p>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-
-                        <div className="pt-4 flex flex-col items-center gap-6">
-                            {enrollmentStatus !== 'verified' ? (
-                                <div className="w-full space-y-4">
-                                    <Button onClick={handleBuyCourse} className="w-full bg-indigo-600 hover:bg-indigo-500 py-8 text-xl font-black tracking-widest rounded-2xl shadow-2xl shadow-indigo-600/30">
-                                        INITIALIZE CHALLENGE — $199.99
-                                    </Button>
-                                    <p className="text-[10px] text-center text-slate-600 font-black tracking-[0.2em] uppercase">Lifetime Access Granted Upon Initialization</p>
-                                </div>
-                            ) : (
-                                <Button onClick={() => setIsHowItWorksOpen(false)} variant="outline" className="w-full border-white/10 py-6 font-black tracking-widest uppercase rounded-2xl">
-                                    Continue Mission
-                                </Button>
-                            )}
-
-                            <div className="p-6 bg-indigo-500/5 border border-indigo-500/10 rounded-3xl w-full">
-                                <h5 className="font-black text-xs text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
-                                    <Info className="w-4 h-4" />
-                                    The 90-Day Guarantee
-                                </h5>
-                                <p className="text-[11px] text-slate-500 font-bold leading-relaxed">
-                                    Complete 15 minutes of daily practice for 30 days. If your ear, speed, and accuracy haven't transformed, we'll issue a full refund. No questions asked.
-                                </p>
                             </div>
                         </div>
                     </div>

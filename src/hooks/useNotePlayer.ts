@@ -5,13 +5,15 @@ export function useNotePlayer(audioContext: AudioContext | null) {
   const audioBufferCache = useRef<Record<string, AudioBuffer>>({});
 
   const currentSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const activeSourcesRef = useRef<AudioBufferSourceNode[]>([]);
+  const activeTimeoutsRef = useRef<NodeJS.Timeout[]>([]);
 
   const playNote = useCallback(
-    async (note: string, volume: number = 1.0) => {
+    async (note: string, volume: number = 1.0, startTime?: number) => {
       if (!audioContext) return;
 
       const noteUrl = `https://idsufbsfywgmcrhldqxq.supabase.co/storage/v1/object/public/Piano/${note}.mp3`;
-      console.log("Fetching note from:", noteUrl);
+      // console.log("Fetching note from:", noteUrl);
 
       try {
         let buffer;
@@ -34,8 +36,13 @@ export function useNotePlayer(audioContext: AudioContext | null) {
         source.connect(gainNode);
         gainNode.connect(audioContext.destination);
 
-        source.start(0);
+        source.start(startTime !== undefined ? startTime : 0);
         currentSourceRef.current = source;
+        
+        activeSourcesRef.current.push(source);
+        source.onended = () => {
+          activeSourcesRef.current = activeSourcesRef.current.filter(s => s !== source);
+        };
       } catch (error) {
         console.error(`Failed to play note ${note}`, error);
       }
@@ -173,19 +180,39 @@ export function useNotePlayer(audioContext: AudioContext | null) {
           .replace('A#', 'Bb');
       };
 
-      const noteDuration = 600 / tempo; // Base duration in ms
+      const noteDurationMs = 600 / tempo; // Base duration in ms
+      const noteDurationSec = noteDurationMs / 1000;
+
+      // Preload all needed notes to ensure accurate scheduling
+      const noteNames = notes.map(n => getNoteFromFret(n.string, n.fret));
+      await preloadNotes(noteNames);
+
+      const startTime = audioContext.currentTime + 0.1; // Slight delay to ensure clean start
 
       for (let i = 0; i < notes.length; i++) {
-        const note = notes[i];
-        const noteName = getNoteFromFret(note.string, note.fret);
+        const noteName = noteNames[i];
+        const noteStartTime = startTime + i * noteDurationSec;
+        const noteStartMs = (noteStartTime - audioContext.currentTime) * 1000;
 
-        onNoteStart?.(i);
-        await playNote(noteName, volume);
+        // Schedule the audio playback precisely
+        // We do not await here because it is already preloaded, and we want to schedule them all fast
+        playNote(noteName, volume, noteStartTime);
 
-        await new Promise(resolve => setTimeout(resolve, noteDuration));
+        // Schedule UI updates
+        const timeoutId = setTimeout(() => {
+          onNoteStart?.(i);
+        }, Math.max(0, noteStartMs));
+        activeTimeoutsRef.current.push(timeoutId);
       }
 
-      onComplete?.();
+      // Schedule completion callback
+      const sequenceDurationMs = notes.length * noteDurationMs;
+      const completeTimeoutId = setTimeout(() => {
+        onComplete?.();
+        activeTimeoutsRef.current = []; // Cleanup
+      }, sequenceDurationMs + 100);
+      activeTimeoutsRef.current.push(completeTimeoutId);
+
     },
     [audioContext, playNote]
   );
@@ -199,6 +226,14 @@ export function useNotePlayer(audioContext: AudioContext | null) {
       }
       currentSourceRef.current = null;
     }
+
+    activeSourcesRef.current.forEach(source => {
+      try { source.stop(); } catch (e) {}
+    });
+    activeSourcesRef.current = [];
+
+    activeTimeoutsRef.current.forEach(timeout => clearTimeout(timeout));
+    activeTimeoutsRef.current = [];
   }, []);
 
   return { playNote, playChord, playSequence, preloadNotes, preloadChords, stop };

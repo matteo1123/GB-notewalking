@@ -29,7 +29,7 @@ const Header = () => {
           {/* Center: Logo - smaller on mobile */}
           <Link to="/" className="flex items-center gap-2 sm:gap-3">
             <div className="flex items-center justify-center h-14 w-14 sm:h-20 sm:w-20 rounded-full bg-primary/15 border border-primary/30 p-1.5 shrink-0">
-              <img src="/logo.png" alt="Guitar Brain Logo" className="h-full w-full object-contain" />
+              <img src="/logo2.png" alt="Guitar Brain Logo" className="h-full w-full object-contain" />
             </div>
             <h1 className="text-2xl sm:text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
               Guitar Brain

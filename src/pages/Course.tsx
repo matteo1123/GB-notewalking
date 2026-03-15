@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, Circle, PlayCircle, Lock, Loader2, Crown, Info, Target, LineChart, Calendar, MessageCircleQuestion, Send, ChevronLeft } from 'lucide-react';
+import { CheckCircle, Circle, PlayCircle, Lock, Loader2, Crown, Info, Target, LineChart, Calendar, MessageCircleQuestion, Send, ChevronLeft, Mail } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -73,6 +73,7 @@ export default function Course() {
     const [emailInput, setEmailInput] = useState('');
     const [isSubmittingEmail, setIsSubmittingEmail] = useState(false);
     const [isEmailSubmitted, setIsEmailSubmitted] = useState(false);
+    const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
 
     useEffect(() => {
         const loadCourseData = async () => {
@@ -881,10 +882,10 @@ export default function Course() {
                         const endPos = nodePositions.get(video.id);
                         if (!startPos || !endPos) return null;
 
-                        const startX = startPos.x + nodeSize / 2;
-                        const startY = startPos.y + nodeSize / 2;
-                        const endX = endPos.x + nodeSize / 2;
-                        const endY = endPos.y + nodeSize / 2;
+                        const startX = startPos.x + 500 + nodeSize / 2;
+                        const startY = startPos.y + 500 + nodeSize / 2;
+                        const endX = endPos.x + 500 + nodeSize / 2;
+                        const endY = endPos.y + 500 + nodeSize / 2;
 
                         const isMet = progress.includes(prereqId);
                         const theme = getCategoryTheme(video);
@@ -926,7 +927,7 @@ export default function Course() {
             {/* Cosmic Background Layer */}
             <div className="fixed inset-0 z-0 pointer-events-none bg-black">
                 {/* Custom space background if exists, otherwise fallback */}
-                <div className="absolute inset-0 bg-[url('/space-bg.jpg')] bg-cover bg-top bg-no-repeat opacity-60 mix-blend-screen" />
+                <div className="absolute inset-0 bg-[url('/space-bg.jpg')] bg-no-repeat opacity-60 mix-blend-screen [background-size:100%_100%]" />
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,#1e1b4b_0%,#020617_100%)] opacity-40 mix-blend-multiply" />
                 <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-20 animate-pulse" />
                 <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-indigo-500/10 rounded-full blur-[120px] animate-pulse" />
@@ -953,7 +954,16 @@ export default function Course() {
                              <span className="text-xs font-black text-indigo-300 tracking-wider whitespace-nowrap">{points} XP</span>
                         </div>
                     )}
-                    <button 
+                    {!user && (
+                        <button
+                            onClick={() => setIsPdfModalOpen(true)}
+                            className="bg-amber-500/20 hover:bg-amber-500/30 backdrop-blur-md border border-amber-500/40 px-4 py-2 rounded-full flex items-center gap-2 transition-colors h-[42px] animate-pulse"
+                        >
+                            <Mail className="w-4 h-4 text-amber-400" />
+                            <span className="text-xs font-bold text-amber-300 whitespace-nowrap hidden sm:inline">Free PDF</span>
+                        </button>
+                    )}
+                    <button
                         onClick={() => navigate(user ? '/premium' : '/')}
                         className="bg-slate-900/60 hover:bg-slate-800/80 backdrop-blur-md border border-white/10 px-4 py-2 rounded-full flex items-center gap-2 transition-colors h-[42px]"
                     >
@@ -1078,7 +1088,7 @@ export default function Course() {
                                             });
                                         }
                                     }}
-                                    className={`w-24 h-24 sm:w-28 sm:h-28 rounded-full flex flex-col items-center justify-center border-2 transition-all duration-700 relative shadow-2xl z-20 hover:scale-110 active:scale-95 group/node
+                                    className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full flex flex-col items-center justify-center border-2 transition-all duration-700 relative shadow-2xl z-20 hover:scale-110 active:scale-95 group/node
                                         ${isPlaying ? `${theme.bg} border-white ${theme.glow}` : 
                                           isCompleted ? 'bg-emerald-500/20 border-emerald-500 shadow-[0_0_30px_rgba(16,185,129,0.4)]' :
                                           (isAvailable && isUnlocked) ? `bg-slate-800/80 ${theme.border} hover:border-white hover:${theme.glow}` : 
@@ -1088,22 +1098,22 @@ export default function Course() {
                                     `}
                                 >
                                     {isCompleted ? (
-                                        <CheckCircle className="w-14 h-14 text-emerald-400 drop-shadow-[0_0_12px_rgba(52,211,153,0.8)]" />
+                                        <CheckCircle className="w-10 h-10 text-emerald-400 drop-shadow-[0_0_12px_rgba(52,211,153,0.8)]" />
                                     ) : requiresPurchase ? (
                                         <div className="flex flex-col items-center animate-pulse">
-                                            <Lock className={`w-8 h-8 mb-1 ${canAfford ? 'text-amber-400' : 'text-slate-500'}`} />
+                                            <Lock className={`w-6 h-6 mb-1 ${canAfford ? 'text-amber-400' : 'text-slate-500'}`} />
                                             <span className={`text-[11px] font-black tracking-widest ${canAfford ? 'text-amber-400' : 'text-red-400/80'}`}>{video.unlock_cost} XP</span>
                                         </div>
                                     ) : (isAvailable && isUnlocked) ? (
                                         <>
-                                            <PlayCircle className={`w-14 h-14 ${isPlaying ? 'text-white' : 'text-indigo-400 group-hover/node:text-white group-hover/node:drop-shadow-[0_0_15px_rgba(79,70,229,0.9)] transition-all animate-float'}`} />
+                                            <PlayCircle className={`w-10 h-10 ${isPlaying ? 'text-white' : 'text-indigo-400 group-hover/node:text-white group-hover/node:drop-shadow-[0_0_15px_rgba(79,70,229,0.9)] transition-all animate-float'}`} />
                                             {/* Special Highlight for New Users (0 points, 0 progress) */}
                                             {points === 0 && progress.length === 0 && video.unlock_cost === 0 && (
                                                 <div className="absolute inset-0 rounded-full border-4 border-indigo-400/50 animate-ping pointer-events-none"></div>
                                             )}
                                         </>
                                     ) : (
-                                        <Lock className="w-10 h-10 text-slate-700" />
+                                        <Lock className="w-7 h-7 text-slate-700" />
                                     )}
 
                                     {/* Pulse Effect for Unlocked nodes */}
@@ -1232,6 +1242,52 @@ export default function Course() {
                                 </div>
                             )}
                         </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Standalone PDF Sign-up Modal */}
+            <Dialog open={isPdfModalOpen} onOpenChange={setIsPdfModalOpen}>
+                <DialogContent className="bg-[#0a0a0f] border border-amber-500/20 text-white max-w-md rounded-2xl">
+                    <DialogHeader className="sr-only">
+                        <DialogTitle>Get the Free PDF</DialogTitle>
+                        <DialogDescription>Sign up to receive the free Hitting Chord Tones PDF guide.</DialogDescription>
+                    </DialogHeader>
+                    <div className="p-2">
+                        {!isEmailSubmitted ? (
+                            <>
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center shrink-0">
+                                        <Mail className="w-5 h-5 text-amber-400" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-lg font-black text-amber-100">Free "Hitting Chord Tones" PDF</h3>
+                                        <p className="text-slate-400 text-sm">Plus a free month of full course access.</p>
+                                    </div>
+                                </div>
+                                <form onSubmit={handleEmailSubmit} className="flex flex-col gap-3">
+                                    <input
+                                        type="email"
+                                        value={emailInput}
+                                        onChange={e => setEmailInput(e.target.value)}
+                                        placeholder="your@email.com"
+                                        required
+                                        className="bg-black/40 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-slate-600 text-sm focus:outline-none focus:border-amber-500/50"
+                                    />
+                                    <Button type="submit" disabled={isSubmittingEmail} className="bg-amber-500 hover:bg-amber-400 text-black font-black py-3 rounded-xl">
+                                        {isSubmittingEmail ? 'Sending...' : 'Send Me the PDF'}
+                                    </Button>
+                                </form>
+                            </>
+                        ) : (
+                            <div className="text-center py-6">
+                                <div className="w-12 h-12 rounded-full bg-emerald-500/20 flex items-center justify-center mx-auto mb-3">
+                                    <CheckCircle className="w-6 h-6 text-emerald-400" />
+                                </div>
+                                <p className="text-emerald-300 font-black text-lg mb-1">Check your inbox!</p>
+                                <p className="text-slate-400 text-sm">The PDF is on its way. You'll also get a link to access the full course free for 30 days.</p>
+                            </div>
+                        )}
                     </div>
                 </DialogContent>
             </Dialog>

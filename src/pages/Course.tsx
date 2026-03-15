@@ -58,8 +58,8 @@ export default function Course() {
     const [activeVideo, setActiveVideo] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
-    const [awardedXPFor, setAwardedXPFor] = useState<string[]>([]);
     const mapRef = React.useRef<HTMLDivElement>(null);
+    const xpTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // Gamification Hook
     const { points, level, refresh: refreshGamification } = useGamification();
@@ -236,8 +236,8 @@ export default function Course() {
                 pos.set(group[0].id, { x: cx, y: cy });
             } else {
                 // Multiple videos at same cell — fan them out in a tight circle
-                // Keep nodes well inside the visual hub ring
-                const spreadRadius = 60 + group.length * 30;
+                // Cap spread so hub nodes never overlap outer grid nodes (gap = 250px)
+                const spreadRadius = Math.min(40 + group.length * 12, 85);
                 group.forEach((v, idx) => {
                     const angle = (idx / group.length) * Math.PI * 2 - Math.PI / 2;
                     pos.set(v.id, {
@@ -273,26 +273,27 @@ export default function Course() {
         }
     }, [loading, videos, nodePositions, getX, getY]);
 
-    // Handle Video Completion -> XP Tracking
-    const handleVideoEnd = React.useCallback(() => {
-        if (activeVideo && user && !awardedXPFor.includes(activeVideo)) {
-            setAwardedXPFor(prev => [...prev, activeVideo]);
-            
-            // Give them 5 XP
-            supabase.rpc('increment_user_points', {
+    // Award XP after ~30% watch time (2 min timer). Fires each session so re-watching re-earns.
+    useEffect(() => {
+        if (!isVideoModalOpen || !activeVideo || !user) return;
+        xpTimerRef.current = setTimeout(async () => {
+            const { error } = await supabase.rpc('increment_user_points', {
                 user_id_param: user.id,
                 points_to_add: 5
-            }).then(({ error }) => {
-                if (!error) {
-                    toast({
-                        title: "+5 XP Earned! 🎉",
-                        description: "You've earned XP for completing a video.",
-                    });
-                    refreshGamification();
-                }
             });
-        }
-    }, [activeVideo, user, awardedXPFor, toast, refreshGamification]);
+            if (!error) {
+                toast({ title: "+5 XP Earned!", description: "You've been watching — keep it up!" });
+                refreshGamification();
+            }
+        }, 2 * 60 * 1000); // 2 minutes ≈ 30% of a typical lesson
+        return () => {
+            if (xpTimerRef.current) clearTimeout(xpTimerRef.current);
+        };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isVideoModalOpen, activeVideo, user?.id]);
+
+    // Handle "Mark as Complete" — no longer awards XP (timer handles it)
+    const handleVideoEnd = React.useCallback(() => {}, []);
 
     // Format standard YouTube URLs or Bunny Stream URLs to Embed URLs
     // withSound=true when opened via user click (so we can autoplay with audio)
@@ -662,8 +663,8 @@ export default function Course() {
                 {(() => {
                     // Count how many videos sit at grid (0,0) to scale the hub circle
                     const hubNodeCount = videos.filter(v => v.grid_row === 0 && v.grid_column === 0).length;
-                    // Tight inner ring that grows gently with node count  
-                    const innerR = Math.max(160, 100 + hubNodeCount * 40);
+                    // Inner ring sized to contain hub nodes but stay inside the gap boundary (250px)
+                    const innerR = Math.min(Math.max(110, 80 + hubNodeCount * 18), 150);
                     const glowR = innerR + 100;
                     const outerR = innerR + 150;
                     const midR = innerR + 60;
@@ -964,8 +965,8 @@ export default function Course() {
 
             {/* Immersive Map Container — drag to pan, no scrollbars */}
             <div 
-                className="flex-1 overflow-scroll relative select-none bg-grid-white/[0.02] cursor-grab active:cursor-grabbing [&::-webkit-scrollbar]:hidden"
-                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' } as React.CSSProperties}
+                className="flex-1 overflow-hidden relative select-none bg-grid-white/[0.02] cursor-grab active:cursor-grabbing"
+                style={{} as React.CSSProperties}
                 ref={(el) => {
                     // Store the scroll container ref for drag-to-pan
                     if (el) (mapRef.current as any).__scrollContainer = el;

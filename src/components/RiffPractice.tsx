@@ -165,6 +165,36 @@ const RiffPractice = ({
   const [hasReachedTargetBpm, setHasReachedTargetBpm] = useState(false);
   const [trackedMaxBpm, setTrackedMaxBpm] = useState(0);
 
+  const practiceTimeAccumulator = useRef(0);
+  const totalAwardedXPTimeForSession = useRef(0);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isPlaying) {
+      interval = setInterval(() => {
+        practiceTimeAccumulator.current += 1;
+        if (practiceTimeAccumulator.current - totalAwardedXPTimeForSession.current >= 120) {
+            totalAwardedXPTimeForSession.current += 120;
+            // Award 10 XP
+             if (user) {
+                supabase.rpc('increment_user_points', {
+                    user_id_param: user.id,
+                    points_to_add: 10
+                }).then(({ error }) => {
+                    if (!error) {
+                         toast({
+                            title: "+10 XP Earned! 🎸",
+                            description: "You've earned XP for 2 minutes of solid practice.",
+                        });
+                    }
+                });
+            }
+        }
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isPlaying, user, toast]);
+
   useEffect(() => {
     setHarmonicContext(repertoireItem.major_key);
   }, [repertoireItem.major_key]);

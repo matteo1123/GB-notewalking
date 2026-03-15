@@ -42,9 +42,19 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
     // THEN check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
+      if (!session) {
+        // Automatically sign in anonymously if no session exists
+        supabase.auth.signInAnonymously().then(({ data, error }) => {
+            if (error) {
+                console.error("Error signing in anonymously:", error.message);
+            }
+            // session state will be updated by the onAuthStateChange listener
+        });
+      } else {
+        setSession(session);
+        setUser(session?.user ?? null);
+        setLoading(false);
+      }
     });
 
     return () => subscription.unsubscribe();

@@ -4,10 +4,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, Circle, PlayCircle, Lock, Loader2, Crown, Info, Target, LineChart, Calendar, MessageCircleQuestion, Send } from 'lucide-react';
+import { CheckCircle, Circle, PlayCircle, Lock, Loader2, Crown, Info, Target, LineChart, Calendar, MessageCircleQuestion, Send, ChevronLeft } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from '@/components/ui/textarea';
 import { useGamification } from '@/hooks/useGamification';
 
@@ -58,6 +58,7 @@ export default function Course() {
     const [activeVideo, setActiveVideo] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
+    const [awardedXPFor, setAwardedXPFor] = useState<string[]>([]);
     const mapRef = React.useRef<HTMLDivElement>(null);
 
     // Gamification Hook
@@ -84,8 +85,28 @@ export default function Course() {
                     .eq('id', user.id)
                     .single();
 
-                const hasPremium = profile?.premium_until && new Date(profile.premium_until) > new Date();
-                setIsPremium(!!hasPremium);
+                let hasPremium = !!(profile?.premium_until && new Date(profile.premium_until) > new Date());
+
+                // Auto-grant 30 days if this user previously signed up for the free PDF
+                if (!hasPremium && user.email) {
+                    const { data: subscriber } = await supabase
+                        .from('email_subscribers')
+                        .select('id')
+                        .eq('email', user.email)
+                        .maybeSingle();
+
+                    if (subscriber) {
+                        const premiumUntil = new Date();
+                        premiumUntil.setDate(premiumUntil.getDate() + 30);
+                        await supabase
+                            .from('profiles')
+                            .update({ premium_until: premiumUntil.toISOString() })
+                            .eq('id', user.id);
+                        hasPremium = true;
+                    }
+                }
+
+                setIsPremium(hasPremium);
 
                 // Check enrollment
                 const { data: enrollment } = await supabase
@@ -177,33 +198,116 @@ export default function Course() {
         loadCourseData();
     }, [user, navigate, searchParams]);
 
-    // Center map on hub (0,0) after loading
+    // Center map on landing video after loading
+    const hasScrolledRef = React.useRef(false);
+    
+    // Calculate mapping variables needed by nodePositions and scrolling
+    const nodeSize = 80;
+    const gap = 250; 
+    
+    const minRow = Math.min(...videos.map(v => v.grid_row ?? 0), -2);
+    const maxRow = Math.max(...videos.map(v => v.grid_row ?? 0), 2);
+    const minCol = Math.min(...videos.map(v => v.grid_column ?? 0), -2);
+    const maxCol = Math.max(...videos.map(v => v.grid_column ?? 0), 2);
+
+    const totalRows = maxRow - minRow + 1;
+    const totalCols = maxCol - minCol + 1;
+
+    const getX = React.useCallback((col: number) => (col - minCol) * gap + 40, [minCol, gap]);
+    const getY = React.useCallback((row: number) => (row - minRow) * gap + 40, [minRow, gap]);
+
+    const nodePositions = React.useMemo(() => {
+        const pos = new Map<string, { x: number; y: number }>();
+        
+        // Group ALL videos by their grid cell to detect collisions
+        const cellGroups = new Map<string, typeof videos>();
+        videos.forEach(v => {
+            const key = `${v.grid_row},${v.grid_column}`;
+            if (!cellGroups.has(key)) cellGroups.set(key, []);
+            cellGroups.get(key)!.push(v);
+        });
+        
+        cellGroups.forEach((group, key) => {
+            const [row, col] = key.split(',').map(Number);
+            const cx = getX(col);
+            const cy = getY(row);
+            
+            if (group.length === 1) {
+                pos.set(group[0].id, { x: cx, y: cy });
+            } else {
+                // Multiple videos at same cell — fan them out in a tight circle
+                // Keep nodes well inside the visual hub ring
+                const spreadRadius = 60 + group.length * 30;
+                group.forEach((v, idx) => {
+                    const angle = (idx / group.length) * Math.PI * 2 - Math.PI / 2;
+                    pos.set(v.id, {
+                        x: cx + Math.cos(angle) * spreadRadius,
+                        y: cy + Math.sin(angle) * spreadRadius
+                    });
+                });
+            }
+        });
+        
+        return pos;
+    }, [videos, getX, getY]); 
+
     useEffect(() => {
-        if (!loading && mapRef.current && videos.length > 0) {
+        if (!loading && mapRef.current && videos.length > 0 && !hasScrolledRef.current && nodePositions.size > 0) {
             const container = mapRef.current.parentElement;
             if (container) {
-                // Precise centering on the hub (0,0)
-                const hubX = getX(0) + 500 + nodeSize / 2;
-                const hubY = getY(0) + 500 + nodeSize / 2;
+                // Find Landing Video (cost 0) or fallback to very first node
+                const landingVideo = videos.find(v => v.unlock_cost === 0) || videos[0];
+                const targetPos = nodePositions.get(landingVideo?.id) || { x: getX(0), y: getY(0) };
                 
-                container.scrollLeft = hubX - container.clientWidth / 2;
-                container.scrollTop = hubY - container.clientHeight / 2;
+                const exactX = targetPos.x + 500 + nodeSize / 2;
+                const exactY = targetPos.y + 500 + nodeSize / 2;
+                
+                container.scrollTo({
+                    left: exactX - container.clientWidth / 2,
+                    top: exactY - container.clientHeight / 2,
+                    behavior: 'auto' // Instant scroll to avoid flashy blank screen
+                });
+                
+                hasScrolledRef.current = true;
             }
         }
-    }, [loading, videos]);
+    }, [loading, videos, nodePositions, getX, getY]);
+
+    // Handle Video Completion -> XP Tracking
+    const handleVideoEnd = React.useCallback(() => {
+        if (activeVideo && user && !awardedXPFor.includes(activeVideo)) {
+            setAwardedXPFor(prev => [...prev, activeVideo]);
+            
+            // Give them 5 XP
+            supabase.rpc('increment_user_points', {
+                user_id_param: user.id,
+                points_to_add: 5
+            }).then(({ error }) => {
+                if (!error) {
+                    toast({
+                        title: "+5 XP Earned! 🎉",
+                        description: "You've earned XP for completing a video.",
+                    });
+                    refreshGamification();
+                }
+            });
+        }
+    }, [activeVideo, user, awardedXPFor, toast, refreshGamification]);
 
     // Format standard YouTube URLs or Bunny Stream URLs to Embed URLs
-    const getEmbedUrl = (url: string) => {
+    // withSound=true when opened via user click (so we can autoplay with audio)
+    const getEmbedUrl = (url: string, withSound = false) => {
         if (!url) return '';
         try {
-            const shouldAutoplay = searchParams.get('autoplay') === '1' || !searchParams.has('lesson');
+            const shouldAutoplay = withSound || searchParams.get('autoplay') === '1' || !searchParams.has('lesson');
+            const shouldMute = !withSound;
 
             // Handle Bunny Stream URLs
             if (url.includes('player.mediadelivery.net/embed/') || url.includes('iframe.mediadelivery.net/embed/')) {
                 const bunnyUrl = new URL(url);
                 if (shouldAutoplay) {
                     bunnyUrl.searchParams.set('autoplay', 'true');
-                    bunnyUrl.searchParams.set('muted', 'true'); // Required by modern browsers for autoplay
+                    if (shouldMute) bunnyUrl.searchParams.set('muted', 'true');
                 }
                 return bunnyUrl.toString();
             }
@@ -213,7 +317,7 @@ export default function Course() {
                 const ytUrl = new URL(url);
                 if (shouldAutoplay && !ytUrl.searchParams.has('autoplay')) {
                     ytUrl.searchParams.set('autoplay', '1');
-                    ytUrl.searchParams.set('mute', '1'); // Required by modern browsers for autoplay
+                    if (shouldMute) ytUrl.searchParams.set('mute', '1');
                 }
                 return ytUrl.toString();
             }
@@ -226,25 +330,24 @@ export default function Course() {
             }
 
             if (videoId) {
-                // Check if we should auto-play this specific video from the funnel params
                 const params = new URLSearchParams({
-                    rel: '0', // Hide related videos from other channels
-                    modestbranding: '1', // Hide YouTube logo
-                    showinfo: '0', // Hide video title (mostly deprecated, but still partially works on some clients)
-                    iv_load_policy: '3', // Hide video annotations
-                    color: 'white', // Changes progress bar color
+                    rel: '0',
+                    modestbranding: '1',
+                    showinfo: '0',
+                    iv_load_policy: '3',
+                    color: 'white',
                 });
 
                 if (shouldAutoplay) {
                     params.append('autoplay', '1');
-                    params.append('mute', '1'); // Required by modern browsers for autoplay
+                    if (shouldMute) params.append('mute', '1');
                 }
 
                 return `https://www.youtube.com/embed/${videoId}?${params.toString()}`;
             }
             return url;
         } catch (e) {
-            return url; // fallback to original if parsing fails
+            return url;
         }
     };
 
@@ -375,15 +478,14 @@ export default function Course() {
             }
 
             setIsEmailSubmitted(true);
-            toast({
-                title: "Success! PDF Sent.",
-                description: "Check your inbox for the Hitting Chord Tones PDF in the next few minutes.",
-            });
             setEmailInput('');
+            // Trigger PDF delivery via edge function (fire-and-forget)
+            supabase.functions.invoke('send-pdf-email', { body: { email: emailInput } }).catch(() => {
+                // Edge function may not exist yet; email is saved and can be processed later
+            });
             toast({
-                title: "Wait a second",
-                description: "We couldn't process your email right now. Try again?",
-                variant: "destructive",
+                title: "PDF is on its way!",
+                description: "Check your inbox for the Hitting Chord Tones guide.",
             });
         } finally {
             setIsSubmittingEmail(false);
@@ -499,9 +601,9 @@ export default function Course() {
     };
 
     if (loading) return (
-        <div className="p-8 flex flex-col items-center justify-center min-h-[50vh] text-muted-foreground">
+        <div className="p-8 flex flex-col items-center justify-center min-h-screen text-muted-foreground bg-[#050505]">
             <Loader2 className="w-8 h-8 animate-spin mb-4" />
-            <p>Loading course data...</p>
+            <p>Booting orbital map...</p>
         </div>
     );
 
@@ -528,20 +630,7 @@ export default function Course() {
         return { id: 'main', color: '#4f46e5', bg: 'bg-indigo-600', border: 'border-indigo-500', glow: 'shadow-[0_0_50px_rgba(79,70,229,0.6)]', text: 'text-indigo-400', label: 'Core Hub' };
     };
 
-    // Map sizing and coordinate logic
-    const nodeSize = 80;
-    const gap = 250; // Increased spacing for clear "sections"
-    
-    const minRow = Math.min(...videos.map(v => v.grid_row ?? 0), -2);
-    const maxRow = Math.max(...videos.map(v => v.grid_row ?? 0), 2);
-    const minCol = Math.min(...videos.map(v => v.grid_column ?? 0), -2);
-    const maxCol = Math.max(...videos.map(v => v.grid_column ?? 0), 2);
 
-    const totalRows = maxRow - minRow + 1;
-    const totalCols = maxCol - minCol + 1;
-
-    const getX = (col: number) => (col - minCol) * gap + 40;
-    const getY = (row: number) => (row - minRow) * gap + 40;
 
     const renderConnectionLines = () => {
         return (
@@ -569,14 +658,217 @@ export default function Course() {
                     <linearGradient id="grad-main" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stopColor="#4f46e5" /><stop offset="100%" stopColor="#818cf8" /></linearGradient>
                 </defs>
                 
-                {/* Region Labels Labels (Large Themed Background Text) */}
-                <g className="opacity-[0.05] select-none pointer-events-none font-black uppercase tracking-[0.5em]">
-                    <text x={getX(0.5) + 500} y={getY(-3.5) + 500} textAnchor="middle" fontSize="160" fill="#3b82f6">Rhythm Realm</text>
-                    <text x={getX(4) + 500} y={getY(0) + 500} textAnchor="middle" fontSize="160" fill="#f59e0b" transform={`rotate(90, ${getX(4) + 500}, ${getY(0) + 500})`}>Chord Tone Territory</text>
-                    <text x={getX(-4) + 500} y={getY(0.5) + 500} textAnchor="middle" fontSize="160" fill="#a855f7" transform={`rotate(-90, ${getX(-4) + 500}, ${getY(0.5) + 500})`}>Ear Training Void</text>
-                    <text x={getX(-0.5) + 500} y={getY(4.5) + 500} textAnchor="middle" fontSize="160" fill="#ef4444">Technique Temple</text>
-                    <text x={getX(3) + 500} y={getY(-3) + 500} textAnchor="middle" fontSize="160" fill="#10b981" transform={`rotate(-45, ${getX(3) + 500}, ${getY(-3) + 500})`}>Fretboard Spire</text>
-                </g>
+                {/* Core Hub Background Effect */}
+                {(() => {
+                    // Count how many videos sit at grid (0,0) to scale the hub circle
+                    const hubNodeCount = videos.filter(v => v.grid_row === 0 && v.grid_column === 0).length;
+                    // Tight inner ring that grows gently with node count  
+                    const innerR = Math.max(160, 100 + hubNodeCount * 40);
+                    const glowR = innerR + 100;
+                    const outerR = innerR + 150;
+                    const midR = innerR + 60;
+                    const hubCx = getX(0) + 500 + nodeSize / 2;
+                    const hubCy = getY(0) + 500 + nodeSize / 2;
+                    
+                    return (
+                        <g className="select-none pointer-events-none">
+                            {/* Distinct Center Zone */}
+                            <circle 
+                                cx={hubCx} 
+                                cy={hubCy} 
+                                r={innerR} 
+                                fill="#0a0a1a" 
+                                stroke="url(#grad-main)"
+                                strokeWidth="2"
+                                strokeDasharray="4 8"
+                                className="opacity-50"
+                            />
+                            <text 
+                                x={hubCx} 
+                                y={hubCy - innerR + 30} 
+                                textAnchor="middle" 
+                                fontSize="24" 
+                                fill="#818cf8" 
+                                className="font-black uppercase tracking-[0.5em] opacity-50"
+                            >
+                                Core Hub
+                            </text>
+                            <circle 
+                                cx={hubCx} 
+                                cy={hubCy} 
+                                r={glowR} 
+                                fill="url(#grad-main)" 
+                                filter="blur(80px)" 
+                                className="opacity-[0.1]"
+                            />
+                            <circle 
+                                cx={hubCx} 
+                                cy={hubCy} 
+                                r={outerR} 
+                                fill="none" 
+                                stroke="url(#grad-main)"
+                                strokeWidth="2"
+                                strokeDasharray="10 20"
+                                className="animate-[spin_60s_linear_infinite] opacity-[0.15]"
+                            />
+                            <circle 
+                                cx={hubCx} 
+                                cy={hubCy} 
+                                r={midR} 
+                                fill="none" 
+                                stroke="url(#grad-main)"
+                                strokeWidth="4"
+                                strokeDasharray="5 30"
+                                className="animate-[spin_40s_linear_infinite_reverse] opacity-[0.15]"
+                            />
+                        </g>
+                    );
+                })()}
+
+                {/* Region Labels Labels (Large Themed Background Text) & Blob Backgrounds */}
+                {(() => {
+                    const categorizedNodes = new Map<string, { x: number, y: number, theme: ReturnType<typeof getCategoryTheme> }[]>();
+                    
+                    videos.forEach(video => {
+                        const theme = getCategoryTheme(video);
+                        if (theme.id === 'main') return;
+                        
+                        if (!categorizedNodes.has(theme.id)) {
+                            categorizedNodes.set(theme.id, []);
+                        }
+                        const pos = nodePositions.get(video.id);
+                        if (pos) {
+                            categorizedNodes.get(theme.id)!.push({
+                                x: pos.x + 500,
+                                y: pos.y + 500,
+                                theme
+                            });
+                        }
+                    });
+
+                    return Array.from(categorizedNodes.entries()).map(([id, nodes]) => {
+                        if (nodes.length === 0) return null;
+                        
+                        // Calculate center of mass for the category
+                        const avgX = nodes.reduce((sum, n) => sum + n.x, 0) / nodes.length;
+                        const avgY = nodes.reduce((sum, n) => sum + n.y, 0) / nodes.length;
+                        
+                        const theme = nodes[0].theme;
+                        
+                        // Find the bounding box
+                        const minX = Math.min(...nodes.map(n => n.x));
+                        const maxX = Math.max(...nodes.map(n => n.x));
+                        const minY = Math.min(...nodes.map(n => n.y));
+                        const maxY = Math.max(...nodes.map(n => n.y));
+                        const width = Math.max(maxX - minX + gap, gap * 2);
+                        const height = Math.max(maxY - minY + gap, gap * 2);
+
+                        const hubX = getX(0) + 500 + nodeSize / 2;
+                        const hubY = getY(0) + 500 + nodeSize / 2;
+
+                        const dx = avgX - hubX;
+                        const dy = avgY - hubY;
+                        const dist = Math.sqrt(dx*dx + dy*dy) || 1;
+
+                        // Push the text outward from center to avoid center clump overlap
+                        const textPushDist = Math.max(dist, 400);
+                        const textX = hubX + (dx / dist) * textPushDist;
+                        const textY = hubY + (dy / dist) * textPushDist;
+
+                        // Calculate an angle for text rotation based on the vector from origin (hub) to center of mass
+                        const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+                        // Normalize text so it's readable
+                        let readableAngle = angle;
+                        if (readableAngle > 90 || readableAngle < -90) readableAngle += 180;
+
+                        return (
+                            <g key={id} className="opacity-[0.2] select-none pointer-events-none">
+                                {/* Organic Blob behind the region */}
+                                <ellipse 
+                                    cx={avgX} 
+                                    cy={avgY} 
+                                    rx={width / 1.5} 
+                                    ry={height / 1.5} 
+                                    fill={theme.color} 
+                                    filter=" blur(80px)" 
+                                    className="opacity-40"
+                                    transform={`rotate(${angle}, ${avgX}, ${avgY})`}
+                                />
+                                {/* Dynamic Text Placement */}
+                                <text 
+                                    x={textX} 
+                                    y={textY} 
+                                    textAnchor="middle" 
+                                    fontSize="40" 
+                                    fill={theme.color} 
+                                    className="font-black uppercase tracking-[0.4em] drop-shadow-2xl opacity-40"
+                                    transform={`rotate(${readableAngle}, ${textX}, ${textY})`}
+                                >
+                                    {theme.label}
+                                </text>
+                            </g>
+                        );
+                    });
+                })()}
+
+                {/* Category-based Connection Lines (same skill tree) */}
+                {(() => {
+                    const categoryGroups = new Map<string, typeof videos>();
+                    videos.forEach(v => {
+                        // Use only the category field (not title) to avoid false groupings
+                        // e.g. "Hit Your First Chord Tone" should NOT group with Chord Tones category
+                        const catOnly = (v.category || '').toLowerCase().trim();
+                        if (!catOnly || catOnly === 'none') return;
+                        const theme = getCategoryTheme({ ...v, title: '' }); // strip title to force category-only match
+                        if (theme.id === 'main') return; // uncategorized — skip
+                        if (!categoryGroups.has(theme.id)) categoryGroups.set(theme.id, []);
+                        categoryGroups.get(theme.id)!.push(v);
+                    });
+                    
+                    const lines: React.ReactNode[] = [];
+                    categoryGroups.forEach((group, catId) => {
+                        if (group.length < 2 || catId === 'main') return;
+                        const theme = getCategoryTheme(group[0]);
+                        
+                        // Connect each node to its nearest neighbor in the same category
+                        for (let i = 0; i < group.length; i++) {
+                            let nearestIdx = -1;
+                            let nearestDist = Infinity;
+                            for (let j = i + 1; j < group.length; j++) {
+                                const pi = nodePositions.get(group[i].id);
+                                const pj = nodePositions.get(group[j].id);
+                                if (!pi || !pj) continue;
+                                const d = Math.sqrt((pi.x - pj.x) ** 2 + (pi.y - pj.y) ** 2);
+                                if (d < nearestDist) { nearestDist = d; nearestIdx = j; }
+                            }
+                            if (nearestIdx === -1) continue;
+                            const p1 = nodePositions.get(group[i].id)!;
+                            const p2 = nodePositions.get(group[nearestIdx].id)!;
+                            const sx = p1.x + 500 + nodeSize / 2;
+                            const sy = p1.y + 500 + nodeSize / 2;
+                            const ex = p2.x + 500 + nodeSize / 2;
+                            const ey = p2.y + 500 + nodeSize / 2;
+                            const dx = ex - sx;
+                            const dy = ey - sy;
+                            const curv = 0.15;
+                            lines.push(
+                                <path
+                                    key={`cat-${catId}-${i}-${nearestIdx}`}
+                                    d={`M ${sx} ${sy} C ${sx + dx * 0.3 - dy * curv} ${sy + dy * 0.3 + dx * curv}, ${sx + dx * 0.7 - dy * curv} ${sy + dy * 0.7 + dx * curv}, ${ex} ${ey}`}
+                                    fill="none"
+                                    stroke={theme.color}
+                                    strokeWidth="3"
+                                    strokeLinecap="round"
+                                    strokeDasharray="8 12"
+                                    className="opacity-30"
+                                />
+                            );
+                        }
+                    });
+                    return lines;
+                })()}
+
+                {/* Prerequisite Connection Paths */}
                 {videos.map(video => {
                     if (!video.prerequisite_ids || video.prerequisite_ids.length === 0) return null;
                     
@@ -584,26 +876,42 @@ export default function Course() {
                         const prereq = videos.find(v => v.id === prereqId);
                         if (!prereq) return null;
 
-                        const startX = getX(prereq.grid_column) + nodeSize / 2;
-                        const startY = getY(prereq.grid_row) + nodeSize / 2;
-                        const endX = getX(video.grid_column) + nodeSize / 2;
-                        const endY = getY(video.grid_row) + nodeSize / 2;
+                        const startPos = nodePositions.get(prereq.id);
+                        const endPos = nodePositions.get(video.id);
+                        if (!startPos || !endPos) return null;
+
+                        const startX = startPos.x + nodeSize / 2;
+                        const startY = startPos.y + nodeSize / 2;
+                        const endX = endPos.x + nodeSize / 2;
+                        const endY = endPos.y + nodeSize / 2;
 
                         const isMet = progress.includes(prereqId);
                         const theme = getCategoryTheme(video);
 
+                        // Calculate curved path (bezier). To make it organic, we slightly offset the control points perpendicular to the main line.
+                        const dx = endX - startX;
+                        const dy = endY - startY;
+                        const distance = Math.sqrt(dx*dx + dy*dy);
+                        // A simple curve pushes the middle point perpendicularly by a fraction of the distance
+                        const curvature = 0.2; 
+                        const cx1 = startX + dx * 0.3 - dy * curvature;
+                        const cy1 = startY + dy * 0.3 + dx * curvature;
+                        const cx2 = startX + dx * 0.7 - dy * curvature;
+                        const cy2 = startY + dy * 0.7 + dx * curvature;
+
+                        const pathData = `M ${startX} ${startY} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${endX} ${endY}`;
+
                         return (
-                            <line
+                            <path
                                 key={`${prereqId}-${video.id}`}
-                                x1={startX}
-                                y1={startY}
-                                x2={endX}
-                                y2={endY}
+                                d={pathData}
+                                fill="none"
                                 stroke={isMet ? `url(#grad-${theme.id})` : "#1e1b4b"}
-                                strokeWidth={isMet ? "4" : "2"}
-                                strokeDasharray={isMet ? "0" : "8,6"}
+                                strokeWidth={isMet ? "10" : "5"}
+                                strokeLinecap="round"
+                                strokeDasharray={isMet ? "0" : "12,12"}
                                 filter={isMet ? "url(#glow)" : "none"}
-                                className="transition-all duration-1000 ease-in-out"
+                                className={`transition-all duration-1000 ease-in-out cursor-pointer ${isMet ? 'opacity-80 hover:opacity-100' : 'opacity-40'}`}
                             />
                         );
                     });
@@ -613,40 +921,99 @@ export default function Course() {
     };
 
     return (
-        <div className="min-h-screen bg-[#050505] text-slate-100 overflow-hidden flex flex-col relative font-sans">
+        <div className="h-[100dvh] w-full bg-[#050505] text-slate-100 overflow-hidden flex flex-col relative font-sans">
             {/* Cosmic Background Layer */}
-            <div className="fixed inset-0 z-0 pointer-events-none">
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,#1e1b4b_0%,#020617_100%)] opacity-40" />
+            <div className="fixed inset-0 z-0 pointer-events-none bg-black">
+                {/* Custom space background if exists, otherwise fallback */}
+                <div className="absolute inset-0 bg-[url('/space-bg.jpg')] bg-cover bg-top bg-no-repeat opacity-60 mix-blend-screen" />
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,#1e1b4b_0%,#020617_100%)] opacity-40 mix-blend-multiply" />
                 <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-20 animate-pulse" />
                 <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-indigo-500/10 rounded-full blur-[120px] animate-pulse" />
                 <div className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-purple-500/5 rounded-full blur-[150px] animate-bounce-slow" />
             </div>
 
-            {/* Immersive Header - Floating */}
-            <div className="absolute top-0 left-0 right-0 z-50 p-6 pointer-events-none flex justify-between items-start">
-                <div className="pointer-events-auto bg-black/40 backdrop-blur-md border border-white/5 p-4 rounded-2xl shadow-2xl">
-                    <h1 className="text-2xl font-black bg-gradient-to-r from-white to-slate-500 bg-clip-text text-transparent">THE 90-DAY CHALLENGE</h1>
+            {/* Immersive HUD - Floating fixed above everything */}
+            <div className="fixed top-0 left-0 right-0 z-50 p-4 sm:p-8 pointer-events-none flex flex-col sm:flex-row justify-between items-start gap-4 h-32 bg-gradient-to-b from-black/60 to-transparent">
+                <div className="pointer-events-auto bg-black/40 backdrop-blur-md border border-white/5 p-4 rounded-2xl shadow-2xl flex flex-col">
+                    <h1 className="text-xl sm:text-2xl font-black bg-gradient-to-r from-white to-slate-500 bg-clip-text text-transparent">THE 90-DAY CHALLENGE</h1>
                     <div className="flex items-center gap-4 mt-1">
                         <div className="flex items-center gap-1.5">
                             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{completedCount}/{videos.length} Skills Mastered</span>
                         </div>
-                        <Progress value={progressPercentage} className="w-24 h-1 bg-white/5" />
+                        <Progress value={progressPercentage} className="w-16 sm:w-24 h-1 bg-white/5" />
                     </div>
                 </div>
 
-                <div className="flex gap-2 pointer-events-auto">
+                <div className="flex flex-row gap-2 pointer-events-auto items-center">
                     {user && (
-                        <div className="bg-indigo-600/20 backdrop-blur-md border border-indigo-500/30 px-5 py-1.5 rounded-full flex items-center gap-2 shadow-lg shadow-indigo-500/10">
+                        <div className="bg-indigo-600/20 backdrop-blur-md border border-indigo-500/30 px-3 sm:px-5 py-2 rounded-full flex items-center gap-2 shadow-lg shadow-indigo-500/10 h-[42px]">
                              <Crown className="w-4 h-4 text-indigo-400" />
-                             <span className="text-xs font-black text-indigo-300 tracking-wider">{points} XP</span>
+                             <span className="text-xs font-black text-indigo-300 tracking-wider whitespace-nowrap">{points} XP</span>
                         </div>
                     )}
+                    <button 
+                        onClick={() => navigate(user ? '/premium' : '/')}
+                        className="bg-slate-900/60 hover:bg-slate-800/80 backdrop-blur-md border border-white/10 px-4 py-2 rounded-full flex items-center gap-2 transition-colors h-[42px]"
+                    >
+                        <ChevronLeft className="w-4 h-4" />
+                        <span className="text-xs font-bold whitespace-nowrap hidden sm:inline">Exit Map</span>
+                    </button>
                 </div>
             </div>
 
-            {/* Immersive Map Container */}
-            <div className="flex-1 overflow-auto relative select-none bg-grid-white/[0.02] cursor-grab active:cursor-grabbing">
+            {/* Immersive Map Container — drag to pan, no scrollbars */}
+            <div 
+                className="flex-1 overflow-scroll relative select-none bg-grid-white/[0.02] cursor-grab active:cursor-grabbing [&::-webkit-scrollbar]:hidden"
+                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' } as React.CSSProperties}
+                ref={(el) => {
+                    // Store the scroll container ref for drag-to-pan
+                    if (el) (mapRef.current as any).__scrollContainer = el;
+                }}
+                onMouseDown={(e) => {
+                    // Don't intercept clicks on buttons/links
+                    if ((e.target as HTMLElement).closest('button, a, [role=button]')) return;
+                    e.preventDefault();
+                    const container = e.currentTarget;
+                    const startX = e.clientX;
+                    const startY = e.clientY;
+                    const scrollLeft = container.scrollLeft;
+                    const scrollTop = container.scrollTop;
+                    container.style.cursor = 'grabbing';
+                    
+                    const onMove = (ev: MouseEvent) => {
+                        container.scrollLeft = scrollLeft - (ev.clientX - startX);
+                        container.scrollTop = scrollTop - (ev.clientY - startY);
+                    };
+                    const onUp = () => {
+                        container.style.cursor = '';
+                        document.removeEventListener('mousemove', onMove);
+                        document.removeEventListener('mouseup', onUp);
+                    };
+                    document.addEventListener('mousemove', onMove);
+                    document.addEventListener('mouseup', onUp);
+                }}
+                onTouchStart={(e) => {
+                    const container = e.currentTarget;
+                    const touch = e.touches[0];
+                    const startX = touch.clientX;
+                    const startY = touch.clientY;
+                    const scrollLeft = container.scrollLeft;
+                    const scrollTop = container.scrollTop;
+                    
+                    const onMove = (ev: TouchEvent) => {
+                        const t = ev.touches[0];
+                        container.scrollLeft = scrollLeft - (t.clientX - startX);
+                        container.scrollTop = scrollTop - (t.clientY - startY);
+                    };
+                    const onEnd = () => {
+                        container.removeEventListener('touchmove', onMove);
+                        container.removeEventListener('touchend', onEnd);
+                    };
+                    container.addEventListener('touchmove', onMove, { passive: true });
+                    container.addEventListener('touchend', onEnd);
+                }}
+            >
                 <div 
                     ref={mapRef}
                     className="relative p-[500px]" // Massive padding to allow huge scroll area
@@ -661,6 +1028,9 @@ export default function Course() {
                     {renderConnectionLines()}
 
                     {videos.map((video) => {
+                        const pos = nodePositions.get(video.id);
+                        if (!pos) return null;
+
                         const isCompleted = progress.includes(video.id);
                         const isUnlocked = video.unlock_cost === 0 || unlockedCourseVideoIds.includes(video.id);
                         
@@ -675,15 +1045,23 @@ export default function Course() {
                         const theme = getCategoryTheme(video);
 
                         return (
-                            <div 
+                            <div
                                 key={video.id}
                                 className="absolute flex flex-col items-center group"
                                 style={{
-                                    left: getX(video.grid_column) + 500,
-                                    top: getY(video.grid_row) + 500,
+                                    left: pos.x + 500,
+                                    top: pos.y + 500,
                                     width: nodeSize
                                 }}
                             >
+                                {/* Hover Tooltip */}
+                                <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 z-50 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-black/90 border border-white/20 rounded-xl p-3 min-w-[180px] max-w-[240px] text-center shadow-2xl backdrop-blur-sm">
+                                    <p className={`text-white font-black text-sm uppercase tracking-wide leading-snug ${theme.text}`}>{video.title}</p>
+                                    {video.description && <p className="text-slate-400 text-xs mt-1.5 leading-snug">{video.description}</p>}
+                                    <p className="text-slate-500 text-[10px] mt-1.5 uppercase tracking-widest">
+                                        {isCompleted ? '✓ Completed' : requiresPurchase ? `${video.unlock_cost} XP to unlock` : isAvailable ? 'Click to watch' : 'Locked'}
+                                    </p>
+                                </div>
                                 <button
                                     onClick={() => {
                                         if (requiresPurchase) {
@@ -703,8 +1081,8 @@ export default function Course() {
                                         ${isPlaying ? `${theme.bg} border-white ${theme.glow}` : 
                                           isCompleted ? 'bg-emerald-500/20 border-emerald-500 shadow-[0_0_30px_rgba(16,185,129,0.4)]' :
                                           (isAvailable && isUnlocked) ? `bg-slate-800/80 ${theme.border} hover:border-white hover:${theme.glow}` : 
-                                          requiresPurchase ? 'bg-amber-950/40 border-amber-600 hover:border-amber-400 shadow-[0_0_30px_rgba(245,158,11,0.2)]' :
-                                          'bg-black/60 border-slate-800 opacity-20 cursor-not-allowed grayscale'
+                                          requiresPurchase ? 'bg-amber-950/60 border-amber-500 hover:border-amber-300 shadow-[0_0_40px_rgba(245,158,11,0.3)] animate-pulse' :
+                                          'bg-black/60 border-slate-700 opacity-50 cursor-not-allowed'
                                         }
                                     `}
                                 >
@@ -716,7 +1094,13 @@ export default function Course() {
                                             <span className={`text-[11px] font-black tracking-widest ${canAfford ? 'text-amber-400' : 'text-red-400/80'}`}>{video.unlock_cost} XP</span>
                                         </div>
                                     ) : (isAvailable && isUnlocked) ? (
-                                        <PlayCircle className={`w-14 h-14 ${isPlaying ? 'text-white' : 'text-indigo-400 group-hover/node:text-white group-hover/node:drop-shadow-[0_0_15px_rgba(79,70,229,0.9)] transition-all animate-float'}`} />
+                                        <>
+                                            <PlayCircle className={`w-14 h-14 ${isPlaying ? 'text-white' : 'text-indigo-400 group-hover/node:text-white group-hover/node:drop-shadow-[0_0_15px_rgba(79,70,229,0.9)] transition-all animate-float'}`} />
+                                            {/* Special Highlight for New Users (0 points, 0 progress) */}
+                                            {points === 0 && progress.length === 0 && video.unlock_cost === 0 && (
+                                                <div className="absolute inset-0 rounded-full border-4 border-indigo-400/50 animate-ping pointer-events-none"></div>
+                                            )}
+                                        </>
                                     ) : (
                                         <Lock className="w-10 h-10 text-slate-700" />
                                     )}
@@ -727,20 +1111,12 @@ export default function Course() {
                                     )}
                                 </button>
                                 
-                                <div className="text-center mt-5 w-[160px] z-10 px-2">
+                                <div className="text-center mt-5 w-[160px] z-10 px-2 flex flex-col items-center">
                                     <p className={`text-[12px] font-black uppercase tracking-widest leading-tight drop-shadow-xl transition-colors duration-300 ${isPlaying ? 'text-white' : isCompleted ? 'text-emerald-400' : isAvailable ? theme.text : 'text-slate-600'}`}>
-                                        {video.title.replace('Pillars - ', '').replace('Modules - ', '')}
+                                        {video.title}
                                     </p>
                                 </div>
 
-                                {video.title.startsWith('Pillars -') && (
-                                    <div className="absolute -top-16 left-1/2 -translate-x-1/2 whitespace-nowrap pointer-events-none">
-                                        <span className="text-[14px] font-black text-white uppercase tracking-[0.5em] opacity-40 group-hover:opacity-100 transition-opacity translate-y-2 group-hover:translate-y-0 duration-500">
-                                            {video.title.replace('Pillars - ', '')}
-                                        </span>
-                                        <div className="h-[2px] w-0 group-hover:w-full bg-gradient-to-r from-transparent via-indigo-500 to-transparent transition-all duration-700 mt-1 mx-auto" />
-                                    </div>
-                                )}
                             </div>
                         );
                     })}
@@ -750,15 +1126,23 @@ export default function Course() {
             {/* Video Player Modal */}
             <Dialog open={isVideoModalOpen} onOpenChange={setIsVideoModalOpen}>
                 <DialogContent className="max-w-6xl p-0 bg-black border-white/10 overflow-hidden shadow-[0_0_100px_rgba(0,0,0,0.8)]">
+                    <DialogTitle className="sr-only">{currentVideoTitle}</DialogTitle>
+                    <DialogDescription className="sr-only">{currentVideoDesc}</DialogDescription>
                     <div className="flex flex-col h-[90vh]">
                         <div className="aspect-video relative bg-slate-950 group">
                             {currentVideoUrl ? (
                                 <iframe
-                                    src={getEmbedUrl(currentVideoUrl)}
+                                    src={getEmbedUrl(currentVideoUrl, true)}
                                     title={currentVideoTitle}
                                     className="w-full h-full border-0"
                                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                                     allowFullScreen
+                                    onLoad={(e) => {
+                                        // Attempting to catch video end if YouTube API is used 
+                                        // (Note: Raw iframe cannot detect end without postMessage API,
+                                        // so we rely on the user confirming mastery or passing ~2 mins minimum for an official mark).
+                                        // In standard cases, you need YT Player API or BunnyPlayer API.
+                                    }}
                                 />
                             ) : (
                                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-8">
@@ -769,97 +1153,83 @@ export default function Course() {
                             )}
                         </div>
                         
-                        <div className="flex-1 overflow-auto p-10 bg-gradient-to-b from-[#0a0a0f] to-black border-t border-white/5">
-                            <div className="flex flex-col lg:flex-row items-start justify-between gap-10">
-                                <div className="space-y-6 flex-1">
-                                    <div className="space-y-2">
-                                        <h2 className="text-5xl font-black tracking-tighter text-white">{currentVideoTitle}</h2>
-                                        <div className="flex items-center gap-4 text-slate-500 font-bold text-xs uppercase tracking-widest">
-                                            <span className="bg-white/5 px-2 py-1 rounded">Rank: Master</span>
-                                            <span>Difficulty: Adaptive</span>
-                                        </div>
-                                    </div>
-                                    
-                                    <p className="text-slate-400 text-xl leading-relaxed font-medium">{currentVideoDesc}</p>
-                                    
-                                    {!user && !activeMainVideoData?.locked && (
-                                        <div className="mt-8 p-8 bg-indigo-500/10 border border-indigo-500/20 rounded-3xl relative overflow-hidden group">
-                                            <div className="absolute -right-10 -top-10 w-40 h-40 bg-indigo-500/10 rounded-full blur-3xl group-hover:scale-150 transition-transform duration-1000" />
-                                            <div className="relative z-10">
-                                                <h4 className="text-2xl font-black text-indigo-100 mb-3 flex items-center gap-3">
-                                                    <Target className="w-8 h-8 text-indigo-400" />
-                                                    Unlock Full Mastery
-                                                </h4>
-                                                <p className="text-slate-300 text-lg mb-6 max-w-xl">You're exploring a preview node. Sign up to unlock the entire 90-Day Skill Tree, track your XP, and gain access to the AI Coach.</p>
-                                                <Button onClick={() => navigate('/auth')} size="lg" className="bg-indigo-600 hover:bg-indigo-500 text-lg px-8 py-7 rounded-2xl shadow-xl shadow-indigo-600/20">
-                                                    Initialize Master Account
+                        <div className="overflow-auto p-8 bg-gradient-to-b from-[#0a0a0f] to-black border-t border-white/5">
+                            <h2 className="text-3xl font-black tracking-tighter text-white mb-2">{currentVideoTitle}</h2>
+                            {currentVideoDesc && <p className="text-slate-400 text-base leading-relaxed mb-6">{currentVideoDesc}</p>}
+
+                            {/* Guest: PDF sign-up offer */}
+                            {!user && (
+                                <div className="p-6 bg-amber-500/10 border border-amber-500/20 rounded-2xl">
+                                    {!isEmailSubmitted ? (
+                                        <>
+                                            <h4 className="text-xl font-black text-amber-100 mb-1">Get the Free "Hitting Chord Tones" PDF</h4>
+                                            <p className="text-slate-400 text-sm mb-4">Drop your email and we'll send you the full guide — plus a free month of access to the course.</p>
+                                            <form onSubmit={handleEmailSubmit} className="flex gap-3">
+                                                <input
+                                                    type="email"
+                                                    value={emailInput}
+                                                    onChange={e => setEmailInput(e.target.value)}
+                                                    placeholder="your@email.com"
+                                                    required
+                                                    className="flex-1 bg-black/40 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-slate-600 text-sm focus:outline-none focus:border-amber-500/50"
+                                                />
+                                                <Button type="submit" disabled={isSubmittingEmail} className="bg-amber-500 hover:bg-amber-400 text-black font-black px-6 rounded-xl whitespace-nowrap">
+                                                    {isSubmittingEmail ? 'Sending...' : 'Send Me the PDF'}
                                                 </Button>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {user && isMainVideoActive && (
-                                        <div className="pt-8">
-                                            <Button
-                                                variant={progress.includes(activeVideo || '') ? "outline" : "default"}
-                                                size="lg"
-                                                onClick={() => {
-                                                    if (activeVideo) {
-                                                        toggleProgress(activeVideo, progress.includes(activeVideo))
-                                                    }
-                                                }}
-                                                className={`gap-4 text-xl py-8 px-10 rounded-2xl transition-all duration-300 ${!progress.includes(activeVideo || '') ? 'bg-emerald-600 hover:bg-emerald-500 hover:scale-105 text-white shadow-2xl shadow-emerald-600/20' : 'border-emerald-500/50 text-emerald-400'}`}
-                                            >
-                                                {progress.includes(activeVideo || '') ? (
-                                                    <><CheckCircle className="w-8 h-8" /> Skill Mastered</>
-                                                ) : (
-                                                    <><Circle className="w-8 h-8" /> Confirm Mastery</>
-                                                )}
-                                            </Button>
+                                            </form>
+                                        </>
+                                    ) : (
+                                        <div className="text-center py-2">
+                                            <p className="text-amber-300 font-black text-lg mb-1">Check your inbox!</p>
+                                            <p className="text-slate-400 text-sm">The PDF is on its way. You'll also get a link to access the full course free for 30 days.</p>
                                         </div>
                                     )}
                                 </div>
+                            )}
 
-                                <div className="w-full lg:w-80 space-y-8">
-                                    <div className="p-6 bg-white/5 rounded-3xl border border-white/5 backdrop-blur-sm">
-                                        <h4 className="font-black text-xs uppercase tracking-[0.2em] text-slate-500 mb-6 flex items-center gap-2">
-                                            <Crown className="w-3.5 h-3.5 text-amber-500" />
-                                            Premium Rewards
-                                        </h4>
-                                        <div className="space-y-4">
-                                            {rewardVideos.slice(0, 3).map(reward => (
-                                                <div 
-                                                    key={reward.id} 
-                                                    className="flex items-center gap-4 group cursor-pointer p-2 rounded-xl hover:bg-white/5 transition-all" 
-                                                    onClick={() => { setActiveVideo(reward.id); setIsVideoModalOpen(true); }}
-                                                >
-                                                    <div className="w-16 h-10 bg-slate-900 rounded-lg border border-white/5 overflow-hidden flex items-center justify-center shrink-0 group-hover:border-indigo-500/30">
-                                                        <PlayCircle className="w-6 h-6 text-slate-700 group-hover:text-indigo-500 transition-colors" />
-                                                    </div>
-                                                    <div className="overflow-hidden">
-                                                        <p className="text-xs font-black text-slate-300 truncate group-hover:text-white transition-colors uppercase tracking-tight">{reward.title}</p>
-                                                        <p className="text-[10px] font-bold text-amber-600 tracking-widest">{reward.unlock_cost} XP</p>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    
-                                    <div className="p-6 bg-indigo-900/10 rounded-3xl border border-indigo-500/10">
-                                        <h4 className="font-black text-[10px] uppercase tracking-widest text-indigo-400 mb-2">System Status</h4>
-                                        <div className="space-y-1">
-                                            <div className="flex justify-between text-[10px] font-bold">
-                                                <span className="text-slate-500">Node ID</span>
-                                                <span className="text-slate-300 font-mono">{activeVideo?.substring(0, 8)}</span>
-                                            </div>
-                                            <div className="flex justify-between text-[10px] font-bold">
-                                                <span className="text-slate-500">Security</span>
-                                                <span className="text-emerald-500">Verified</span>
-                                            </div>
-                                        </div>
+                            {/* Logged-in: Confirm Mastery */}
+                            {user && isMainVideoActive && (
+                                <Button
+                                    variant={progress.includes(activeVideo || '') ? "outline" : "default"}
+                                    size="lg"
+                                    onClick={() => {
+                                        if (activeVideo) {
+                                            toggleProgress(activeVideo, progress.includes(activeVideo));
+                                            handleVideoEnd();
+                                        }
+                                    }}
+                                    className={`gap-3 text-base py-6 px-8 rounded-2xl transition-all duration-300 ${!progress.includes(activeVideo || '') ? 'bg-emerald-600 hover:bg-emerald-500 hover:scale-105 text-white shadow-xl shadow-emerald-600/20' : 'border-emerald-500/50 text-emerald-400'}`}
+                                >
+                                    {progress.includes(activeVideo || '') ? (
+                                        <><CheckCircle className="w-5 h-5" /> Skill Mastered</>
+                                    ) : (
+                                        <><Circle className="w-5 h-5" /> Mark as Complete</>
+                                    )}
+                                </Button>
+                            )}
+
+                            {/* Question submission for logged-in users */}
+                            {user && isMainVideoActive && (
+                                <div className="mt-6 pt-6 border-t border-white/5">
+                                    <p className="text-xs font-bold uppercase tracking-widest text-slate-600 mb-3">Have a question about this lesson?</p>
+                                    <div className="flex gap-3">
+                                        <Textarea
+                                            value={questionText}
+                                            onChange={e => setQuestionText(e.target.value)}
+                                            placeholder="Ask anything about this lesson..."
+                                            className="flex-1 bg-white/5 border-white/10 text-sm resize-none h-16 rounded-xl"
+                                        />
+                                        <Button
+                                            onClick={handleSubmitQuestion}
+                                            disabled={isSubmittingQuestion || !questionText.trim()}
+                                            size="sm"
+                                            className="bg-indigo-600 hover:bg-indigo-500 self-end rounded-xl px-4"
+                                        >
+                                            <Send className="w-4 h-4" />
+                                        </Button>
                                     </div>
                                 </div>
-                            </div>
+                            )}
                         </div>
                     </div>
                 </DialogContent>

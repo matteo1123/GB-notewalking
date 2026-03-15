@@ -32,7 +32,7 @@ export default function CourseEditor() {
     const [formLoading, setFormLoading] = useState(false);
     
     // Categories constant
-    const categories = ['Rhythm', 'Chord Tones', 'Fretboard Mastery', 'Ear', 'Technique'];
+    const categories = ['None', 'Rhythm', 'Chord Tones', 'Fretboard Mastery', 'Ear', 'Technique'];
 
     // Form state
     const [formData, setFormData] = useState<Partial<CourseVideo>>({
@@ -46,7 +46,7 @@ export default function CourseEditor() {
         grid_row: 0,
         grid_column: 0,
         prerequisite_ids: [],
-        category: 'Rhythm'
+        category: 'None'
     });
 
     const loadVideos = async () => {
@@ -81,7 +81,7 @@ export default function CourseEditor() {
             grid_row: 0,
             grid_column: 0,
             prerequisite_ids: [],
-            category: 'Rhythm'
+            category: 'None'
         });
     };
 
@@ -338,16 +338,23 @@ export default function CourseEditor() {
                                 />
                             </div>
 
-                            <div className="flex items-center justify-between p-3 border rounded-lg bg-muted/50">
-                                <div className="space-y-1">
-                                    <Label className="cursor-pointer" htmlFor="locked">Premium Lock</Label>
-                                    <p className="text-xs text-muted-foreground">If disabled, any free user can watch this.</p>
+                            <div className="flex flex-col gap-4 p-4 border rounded-lg bg-indigo-950/20 border-indigo-500/20">
+                                <div className="flex items-center justify-between">
+                                    <div className="space-y-1">
+                                        <Label className="cursor-pointer text-indigo-100" htmlFor="locked">Premium Lock</Label>
+                                        <p className="text-xs text-indigo-300">If disabled, any free user can watch this.</p>
+                                    </div>
+                                    <Switch
+                                        id="locked"
+                                        checked={formData.locked}
+                                        onCheckedChange={c => setFormData({ ...formData, locked: c })}
+                                    />
                                 </div>
-                                <Switch
-                                    id="locked"
-                                    checked={formData.locked}
-                                    onCheckedChange={c => setFormData({ ...formData, locked: c })}
-                                />
+                                {!formData.locked && formData.unlock_cost === 0 && (
+                                    <div className="rounded bg-emerald-500/10 p-2 border border-emerald-500/20 text-xs text-emerald-400 font-bold">
+                                        💡 This video is Free & Costs 0 XP. It will act as a "Landing Video" for brand new users.
+                                    </div>
+                                )}
                             </div>
 
                             <div className="flex gap-2 pt-4">

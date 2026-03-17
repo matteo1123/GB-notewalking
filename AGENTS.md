@@ -45,8 +45,29 @@ supabase secrets list
 
 **Email Function Location:**
 - File: `supabase/functions/send-welcome-email/index.ts`
-- Trigger: Database webhook on `email_subscribers` table INSERT
 - Config: `supabase/config.toml` → `[functions.send-welcome-email]`
+
+**How It Works (Two Paths):**
+
+1. **Direct Invocation** (Current flow from Course page):
+   - User submits email via form in `src/pages/Course.tsx`
+   - Frontend calls `supabase.functions.invoke('send-welcome-email', { body: { email } })`
+   - Edge function sends email immediately and marks subscriber as fulfilled
+
+2. **Webhook Trigger** (Alternative - not currently used):
+   - Database webhook on `email_subscribers` INSERT
+   - Sends `{ record: { id, email, ... } }` payload
+   - Edge function supports this format for future use
+
+**Deployment:**
+
+```bash
+# Deploy the edge function
+supabase functions deploy send-welcome-email --project-ref idsufbsfywgmcrhldqxq
+
+# Or deploy all functions
+supabase functions deploy --project-ref idsufbsfywgmcrhldqxq
+```
 
 **Migration Notes:**
 - Previously used Resend API (npm:resend@2.0.0)

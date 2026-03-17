@@ -481,8 +481,8 @@ export default function Course() {
 
             setIsEmailSubmitted(true);
             setEmailInput('');
-            // Trigger PDF delivery via edge function (fire-and-forget)
-            supabase.functions.invoke('send-pdf-email', { body: { email: emailInput } }).catch(() => {
+            // Trigger welcome email via edge function (fire-and-forget)
+            supabase.functions.invoke('send-welcome-email', { body: { email: emailInput } }).catch(() => {
                 // Edge function may not exist yet; email is saved and can be processed later
             });
             toast({

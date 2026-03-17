@@ -25,9 +25,11 @@ serve(async (req) => {
 
   try {
     const payload = await req.json();
-    const { record } = payload; // Webhook payload from email_subscribers INSERT
-    const email = record.email;
-    const subscriberId = record.id;
+    
+    // Support both webhook format (from database trigger) and direct invocation
+    const { record, email: directEmail } = payload;
+    const email = record?.email || directEmail;
+    const subscriberId = record?.id;
 
     if (!email) {
       throw new Error("No email found in payload");
@@ -78,12 +80,22 @@ serve(async (req) => {
     // Close the connection
     await client.close();
 
-    // Update database to mark as fulfilled
+    // Update database to mark as fulfilled (only if we have subscriberId from webhook)
     if (subscriberId) {
       const { error: dbError } = await supabase
         .from("email_subscribers")
         .update({ fulfilled: true })
         .eq("id", subscriberId);
+      
+      if (dbError) {
+        console.error("DB Update error:", dbError);
+      }
+    } else if (email) {
+      // Try to update by email for direct invocations
+      const { error: dbError } = await supabase
+        .from("email_subscribers")
+        .update({ fulfilled: true })
+        .eq("email", email);
       
       if (dbError) {
         console.error("DB Update error:", dbError);

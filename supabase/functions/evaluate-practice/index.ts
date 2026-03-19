@@ -138,7 +138,7 @@ serve(async (req) => {
     }
 
     if (module_type === 'rhythm') {
-      systemPromptText += `\n\nMODULE CONTEXT (Rhythm Practice): The student is practicing rhythm guitar with a metronome backing track. Note pitch data may not be available since this is rhythm-focused. If no notes are detected, the student was likely practicing muted strumming or wasn't playing. Encourage them to keep working on their rhythmic feel and groove.`;
+      systemPromptText += `\n\nMODULE CONTEXT (Rhythm Practice): The student is practicing rhythm guitar with a metronome. IMPORTANT: Pitch/note data is NOT captured for rhythm practice — this is by design, not an error. If midi_data is empty, that is completely normal. Give feedback about rhythm practice in general: emphasize locking in with the metronome, consistent strumming attack, groove, and timing accuracy. Do NOT say the student didn't play anything or that the mic picked up nothing.`;
     }
 
     if (promptData && promptData.system_prompt) {
@@ -171,7 +171,7 @@ serve(async (req) => {
       const totalDuration = midi_data.reduce((sum: number, n: any) => sum + (n.duration || 0), 0);
       
       if (midi_data.length === 1 && totalDuration > 10) {
-        performanceDataString += `[SYSTEM NOTE] Anomalous Input Detected: The student held a single note (${midi_data[0].pitch}) for over ${totalDuration.toFixed(1)} seconds. This is almost certainly an error, the mic picking up background noise, or them just testing the mic. DO NOT analyze this as a deliberate creative choice. Playfully acknowledge they held one note the whole time but keep it short.\n`;
+        performanceDataString += `[SYSTEM NOTE] Only one pitch was detected (${midi_data[0].pitch}) for the full recording duration (${totalDuration.toFixed(1)}s). This likely means the mic was picking up a drone/backing note rather than the student's playing, or the student was holding one note for a long time. Give brief, constructive feedback: encourage them to check their mic placement and play through the full exercise pattern. Keep it short and positive.\n`;
       } else {
         midi_data.forEach((note: any) => {
           // Handle both raw string pitches like "E4" or MIDI numbers
@@ -188,9 +188,14 @@ serve(async (req) => {
       }
       console.log("[evaluate-practice] MIDI notes formatted:", midi_data.length);
     } else {
-      performanceDataString += "No notes were detected during this recording.\n";
-      performanceDataString += "[SYSTEM NOTE] The student didn't play anything. Playfully encourage them to play next time.\n";
-      console.log("[evaluate-practice] No MIDI data to format");
+      if (module_type === 'rhythm') {
+        performanceDataString += "No pitch data captured (expected — rhythm practice does not track pitch).\n";
+        console.log("[evaluate-practice] No MIDI data (rhythm module — expected)");
+      } else {
+        performanceDataString += "No notes were detected during this recording.\n";
+        performanceDataString += "[SYSTEM NOTE] The microphone may not have been picking up the student's playing. Give brief, encouraging feedback about checking mic placement and playing with more confidence. Keep it short.\n";
+        console.log("[evaluate-practice] No MIDI data to format");
+      }
     }
 
     // Call the AI (Gemini 1.5 Pro)

@@ -18,6 +18,7 @@ export interface AutoRecordingOptions {
     currentContext?: string | null; // Track current chord playing
     currentPitch?: string | null; // Track current pitch playing
     coachAdvice?: string | null; // Pass advice given to the student to check if they followed it
+    exerciseCategory?: string | null; // Label for what exercise was being practiced (e.g. "G Major Scale")
 }
 
 export interface AutoRecordingState {
@@ -63,6 +64,7 @@ export function useAutoRecording(options: AutoRecordingOptions) {
         recordingDurationSeconds = 30, // Default duration of 30s
         existingMicStream,
         currentContext = null,
+        exerciseCategory = null,
     } = options;
 
     const { toast } = useToast();
@@ -274,6 +276,7 @@ export function useAutoRecording(options: AutoRecordingOptions) {
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     module_config: configWithMetronome as any,
                     session_id: sessionId || null,
+                    exercise_category: exerciseCategory || null,
                     created_at: new Date().toISOString(),
                 })
                 .select('id')
@@ -304,7 +307,7 @@ export function useAutoRecording(options: AutoRecordingOptions) {
 
             setState(prev => ({ ...prev, isRecording: false }));
         }
-    }, [supabase, moduleType, moduleConfig, sessionId, metronomeConfig, recordingDurationSeconds, toast]);
+    }, [supabase, moduleType, moduleConfig, sessionId, metronomeConfig, recordingDurationSeconds, exerciseCategory, toast]);
 
     /**
      * Evaluate recording internally

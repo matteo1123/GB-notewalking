@@ -178,6 +178,7 @@ const RiffPractice = ({
     currentContext: harmonicContext,
     currentPitch: pitchDetection.currentNote?.note || null,
     moduleConfig,
+    exerciseCategory: repertoireItem.name || null,
   });
 
   const practiceTimeAccumulator = useRef(0);

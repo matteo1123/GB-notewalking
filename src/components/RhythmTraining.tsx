@@ -131,6 +131,7 @@ export function RhythmTraining({ autoStart = true, sessionId, onExit, moduleConf
         enabled: autoRecordEnabled && isPlaying,
         moduleType: 'rhythm',
         sessionId,
+        exerciseCategory: `Rhythm Level ${level}`,
         moduleConfig: {
             module_type: 'rhythm',
             rhythm_level: level,

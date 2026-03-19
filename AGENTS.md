@@ -4,75 +4,144 @@ This document contains technical details for AI agents working on this project.
 
 ## Email Configuration
 
-### Email List Welcome Emails (Zoho SMTP)
+### Email List Welcome Emails
 
 The `send-welcome-email` Supabase Edge Function handles sending welcome emails to new email list subscribers.
 
-**Technology Stack:**
-- Uses Zoho SMTP (migrated from Resend)
-- Denomailer library for SMTP in Deno
-- SMTP over SSL on port 465
+**Current Status:**
+- Edge function is deployed and marks subscribers as `fulfilled` in the database
+- Email sending requires an external email service API (SendGrid recommended)
 
-**Required Environment Variables:**
+**Recommended Solution: SendGrid**
 
-```bash
-# Supabase Edge Function Secrets (set via Supabase dashboard or CLI)
-ZOHO_SMTP_PASSWORD=<your_zoho_app_specific_password>
+SendGrid offers a reliable HTTP API that works perfectly in Supabase Edge Functions:
+- Free tier: 100 emails/day
+- Simple fetch() API call (no SMTP complexity)
+- Reliable delivery
 
-# Optional - defaults to matt@guitarbrain.org if not set
-ZOHO_SMTP_USERNAME=matt@guitarbrain.org
+**Setup Instructions:**
 
-# Existing Supabase secrets (already configured)
-SUPABASE_URL=<supabase_project_url>
-SUPABASE_SERVICE_ROLE_KEY=<supabase_service_role_key>
+1. **Sign up for SendGrid:**
+   - Go to https://sendgrid.com/
+   - Create a free account
+   - Verify your sender email (matt@guitarbrain.org)
+   - Create an API key with "Mail Send" permissions
+
+2. **Set Supabase Secrets:**
+   ```bash
+   supabase secrets set SENDGRID_API_KEY="SG.xxxxx" --project-ref idsufbsfywgmcrhldqxq
+   ```
+
+3. **Update the Edge Function** to use SendGrid (see code below)
+
+**Alternative: Zoho**
+
+Zoho Mail is primarily SMTP-based which is difficult in edge functions. Options:
+1. Use Zoho's REST API (requires OAuth 2.0 setup - complex)
+2. Use a relay service like SendGrid/Amazon SES with your Zoho domain
+3. Set up a small Node.js server to handle SMTP
+
+**Recommended: Stick with SendGrid for reliability.**
+
+---
+
+## SendGrid Integration Code
+
+To enable SendGrid, update `supabase/functions/send-welcome-email/index.ts`:
+
+```typescript
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
+
+const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+const sendgridApiKey = Deno.env.get("SENDGRID_API_KEY") ?? "";
+
+const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+async function sendEmailViaSendGrid(to: string, subject: string, htmlBody: string): Promise<void> {
+  const response = await fetch("https://api.sendgrid.com/v3/mail/send", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${sendgridApiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      personalizations: [{ to: [{ email: to }] }],
+      from: { email: "matt@guitarbrain.org", name: "Matthew from Guitar Brain" },
+      subject: subject,
+      content: [{ type: "text/html", value: htmlBody }],
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`SendGrid error: ${error}`);
+  }
+}
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
+  try {
+    const payload = await req.json();
+    const { record, email: directEmail } = payload;
+    const email = record?.email || directEmail;
+    const subscriberId = record?.id;
+
+    if (!email) {
+      throw new Error("No email found in payload");
+    }
+
+    console.log(`Sending welcome email to: ${email}`);
+
+    // Send email via SendGrid if configured
+    if (sendgridApiKey) {
+      const htmlBody = `...your HTML email content...`;
+      await sendEmailViaSendGrid(email, "Your Hitting Chord Tones PDF (and a personal note)", htmlBody);
+      console.log(`Email sent successfully via SendGrid to: ${email}`);
+    } else {
+      console.log(`SendGrid not configured, email not sent to: ${email}`);
+    }
+
+    // Mark as fulfilled in database
+    if (subscriberId) {
+      await supabase.from("email_subscribers").update({ fulfilled: true }).eq("id", subscriberId);
+    } else if (email) {
+      await supabase.from("email_subscribers").update({ fulfilled: true }).eq("email", email);
+    }
+
+    return new Response(JSON.stringify({ success: true }), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (error: any) {
+    console.error("Error:", error.message);
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+});
 ```
 
-**Setting Environment Variables:**
+---
 
-```bash
-# Using Supabase CLI
-supabase secrets set ZOHO_SMTP_PASSWORD="your-app-specific-password"
+## How Email Signup Works
 
-# Verify secrets
-supabase secrets list
-```
-
-**How to Generate Zoho App-Specific Password:**
-1. Log into Zoho Mail at mail.zoho.com
-2. Go to My Account → Security → App Passwords
-3. Generate a new app-specific password for "Guitar Brain SMTP"
-4. Use this password (not your main Zoho password) for ZOHO_SMTP_PASSWORD
-
-**Email Function Location:**
-- File: `supabase/functions/send-welcome-email/index.ts`
-- Config: `supabase/config.toml` → `[functions.send-welcome-email]`
-
-**How It Works (Two Paths):**
-
-1. **Direct Invocation** (Current flow from Course page):
-   - User submits email via form in `src/pages/Course.tsx`
-   - Frontend calls `supabase.functions.invoke('send-welcome-email', { body: { email } })`
-   - Edge function sends email immediately and marks subscriber as fulfilled
-
-2. **Webhook Trigger** (Alternative - not currently used):
-   - Database webhook on `email_subscribers` INSERT
-   - Sends `{ record: { id, email, ... } }` payload
-   - Edge function supports this format for future use
-
-**Deployment:**
-
-```bash
-# Deploy the edge function
-supabase functions deploy send-welcome-email --project-ref idsufbsfywgmcrhldqxq
-
-# Or deploy all functions
-supabase functions deploy --project-ref idsufbsfywgmcrhldqxq
-```
-
-**Migration Notes:**
-- Previously used Resend API (npm:resend@2.0.0)
-- Migrated to Zoho SMTP on March 17, 2026
-- Resend API key (RESEND_API_KEY) is no longer needed
+1. **User submits email** via form in `src/pages/Course.tsx` (the "Free PDF" modal)
+2. **Frontend** inserts into `email_subscribers` table and calls edge function:
+   ```typescript
+   supabase.functions.invoke('send-welcome-email', { body: { email } })
+   ```
+3. **Edge function** sends email via email service API and marks subscriber as `fulfilled`
 
 ---
 
@@ -81,36 +150,22 @@ supabase functions deploy --project-ref idsufbsfywgmcrhldqxq
 ### Deployment
 
 ```bash
-# Deploy all functions
-supabase functions deploy
-
 # Deploy specific function
-supabase functions deploy send-welcome-email
+supabase functions deploy send-welcome-email --project-ref idsufbsfywgmcrhldqxq
 
-# Deploy with specific Supabase project
+# Deploy all functions
 supabase functions deploy --project-ref idsufbsfywgmcrhldqxq
+
+# View logs
+supabase functions logs send-welcome-email --project-ref idsufbsfywgmcrhldqxq
 ```
 
 ### Local Development
 
 ```bash
-# Start Supabase local stack
-supabase start
-
-# Serve function locally for testing
+# Serve function locally
 supabase functions serve send-welcome-email
 ```
-
----
-
-## Database Webhooks
-
-The `send-welcome-email` function is triggered by a database webhook:
-- Table: `email_subscribers`
-- Event: INSERT
-- Webhook URL: `https://idsufbsfywgmcrhldqxq.supabase.co/functions/v1/send-welcome-email`
-
-Webhook configuration is in Supabase Dashboard → Database → Webhooks.
 
 ---
 
@@ -119,9 +174,8 @@ Webhook configuration is in Supabase Dashboard → Database → Webhooks.
 ```
 supabase/
 ├── functions/           # Supabase Edge Functions
-│   ├── send-welcome-email/    # Email welcome function (Zoho SMTP)
+│   ├── send-welcome-email/    # Email welcome function
 │   ├── create-checkout-session/
-│   ├── stripe-webhook/
 │   └── ...
 ├── migrations/          # Database migrations
 └── config.toml         # Supabase configuration
@@ -140,4 +194,3 @@ supabase/
 ### Edge Functions (Deno)
 - Deno standard library
 - Supabase JS client via esm.sh
-- Denomailer for SMTP (send-welcome-email only)

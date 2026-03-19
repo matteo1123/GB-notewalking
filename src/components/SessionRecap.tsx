@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
-import { Play, Pause, CheckCircle, Music, Clock, RotateCcw, ChevronRight, Calendar, Sparkles } from 'lucide-react';
+import { Play, Pause, Music, RotateCcw, ChevronDown, ChevronUp, Calendar, Sparkles } from 'lucide-react';
 import type { SessionBlock } from '@/lib/sessionGenerator';
 
 interface RecordedAudio {
@@ -13,6 +13,7 @@ interface RecordedAudio {
     module_type: string;
     duration: number;
     created_at: string;
+    exercise_category?: string | null;
     practice_evaluations?: { ai_feedback: string }[];
 }
 
@@ -20,38 +21,25 @@ interface SessionRecapProps {
     onStartNewSession?: () => void;
 }
 
-/**
- * Session Recap Component
- * 
- * Displays a summary of the most recent completed practice session including:
- * - List of completed blocks
- * - Any audio recordings made during the session
- * - Auto-play functionality for recordings
- * 
- * This persists between sessions - users can always see their last practice recap
- */
 export function SessionRecap({ onStartNewSession }: SessionRecapProps) {
     const { user } = useAuth();
     const [loading, setLoading] = useState(true);
-    const [sessionBlocks, setSessionBlocks] = useState<SessionBlock[]>([]);
     const [recordings, setRecordings] = useState<RecordedAudio[]>([]);
-    const [totalDurationMinutes, setTotalDurationMinutes] = useState(0);
     const [sessionDate, setSessionDate] = useState<Date | null>(null);
     const [sessionName, setSessionName] = useState<string | null>(null);
     const [hasSession, setHasSession] = useState(false);
+    const [expandedFeedback, setExpandedFeedback] = useState<Set<number>>(new Set());
 
     const [currentlyPlaying, setCurrentlyPlaying] = useState<number | null>(null);
     const [autoPlayQueue, setAutoPlayQueue] = useState<number[]>([]);
     const audioRef = useRef<HTMLAudioElement | null>(null);
 
-    // Load most recent completed session on mount
     useEffect(() => {
         if (user) {
             loadLastSession();
         }
     }, [user]);
 
-    // Handle audio end - play next in queue
     useEffect(() => {
         if (audioRef.current) {
             const handleEnded = () => {
@@ -77,7 +65,6 @@ export function SessionRecap({ onStartNewSession }: SessionRecapProps) {
         setLoading(true);
 
         try {
-            // Get the most recent completed or ended session
             const { data: session, error } = await supabase
                 .from('practice_sessions')
                 .select('*')
@@ -93,29 +80,22 @@ export function SessionRecap({ onStartNewSession }: SessionRecapProps) {
                 return;
             }
 
-            // Parse session data
-            const planData = session.session_plan;
-            const blocks: SessionBlock[] = Array.isArray(planData)
-                ? planData
-                : planData?.blocks || [];
-
-            setSessionBlocks(blocks);
-            setTotalDurationMinutes(Math.round((session.total_duration_seconds || 0) / 60));
+            const planData = session.session_plan as any;
             setSessionDate(new Date(session.ended_at));
             setSessionName(planData?.name || null);
             setHasSession(true);
 
-            // Fetch recordings from this session
             const { data: recordingsData } = await supabase
                 .from('practice_log')
                 .select(`
-                    id, audio, module_type, duration, created_at,
+                    id, audio, module_type, duration, created_at, exercise_category,
                     practice_evaluations (
                         ai_feedback
                     )
                 `)
                 .eq('session_id', session.id)
-                .not('audio', 'is', null);
+                .not('audio', 'is', null)
+                .order('created_at', { ascending: true });
 
             if (recordingsData) {
                 setRecordings(recordingsData as RecordedAudio[]);
@@ -131,33 +111,34 @@ export function SessionRecap({ onStartNewSession }: SessionRecapProps) {
 
     const playRecording = (index: number) => {
         if (currentlyPlaying === index) {
-            // Pause current
             audioRef.current?.pause();
             setCurrentlyPlaying(null);
             setAutoPlayQueue([]);
             return;
         }
 
-        // Play this recording and queue the rest
         setCurrentlyPlaying(index);
-
-        // Build queue of subsequent recordings
         const subsequentRecordings = recordings
             .slice(index + 1)
             .map((_, i) => index + 1 + i);
         setAutoPlayQueue(subsequentRecordings);
 
-        // Create and play audio
         if (audioRef.current) {
             audioRef.current.src = recordings[index].audio;
             audioRef.current.play().catch(console.error);
         }
     };
 
-    const formatDuration = (seconds: number) => {
-        const mins = Math.floor(seconds / 60);
-        const secs = seconds % 60;
-        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    const toggleFeedback = (id: number) => {
+        setExpandedFeedback(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) {
+                next.delete(id);
+            } else {
+                next.add(id);
+            }
+            return next;
+        });
     };
 
     const getModuleEmoji = (moduleType: string) => {
@@ -169,6 +150,18 @@ export function SessionRecap({ onStartNewSession }: SessionRecapProps) {
             case 'chord_progressions': return '🎶';
             case 'piece_mastery': return '🎼';
             default: return '🎯';
+        }
+    };
+
+    const getModuleLabel = (moduleType: string) => {
+        switch (moduleType) {
+            case 'rhythm': return 'Rhythm';
+            case 'notewalking': return 'Notewalking';
+            case 'scale': return 'Scale';
+            case 'arpeggio': return 'Arpeggio';
+            case 'chord_progressions': return 'Chord Progressions';
+            case 'piece_mastery': return 'Piece Mastery';
+            default: return moduleType.replace('_', ' ');
         }
     };
 
@@ -217,7 +210,6 @@ export function SessionRecap({ onStartNewSession }: SessionRecapProps) {
 
     return (
         <div className="max-w-2xl mx-auto space-y-6">
-            {/* Hidden audio element for playback */}
             <audio ref={audioRef} />
 
             {/* Header */}
@@ -229,126 +221,99 @@ export function SessionRecap({ onStartNewSession }: SessionRecapProps) {
                 <p className="text-muted-foreground flex items-center justify-center gap-2">
                     <Calendar className="w-4 h-4" />
                     {sessionDate && formatDate(sessionDate)}
-                    {totalDurationMinutes > 0 && (
-                        <>
-                            <span className="mx-1">•</span>
-                            <Clock className="w-4 h-4" />
-                            {totalDurationMinutes} minutes
-                        </>
-                    )}
                 </p>
             </div>
 
-            {/* Completed Blocks */}
-            {sessionBlocks.length > 0 && (
+            {/* Practice Recap Table */}
+            {recordings.length > 0 ? (
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
-                            <CheckCircle className="w-5 h-5 text-green-500" />
-                            What You Practiced
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-2">
-                        {sessionBlocks.map((block, index) => (
-                            <div
-                                key={block.id || index}
-                                className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg"
-                            >
-                                <span className="text-2xl">{getModuleEmoji(block.module_type)}</span>
-                                <div className="flex-1">
-                                    <div className="font-medium capitalize">
-                                        {block.title || block.module_type.replace('_', ' ')}
-                                    </div>
-                                    <div className="text-sm text-muted-foreground">
-                                        {block.duration_minutes} minutes
-                                    </div>
-                                </div>
-                                <Badge variant="secondary">
-                                    <CheckCircle className="w-3 h-3 mr-1" />
-                                    Done
-                                </Badge>
-                            </div>
-                        ))}
-                    </CardContent>
-                </Card>
-            )}
-
-            {/* Recordings */}
-            {recordings.length > 0 && (
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <Music className="w-5 h-5 text-primary" />
-                            Your Recordings
+                            <Sparkles className="w-5 h-5 text-primary" />
+                            Practice Recap
                         </CardTitle>
                         <CardDescription>
-                            Click play to hear your practice • Auto-plays remaining recordings
+                            Your recordings and AI coach feedback from this session
                         </CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-2">
-                        {recordings.map((recording, index) => (
-                            <div
-                                key={recording.id}
-                                className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${currentlyPlaying === index
-                                    ? 'border-primary bg-primary/5'
-                                    : 'hover:bg-muted/50'
-                                    }`}
-                            >
-                                <Button
-                                    variant={currentlyPlaying === index ? "default" : "outline"}
-                                    size="icon"
-                                    className="flex-shrink-0"
-                                    onClick={() => playRecording(index)}
-                                >
-                                    {currentlyPlaying === index
-                                        ? <Pause className="w-4 h-4" />
-                                        : <Play className="w-4 h-4" />
-                                    }
-                                </Button>
-                                <div className="flex-1">
-                                    <div className="font-medium capitalize flex items-center gap-2">
-                                        {getModuleEmoji(recording.module_type)}
-                                        {recording.module_type.replace('_', ' ')}
-                                        {currentlyPlaying === index && (
-                                            <Badge variant="secondary" className="animate-pulse">
-                                                Playing...
-                                            </Badge>
-                                        )}
-                                    </div>
-                                    <div className="text-sm text-muted-foreground flex items-center gap-2">
-                                        <Clock className="w-3 h-3" />
-                                        {formatDuration(recording.duration)}
-                                        {autoPlayQueue.includes(index) && (
-                                            <span className="text-primary">• Up next</span>
-                                        )}
-                                    </div>
-                                    {recording.practice_evaluations?.[0]?.ai_feedback && (
-                                        <div className="mt-3 p-3 bg-primary/5 rounded border border-primary/20 text-sm">
-                                            <span className="font-semibold text-primary flex items-center gap-1 mb-1">
-                                                <Sparkles className="w-3 h-3" /> AI Coach Feedback
-                                            </span>
-                                            <p className="whitespace-pre-wrap">{recording.practice_evaluations[0].ai_feedback}</p>
+                    <CardContent className="p-0">
+                        <div className="divide-y">
+                            {recordings.map((recording, index) => {
+                                const hasFeedback = !!recording.practice_evaluations?.[0]?.ai_feedback;
+                                const isExpanded = expandedFeedback.has(recording.id);
+                                const isPlaying = currentlyPlaying === index;
+
+                                return (
+                                    <div key={recording.id} className="p-4 space-y-3">
+                                        {/* Row: play button + module + exercise */}
+                                        <div className="flex items-start gap-3">
+                                            <Button
+                                                variant={isPlaying ? "default" : "outline"}
+                                                size="icon"
+                                                className="flex-shrink-0 mt-0.5"
+                                                onClick={() => playRecording(index)}
+                                            >
+                                                {isPlaying
+                                                    ? <Pause className="w-4 h-4" />
+                                                    : <Play className="w-4 h-4" />
+                                                }
+                                            </Button>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 font-medium">
+                                                    <span>{getModuleEmoji(recording.module_type)}</span>
+                                                    <span>{getModuleLabel(recording.module_type)}</span>
+                                                    {isPlaying && (
+                                                        <Badge variant="secondary" className="animate-pulse text-xs">
+                                                            Playing
+                                                        </Badge>
+                                                    )}
+                                                    {autoPlayQueue.includes(index) && (
+                                                        <span className="text-xs text-primary">Up next</span>
+                                                    )}
+                                                </div>
+                                                {recording.exercise_category && (
+                                                    <div className="text-sm text-muted-foreground mt-0.5">
+                                                        {recording.exercise_category}
+                                                    </div>
+                                                )}
+                                            </div>
+                                            {hasFeedback && (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="flex-shrink-0 text-primary gap-1"
+                                                    onClick={() => toggleFeedback(recording.id)}
+                                                >
+                                                    <Sparkles className="w-3 h-3" />
+                                                    AI Coach
+                                                    {isExpanded
+                                                        ? <ChevronUp className="w-3 h-3" />
+                                                        : <ChevronDown className="w-3 h-3" />
+                                                    }
+                                                </Button>
+                                            )}
                                         </div>
-                                    )}
-                                </div>
-                                {index < recordings.length - 1 && autoPlayQueue.length === 0 && currentlyPlaying !== index && (
-                                    <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                                )}
-                            </div>
-                        ))}
+
+                                        {/* AI Feedback (expanded) */}
+                                        {hasFeedback && isExpanded && (
+                                            <div className="ml-11 p-3 bg-primary/5 rounded-lg border border-primary/20 text-sm">
+                                                <p className="whitespace-pre-wrap">
+                                                    {recording.practice_evaluations![0].ai_feedback}
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </CardContent>
                 </Card>
-            )}
-
-            {/* No recordings message */}
-            {recordings.length === 0 && (
+            ) : (
                 <Card className="border-dashed">
                     <CardContent className="py-8 text-center text-muted-foreground">
                         <Music className="w-10 h-10 mx-auto mb-3 opacity-50" />
                         <p>No recordings from this session</p>
-                        <p className="text-sm">
-                            Enable auto-record to capture your practice!
-                        </p>
+                        <p className="text-sm">Enable auto-record to capture your practice!</p>
                     </CardContent>
                 </Card>
             )}
@@ -356,10 +321,7 @@ export function SessionRecap({ onStartNewSession }: SessionRecapProps) {
             {/* Actions */}
             {onStartNewSession && (
                 <div className="flex gap-3">
-                    <Button
-                        className="flex-1"
-                        onClick={onStartNewSession}
-                    >
+                    <Button className="flex-1" onClick={onStartNewSession}>
                         <Play className="w-4 h-4 mr-2" />
                         New Session
                     </Button>

@@ -4,6 +4,9 @@ import { useMetronome, MetronomeSettings } from "@/hooks/useMetronome";
 import { useNotePlayer } from "@/hooks/useNotePlayer";
 import { useRecorder } from "@/hooks/useRecorder";
 import { useBpmControls } from "@/hooks/useBpmControls";
+import { usePitchDetection } from "@/hooks/usePitchDetection";
+import { useAutoRecording } from "@/hooks/useAutoRecording";
+import { useAutoRecord } from "@/contexts/AutoRecordContext";
 import NoteDisplay from "./NoteDisplay";
 import { BeatVisualizer } from "./BeatVisualizer";
 import { MetronomeControls, MetronomeMode } from "./MetronomeControls";
@@ -154,16 +157,28 @@ const RiffPractice = ({
   const [playContextNote, setPlayContextNote] = useState(false);
   const tickCountRef = useRef(0);
   const [tickCountState, setTickCountState] = useState(0); // For triggering re-renders in EarTraining
-  const [isRecordingArmed, setIsRecordingArmed] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
-  const [autoRecord, setAutoRecord] = useState(false);
-  const autoRecordStartClickRef = useRef<number | null>(null);
   const recorder = useRecorder();
   const [showSaveDialog, setShowSaveDialog] = useState(false);
-  const [autoRecordCountdown, setAutoRecordCountdown] = useState<number | null>(null);
-  const [hasRecorded, setHasRecorded] = useState(false);
-  const [hasReachedTargetBpm, setHasReachedTargetBpm] = useState(false);
   const [trackedMaxBpm, setTrackedMaxBpm] = useState(0);
+
+  // Global auto-record context
+  const { autoRecordEnabled } = useAutoRecord();
+
+  // Pitch detection for AI feedback
+  const pitchDetection = usePitchDetection({
+    isEnabled: pitchDetectionEnabled && isPlaying && !isConfigMode,
+  });
+
+  // Auto-recording with pitch data for AI evaluation
+  const aiRecording = useAutoRecording({
+    enabled: autoRecordEnabled && isPlaying && !isConfigMode,
+    moduleType: (repertoireItem.category as 'scale' | 'arpeggio') || 'scale',
+    sessionId,
+    existingMicStream: pitchDetection.audioStream || undefined,
+    currentContext: harmonicContext,
+    currentPitch: pitchDetection.currentNote?.note || null,
+    moduleConfig,
+  });
 
   const practiceTimeAccumulator = useRef(0);
   const totalAwardedXPTimeForSession = useRef(0);
@@ -256,26 +271,6 @@ const RiffPractice = ({
 
     fetchPracticeLog();
   }, [repertoireItem.id, user]);
-
-  useEffect(() => {
-    const fetchSettings = async () => {
-      if (!user) return;
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("settings")
-        .eq("id", user.id)
-        .maybeSingle();
-
-      if (error) {
-        console.error("Error fetching settings:", error);
-      } else if (data && data.settings) {
-        const settings = data.settings as { autoRecord: boolean };
-        setAutoRecord(settings.autoRecord);
-      }
-    };
-
-    fetchSettings();
-  }, [user]);
 
   const handleSavePractice = async (audioBlob: Blob | null, duration: number) => {
     if (!user || !activeSequence) return;
@@ -401,52 +396,8 @@ const RiffPractice = ({
           setTrackedMaxBpm(currentBpm);
         }
 
-        // Auto-recording logic - depends on mode
-        if (autoRecord && !hasRecorded && !isRecording) {
-          if (mode === 'regular') {
-            // Regular mode: Wait 4 beats, then record for 16 beats
-            if (tickCountRef.current <= 4) {
-              setAutoRecordCountdown(4 - tickCountRef.current);
-            } else if (tickCountRef.current === 5) {
-              // Start recording after 4 beats
-              recorder.startRecording();
-              setIsRecording(true);
-              setAutoRecordCountdown(16);
-            }
-          } else {
-            // Progressive/Speed-trainer: Wait for target BPM to be reached
-            const targetBpm = metronomeSettings.endBpm;
-            if (!hasReachedTargetBpm && currentBpm >= targetBpm) {
-              // Just reached target BPM - mark it and reset counter for recording
-              setHasReachedTargetBpm(true);
-              tickCountRef.current = 0;
-              setAutoRecordCountdown(16);
-            } else if (hasReachedTargetBpm && tickCountRef.current === 1) {
-              // First beat at target BPM - start recording
-              recorder.startRecording();
-              setIsRecording(true);
-            }
-          }
-        }
-
-        // Handle active recording - count down and stop after 16 beats
-        if (isRecording) {
-          const beatsRemaining = 16 - tickCountRef.current;
-          setAutoRecordCountdown(beatsRemaining > 0 ? beatsRemaining : 0);
-
-          if (tickCountRef.current >= 16) {
-            recorder.stopRecording();
-            setIsRecording(false);
-            setAutoRecordCountdown(null);
-            setHasRecorded(true);
-            // Auto-disable auto-record after successful recording
-            setAutoRecord(false);
-            toast({
-              title: "Recording complete!",
-              description: "Auto-record has been disabled.",
-            });
-          }
-        }
+        // AI auto-recording (pitch-aware, sends to AI coach)
+        aiRecording.handleTick(tickCountRef.current);
 
         if (playContextNote) {
           if (tickCountRef.current % 4 === 0) {
@@ -546,29 +497,18 @@ const RiffPractice = ({
 
   const handlePlay = useCallback(() => {
     if (!metronome.state.isPlaying) {
-      // Reset tracking for new practice session
-      setHasReachedTargetBpm(false);
       tickCountRef.current = 0;
       metronome.start();
     } else {
       metronome.pause();
-      if (isRecording) {
-        recorder.stopRecording();
-        setIsRecording(false);
-        setHasRecorded(true);
-        setAutoRecord(false); // Auto-disable after recording
-        toast({
-          title: "Recording complete!",
-        });
-      }
-      // Auto-fill max BPM from tracked value and show save dialog after meaningful practice
+      // Show save dialog after meaningful practice for manual BPM logging
       if (tickCountRef.current > 40) {
         setMaxBpm(trackedMaxBpm || metronomeBpm);
         setShowSaveDialog(true);
       }
     }
     setIsPlaying(!metronome.state.isPlaying);
-  }, [metronome, isRecording, recorder, toast, trackedMaxBpm, metronomeBpm]);
+  }, [metronome, trackedMaxBpm, metronomeBpm]);
 
   const baseExerciseNotes = useMemo(() => {
     if (!activeSequence) {
@@ -778,14 +718,19 @@ const RiffPractice = ({
                 <div className="flex items-center space-x-2">
                   <Checkbox
                     id="auto-record"
-                    checked={autoRecord}
-                    onCheckedChange={(checked) => setAutoRecord(Boolean(checked))}
+                    checked={autoRecordEnabled}
+                    disabled
                   />
-                  <Label htmlFor="auto-record">Auto Record</Label>
-                  {autoRecordCountdown !== null && (
+                  <Label htmlFor="auto-record" className="text-muted-foreground">
+                    AI Record {autoRecordEnabled ? 'On' : 'Off'}
+                  </Label>
+                  {aiRecording.countdown !== null && (
                     <span className="text-xs text-muted-foreground">
-                      ({autoRecordCountdown})
+                      (recording in {aiRecording.countdown})
                     </span>
+                  )}
+                  {aiRecording.isRecording && (
+                    <span className="text-xs text-red-500 animate-pulse">● Recording</span>
                   )}
                 </div>
               </div>

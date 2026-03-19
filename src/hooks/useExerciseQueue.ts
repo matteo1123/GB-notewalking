@@ -96,21 +96,11 @@ export function useExerciseQueue({
             setError(null);
 
             try {
-                // Build query for scales/arpeggios
-                let query = supabase
+                // Always fetch all scales — client-side filtering is more robust and
+                // allows graceful fallback when a stored typeFilter is stale/invalid.
+                const { data: scales, error: fetchError } = await supabase
                     .from('scales')
                     .select('*');
-
-                // Apply type filter if provided (exact match for enum)
-                if (typeFilter) {
-                    query = query.eq('Type', typeFilter);
-                }
-
-                // NOTE: We don't filter by arpeggio vs scale in the query because
-                // Type is an enum and ilike doesn't work on enums.
-                // We'll filter client-side instead.
-
-                const { data: scales, error: fetchError } = await query;
 
                 if (fetchError) {
                     throw fetchError;
@@ -122,18 +112,22 @@ export function useExerciseQueue({
                     return;
                 }
 
-                // Filter by module type client-side (scale vs arpeggio)
-                // The 'Type' field contains values like '3 Notes Per String Scale', 'arpeggio', etc.
-                let filteredScales = scales;
-                if (!typeFilter) {
-                    if (moduleType === 'arpeggio') {
-                        filteredScales = scales.filter((s: any) =>
-                            s.Type?.toLowerCase().includes('arpeggio')
-                        );
+                // Step 1: Filter by module type (scale vs arpeggio)
+                const isArpeggio = (s: any) => s.Type?.toLowerCase().includes('arpeggio');
+                let filteredScales = moduleType === 'arpeggio'
+                    ? scales.filter(isArpeggio)
+                    : scales.filter((s: any) => !isArpeggio(s));
+
+                // Step 2: Apply typeFilter if provided — but fall back to all module
+                // exercises if the stored filter matches nothing (e.g. stale JSON from
+                // an older version of the app).
+                if (typeFilter && filteredScales.length > 0) {
+                    const withFilter = filteredScales.filter((s: any) => s.Type === typeFilter);
+                    if (withFilter.length > 0) {
+                        filteredScales = withFilter;
                     } else {
-                        // For scales, exclude arpeggios
-                        filteredScales = scales.filter((s: any) =>
-                            !s.Type?.toLowerCase().includes('arpeggio')
+                        console.warn(
+                            `[useExerciseQueue] typeFilter "${typeFilter}" matched 0 ${moduleType} exercises — ignoring filter and showing all.`
                         );
                     }
                 }

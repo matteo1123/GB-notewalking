@@ -137,7 +137,7 @@ export function SessionExecutor() {
 
             {/* Module Content */}
             <div className="flex-1 min-h-0 overflow-hidden">
-                {renderModuleContent(currentBlock, session.id, selectedPiece, setSelectedPiece)}
+                {renderModuleContent(currentBlock, session.id, selectedPiece, setSelectedPiece, currentBlockIndex)}
             </div>
         </div>
     );
@@ -148,7 +148,8 @@ function renderModuleContent(
     block: SessionBlock,
     sessionId?: string,
     selectedPiece?: Piece | null,
-    setSelectedPiece?: (piece: Piece | null) => void
+    setSelectedPiece?: (piece: Piece | null) => void,
+    blockIndex?: number
 ) {
     switch (block.module_type) {
         case 'rhythm':
@@ -184,6 +185,7 @@ function renderModuleContent(
             return (
                 <div className="h-full flex flex-col overflow-hidden">
                     <ScalePracticeSession
+                        key={`${block.module_type}-${blockIndex ?? 0}`}
                         autoStart={true}
                         sessionId={sessionId}
                         moduleType={block.module_type as 'scale' | 'arpeggio'}

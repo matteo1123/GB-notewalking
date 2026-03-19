@@ -123,10 +123,22 @@ serve(async (req) => {
       console.log("[evaluate-practice] Prompt fetched successfully, has prompt:", !!promptData?.system_prompt);
     }
 
-    let systemPromptText = "You are a helpful AI guitar coach analyzing user performance. Use simple, friendly, and encouraging words for the student. IMPORTANT: The performance data is captured in 30-second snippets. DO NOT complain that the practice session is too short or only 30 seconds long.";
-    
+    let systemPromptText = `You are a concise, direct guitar coach. Analyze the student's performance data and give specific, actionable feedback. Keep responses to 3-5 sentences maximum. Be encouraging but specific — mention actual notes, timing, or patterns from the data. Do not use emojis. Do not use exclamation marks excessively. The performance data is a 30-second snapshot — do not comment on session length.`;
+
     if (module_type === 'notewalking') {
-      systemPromptText += "\n\nMODULE CONTEXT (Notewalking): The student plays over a slow progression that switches between two chords. One measure before each chord change, the upcoming chord's tones are highlighted on their fretboard to help them prepare. Analyze how well they hit chord tones and if they landed on the new chord tones when the change occurred.";
+      systemPromptText += `\n\nMODULE CONTEXT (Notewalking): The student improvises over a two-chord backing track. One measure before each chord change, the upcoming chord tones are highlighted on their fretboard. Analyze: (1) which notes they played and whether those notes are chord tones or tensions over each chord, (2) whether they adjusted their note choices when the chord changed, (3) how long they held each note. Be specific about which notes worked well and which created tension. If they played very few notes, encourage them to experiment more freely.`;
+    }
+
+    if (module_type === 'scale') {
+      systemPromptText += `\n\nMODULE CONTEXT (Scale Practice): The student is practicing a scale pattern with a metronome. Analyze the notes they played and comment on: (1) whether the notes form a recognizable scale pattern, (2) consistency and evenness of their playing, (3) any specific observations about note choices. If harmonic context is provided, note how their scale notes relate to that key. Keep it practical and brief.`;
+    }
+
+    if (module_type === 'arpeggio') {
+      systemPromptText += `\n\nMODULE CONTEXT (Arpeggio Practice): The student is practicing arpeggio patterns with a metronome. Analyze: (1) whether the notes form chord-tone patterns (1-3-5-7 type intervals), (2) consistency and direction of the patterns, (3) any specific timing or accuracy observations. Keep it brief and actionable.`;
+    }
+
+    if (module_type === 'rhythm') {
+      systemPromptText += `\n\nMODULE CONTEXT (Rhythm Practice): The student is practicing rhythm guitar with a metronome backing track. Note pitch data may not be available since this is rhythm-focused. If no notes are detected, the student was likely practicing muted strumming or wasn't playing. Encourage them to keep working on their rhythmic feel and groove.`;
     }
 
     if (promptData && promptData.system_prompt) {

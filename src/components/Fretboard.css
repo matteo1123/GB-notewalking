@@ -60,6 +60,28 @@
   box-sizing: border-box;
 }
 
+/* CAGED zone background overlays — rendered behind everything */
+.caged-zone {
+  grid-row: 1 / -1;
+  z-index: 0;
+  pointer-events: none;
+  position: relative;
+}
+
+.caged-zone::after {
+  content: attr(data-shape);
+  position: absolute;
+  bottom: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--caged-label-color, rgba(255,255,255,0.4));
+  letter-spacing: 0;
+  pointer-events: none;
+  user-select: none;
+}
+
 .fret {
   grid-row: 1 / -1;
   border-right: 1px solid #fff;

@@ -20,6 +20,7 @@ interface EarTrainingWrapperProps {
     currentPosition?: number;
     tickCount?: number;
     onEnsurePlaying?: () => void;
+    cagedKey?: string; // Key for CAGED zone overlay
 }
 
 export function EarTrainingWrapper({
@@ -31,6 +32,7 @@ export function EarTrainingWrapper({
     currentPosition = 0,
     tickCount = 0,
     onEnsurePlaying,
+    cagedKey,
 }: EarTrainingWrapperProps) {
     const [earTrainingEnabled, setEarTrainingEnabled] = useState(false);
     const [earTrainingSettings, setEarTrainingSettings] = useState<EarTrainingSettings>({
@@ -368,6 +370,7 @@ export function EarTrainingWrapper({
                                 (n) => getNoteFromFret(n.string, n.fret) === major_key
                             )}
                             onNoteClick={handleGeneralFretboardClick}
+                            cagedKey={cagedKey || major_key}
                         />
                     </div>
                 </div>

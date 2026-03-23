@@ -1,5 +1,6 @@
 import React from 'react';
 import { FRET_COUNT, STRING_COUNT, getNoteFromFret, createChromaticDegreeMap, CHROMATIC_DEGREE_COLORS, DEGREE_COLORS } from '@/lib/musicTheory';
+import { getCagedZones } from '@/lib/cagedSystem';
 import './Fretboard.css';
 
 interface Note {
@@ -17,6 +18,7 @@ interface FretboardProps {
   showDegreeNumbers?: boolean;
   degreeMap?: Map<string, number> | null;
   animatedNote?: Note;
+  cagedKey?: string; // If set, renders faint CAGED shape zone overlays
 }
 
 const Fretboard: React.FC<FretboardProps> = ({
@@ -29,8 +31,26 @@ const Fretboard: React.FC<FretboardProps> = ({
   showDegreeNumbers = false,
   degreeMap,
   animatedNote,
+  cagedKey,
 }) => {
   const chromaticDegreeMap = rootNote ? createChromaticDegreeMap(getNoteFromFret(rootNote.string, rootNote.fret)) : null;
+  const cagedZones = cagedKey ? getCagedZones(cagedKey, FRET_COUNT) : [];
+
+  const renderCagedZones = () => {
+    return cagedZones.map(zone => (
+      <div
+        key={`caged-${zone.shape}-${zone.startFret}`}
+        className="caged-zone"
+        data-shape={zone.shape}
+        style={{
+          gridColumn: `${zone.startFret} / ${zone.endFret + 1}`,
+          gridRow: '1 / -1',
+          backgroundColor: zone.color,
+          '--caged-label-color': zone.labelColor,
+        } as React.CSSProperties}
+      />
+    ));
+  };
 
   const renderFrets = () => {
     const frets = [];
@@ -159,6 +179,7 @@ const Fretboard: React.FC<FretboardProps> = ({
       </div>
       <div className="fretboard-container">
         <div className="fretboard">
+          {renderCagedZones()}
           {renderFrets()}
           {renderStrings()}
           {renderMarkers()}

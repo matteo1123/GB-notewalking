@@ -103,7 +103,7 @@ const RiffPractice = ({
   onComplete,
   onExerciseSelect,
   autoAdvance = false,
-  autoStart = true,
+  autoStart = false,
   timeLimit,
   isControlledSession = false,
   lessonExercise,
@@ -117,6 +117,7 @@ const RiffPractice = ({
   const { settings: practiceSettings } = usePracticeSettings();
   const [noteIndex, setNoteIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(!isConfigMode && autoStart);
+  const hasAutoStarted = useRef(false);
 
   // Determine mode: Use progressive when in controlled session + settings say so
   // Priority: moduleConfig (from troubleshoot) > controlled session > lesson > regular
@@ -413,15 +414,14 @@ const RiffPractice = ({
 
   const { playNote } = useNotePlayer(metronome.audioContext);
 
-  // Handle auto-start (skip in config mode)
+  // Handle auto-start (skip in config mode). Guard with ref so this only fires once —
+  // metronome.audioContext changes from null → AudioContext on first start, which would
+  // otherwise re-trigger this effect and restart the metronome after the user pauses.
   useEffect(() => {
-    if (autoStart && !isConfigMode) {
-      // Small delay to ensure audio context is ready/user interaction context is satisfied
-      // Note: Modern browsers block audio without user interaction.
-      // Since the user CLICKED "Start Practice Session" to get here,
-      // the audio context should be allowed to resume/start.
+    if (autoStart && !isConfigMode && !hasAutoStarted.current) {
+      hasAutoStarted.current = true;
       const timer = setTimeout(() => {
-        if (metronome.audioContext.state === 'suspended') {
+        if (metronome.audioContext && metronome.audioContext.state === 'suspended') {
           metronome.audioContext.resume();
         }
         metronome.start();
@@ -497,19 +497,19 @@ const RiffPractice = ({
 
 
   const handlePlay = useCallback(() => {
-    if (!metronome.state.isPlaying) {
-      tickCountRef.current = 0;
-      metronome.start();
-    } else {
+    if (isPlaying) {
       metronome.pause();
       // Show save dialog after meaningful practice for manual BPM logging
       if (tickCountRef.current > 40) {
         setMaxBpm(trackedMaxBpm || metronomeBpm);
         setShowSaveDialog(true);
       }
+    } else {
+      tickCountRef.current = 0;
+      metronome.start();
     }
-    setIsPlaying(!metronome.state.isPlaying);
-  }, [metronome, trackedMaxBpm, metronomeBpm]);
+    setIsPlaying(!isPlaying);
+  }, [metronome, isPlaying, trackedMaxBpm, metronomeBpm]);
 
   const baseExerciseNotes = useMemo(() => {
     if (!activeSequence) {
@@ -832,6 +832,7 @@ const RiffPractice = ({
           <NoteDisplay
             notes={displayNotes}
             major_key={harmonicContext}
+            cagedKey={repertoireItem.tonic || harmonicContext}
             tonalContext="Ionian"
             currentPosition={currentTime}
             isLearning={isLearning}

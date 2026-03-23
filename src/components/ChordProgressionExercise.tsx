@@ -884,6 +884,7 @@ export function ChordProgressionExercise({ autoStart = true, sessionId, onExit, 
                                         degreeMap={degreeMap}
                                         showDegreeNumbers
                                         isEditable={true}
+                                        cagedKey={settings.key}
                                         onNoteClick={(string, fret) => {
                                             setRevealedFrets(prev => {
                                                 const next = new Set(prev);

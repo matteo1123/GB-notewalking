@@ -1,5 +1,6 @@
 import { Note } from "@/types/repertoire";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { CAGED_SHAPE_COLORS, CAGED_LABEL_COLORS } from "@/lib/cagedSystem";
 import {
   createDegreeMap,
   DEGREE_COLORS,
@@ -17,6 +18,7 @@ import { Input } from "./ui/input";
 interface NoteDisplayProps {
   notes: Note[];
   major_key?: string;
+  cagedKey?: string; // Root note for CAGED overlay (e.g. "G", "F#"). Falls back to major_key.
   tonalContext?: string;
   className?: string;
   currentPosition?: number; // Current time position for highlighting
@@ -40,6 +42,7 @@ interface NoteDisplayProps {
 const NoteDisplay = ({
   notes,
   major_key,
+  cagedKey,
   tonalContext,
   className = "",
   currentPosition = 0,
@@ -380,6 +383,7 @@ const NoteDisplay = ({
                 return displayNotes;
               })()}
               major_key={major_key}
+              cagedKey={cagedKey || major_key}
               tonalContext={tonalContext}
               displayMode="fretboard"
               scaleShapeNotes={scaleShapeNotes}
@@ -423,6 +427,20 @@ const NoteDisplay = ({
           </div>
         ))}
       </div>
+      {/* CAGED legend — fretboard mode only */}
+      {displayMode === 'fretboard' && (
+        <div className="flex-shrink-0 flex justify-center gap-2 text-xs mt-0.5 px-1 opacity-60">
+          {(['C', 'A', 'G', 'E', 'D'] as const).map(shape => (
+            <div key={shape} className="flex items-center gap-0.5">
+              <span
+                className="inline-block w-3 h-3 rounded"
+                style={{ backgroundColor: CAGED_SHAPE_COLORS[shape].replace(/[\d.]+\)$/, '0.5)') }}
+              />
+              <span style={{ color: CAGED_LABEL_COLORS[shape] }} className="font-semibold">{shape}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

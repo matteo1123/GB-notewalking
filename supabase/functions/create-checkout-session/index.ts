@@ -34,13 +34,17 @@ serve(async (req) => {
         }
 
         // 2. Get Request Body (Price ID, mode, metadata)
-        let priceId, subscriptionPriceId, mode, metadata;
+        let priceId, subscriptionPriceId, mode, metadata, successUrl, cancelUrl;
         try {
             const body = await req.json();
             priceId = body.priceId;
             subscriptionPriceId = body.subscriptionPriceId;
             mode = body.mode || "subscription";
             metadata = body.metadata || {};
+            // Callers can pass full URLs to support multiple domains/subdomains.
+            // Falls back to the FRONTEND_URL secret + default paths.
+            successUrl = body.successUrl || `${frontendUrl}/premium?success=true`;
+            cancelUrl = body.cancelUrl || `${frontendUrl}/premium?canceled=true`;
         } catch (e) {
             throw new Error("Invalid JSON body");
         }
@@ -93,8 +97,8 @@ serve(async (req) => {
             customer: customerId,
             line_items: [{ price: priceId, quantity: 1 }],
             mode: isCoursePurchase ? 'payment' : (mode as Stripe.Checkout.SessionCreateParams.Mode),
-            success_url: `${frontendUrl}/premium?success=true`,
-            cancel_url: `${frontendUrl}/premium?canceled=true`,
+            success_url: successUrl,
+            cancel_url: cancelUrl,
         };
 
         if (isCoursePurchase) {

@@ -75,16 +75,16 @@ const Auth = () => {
         <div className="text-center space-y-4">
           <Link to="/" className="flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
             <Home className="h-4 w-4" />
-            Back to Metronome
+            Back
           </Link>
           <div className="flex items-center justify-center gap-3">
             <Music className="h-8 w-8 text-primary" />
             <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-              Guitar Brain
+              GB Notewalking
             </h1>
           </div>
           <p className="text-muted-foreground">
-            Sign in to access premium features
+            Sign in or create an account to purchase
           </p>
         </div>
 
@@ -127,8 +127,7 @@ const Auth = () => {
 
         <div className="text-center text-sm text-muted-foreground">
           <p>
-            By signing up, you'll get access to premium features including
-            repertoire practice with scales, riffs, and arpeggios.
+            Create a free account, then purchase GB Notewalking for $5.99 — yours forever.
           </p>
         </div>
       </div>

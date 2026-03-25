@@ -44,7 +44,9 @@ serve(async (req) => {
             case "checkout.session.completed":
                 // Fired when a checkout session completes (subscription or one-time payment)
                 const session = event.data.object;
-                if (session.metadata && session.metadata.type === 'course_purchase') {
+                if (session.metadata && session.metadata.type === 'notewalking_purchase') {
+                    await handleNotewalkingPurchase(session);
+                } else if (session.metadata && session.metadata.type === 'course_purchase') {
                     await handleCoursePurchase(session);
                 } else {
                     await handleSubscriptionUpdate(session);
@@ -77,6 +79,24 @@ serve(async (req) => {
         );
     }
 });
+
+async function handleNotewalkingPurchase(session: any) {
+    const customerId = session.customer;
+    if (!customerId) return;
+
+    const { data: profile } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("stripe_customer_id", customerId)
+        .single();
+
+    if (profile) {
+        await supabase
+            .from("profiles")
+            .update({ has_notewalking_access: true })
+            .eq("id", profile.id);
+    }
+}
 
 async function handleCoursePurchase(session: any) {
     const customerId = session.customer;

@@ -1,0 +1,1209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fretquest - Action RPG</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Silkscreen:wght@400;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #0a0a12;
+    --panel: #12121f;
+    --border: #2a2a4a;
+    --gold: #f0c040;
+    --hp-red: #e04040;
+    --mp-blue: #4080e0;
+    --xp-green: #40c060;
+    --text: #c8c8e0;
+    --dim: #606080;
+    --note-glow: #f0c040;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Silkscreen', monospace;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  #start-screen {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    gap: 20px;
+  }
+
+  #start-screen h1 {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 36px;
+    color: var(--gold);
+    text-shadow: 0 0 30px rgba(240,192,64,0.5), 0 4px 0 #806020;
+    letter-spacing: 4px;
+  }
+
+  #start-screen .subtitle {
+    color: var(--dim);
+    font-size: 11px;
+    margin-bottom: 20px;
+  }
+
+  #start-btn {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 14px;
+    padding: 16px 40px;
+    background: transparent;
+    border: 2px solid var(--gold);
+    color: var(--gold);
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 2px;
+  }
+
+  #start-btn:hover {
+    background: var(--gold);
+    color: var(--bg);
+    box-shadow: 0 0 30px rgba(240,192,64,0.3);
+  }
+
+  .controls-hint {
+    color: var(--dim);
+    font-size: 9px;
+    line-height: 1.8;
+    text-align: center;
+    margin-top: 20px;
+    max-width: 500px;
+  }
+
+  .controls-hint span {
+    color: var(--gold);
+  }
+
+  #game-container {
+    display: none;
+    flex: 1;
+    flex-direction: column;
+    height: 100vh;
+  }
+
+  #top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 16px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    min-height: 48px;
+  }
+
+  .note-display {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 20px;
+    color: var(--gold);
+    min-width: 50px;
+    text-align: center;
+    text-shadow: 0 0 20px rgba(240,192,64,0.6);
+    transition: all 0.1s;
+  }
+
+  .note-display.active {
+    transform: scale(1.3);
+    color: #fff;
+  }
+
+  .stats {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+  }
+
+  .stat-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10px;
+  }
+
+  .stat-bar .label { color: var(--dim); }
+
+  .bar-outer {
+    width: 80px;
+    height: 8px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .bar-inner {
+    height: 100%;
+    transition: width 0.2s;
+    border-radius: 1px;
+  }
+
+  .bar-hp .bar-inner { background: var(--hp-red); }
+  .bar-xp .bar-inner { background: var(--xp-green); }
+
+  .stat-val {
+    font-size: 9px;
+    min-width: 30px;
+  }
+
+  .level-display {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 10px;
+    color: var(--gold);
+  }
+
+  #main-area {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+    position: relative;
+  }
+
+  #game-canvas {
+    flex: 1;
+    background: 
+      radial-gradient(circle at 50% 50%, rgba(240,192,64,0.03) 0%, transparent 60%),
+      var(--bg);
+    image-rendering: pixelated;
+  }
+
+  #side-panel {
+    width: 260px;
+    background: var(--panel);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  #side-panel h3 {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 10px;
+    padding: 12px;
+    color: var(--gold);
+    border-bottom: 1px solid var(--border);
+  }
+
+  #log {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  #log::-webkit-scrollbar { width: 4px; }
+  #log::-webkit-scrollbar-track { background: var(--bg); }
+  #log::-webkit-scrollbar-thumb { background: var(--border); }
+
+  .log-entry {
+    font-size: 10px;
+    line-height: 1.5;
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(42,42,74,0.3);
+    animation: fadeIn 0.3s;
+  }
+
+  .log-entry.combat { color: var(--hp-red); }
+  .log-entry.loot { color: var(--gold); }
+  .log-entry.info { color: var(--dim); }
+  .log-entry.heal { color: var(--xp-green); }
+  .log-entry.levelup { color: var(--gold); text-shadow: 0 0 10px rgba(240,192,64,0.5); }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  #note-guide {
+    padding: 10px 12px;
+    border-top: 1px solid var(--border);
+    font-size: 9px;
+    color: var(--dim);
+    line-height: 1.8;
+  }
+
+  #note-guide .key {
+    color: var(--gold);
+    display: inline-block;
+    min-width: 20px;
+  }
+
+  .damage-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(224, 64, 64, 0.3);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.1s;
+    z-index: 40;
+  }
+
+  .damage-overlay.active {
+    opacity: 1;
+  }
+
+  @media (max-width: 768px) {
+    #side-panel { display: none; }
+    .bar-outer { width: 50px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="start-screen">
+  <h1>FRETQUEST</h1>
+  <div class="subtitle">Action RPG - Play Guitar to Adventure</div>
+  <button id="start-btn">PLUG IN & PLAY</button>
+  <div class="controls-hint">
+    <span>C E G B</span> = Move (C↑ E← G→ B↓)<br>
+    <span>F</span> = Slash Attack (in facing direction)<br>
+    <span>F-A-C-E</span> = Fireball Spell (play all 4 in order)<br>
+    Timing matters! Strike when enemy is in range!
+  </div>
+</div>
+
+<div id="game-container">
+  <div id="top-bar">
+    <div class="level-display">LV <span id="player-level">1</span></div>
+    <div class="stats">
+      <div class="stat-bar">
+        <span class="label">HP</span>
+        <div class="bar-outer bar-hp"><div class="bar-inner" id="hp-bar" style="width:100%"></div></div>
+        <span class="stat-val" id="hp-val">20/20</span>
+      </div>
+      <div class="stat-bar">
+        <span class="label">XP</span>
+        <div class="bar-outer bar-xp"><div class="bar-inner" id="xp-bar" style="width:0%"></div></div>
+        <span class="stat-val" id="xp-val">0/10</span>
+      </div>
+    </div>
+    <div class="note-display" id="note-display">--</div>
+  </div>
+
+  <div id="main-area">
+    <canvas id="game-canvas"></canvas>
+    <div id="side-panel">
+      <h3>⚔ ADVENTURE LOG</h3>
+      <div id="log"></div>
+      <div id="note-guide">
+        <div style="color:#888;margin-bottom:4px;">MOVEMENT (C major)</div>
+        <div><span class="key">C</span> ↑ Up</div>
+        <div><span class="key">E</span> ← Left</div>
+        <div><span class="key">G</span> → Right</div>
+        <div><span class="key">B</span> ↓ Down</div>
+        <div style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
+          <div style="color:#888;margin-bottom:4px;">COMBAT</div>
+          <div><span class="key">F</span> ⚔ Slash (facing dir)</div>
+          <div style="margin-top:6px;color:#f0c040;font-size:8px;">
+            SPELL: Play <span style="color:#ff6b35">F-A-C-E</span><br>
+            in order for fireball!
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="damage-overlay" id="damage-overlay"></div>
+
+<script>
+// ─── AUDIO / PITCH DETECTION ────────────────────────────────────
+let audioCtx, analyser, dataArray, source;
+const NOTE_STRINGS = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+
+function autoCorrelate(buf, sampleRate) {
+  let size = buf.length;
+  let rms = 0;
+  for (let i = 0; i < size; i++) rms += buf[i] * buf[i];
+  rms = Math.sqrt(rms / size);
+  if (rms < 0.01) return -1;
+
+  let r1 = 0, r2 = size - 1;
+  const thresh = 0.2;
+  for (let i = 0; i < size / 2; i++) { if (Math.abs(buf[i]) < thresh) { r1 = i; break; } }
+  for (let i = 1; i < size / 2; i++) { if (Math.abs(buf[size - i]) < thresh) { r2 = size - i; break; } }
+
+  buf = buf.slice(r1, r2);
+  size = buf.length;
+
+  const c = new Array(size).fill(0);
+  for (let i = 0; i < size; i++)
+    for (let j = 0; j < size - i; j++)
+      c[i] += buf[j] * buf[j + i];
+
+  let d = 0;
+  while (c[d] > c[d + 1]) d++;
+
+  let maxval = -1, maxpos = -1;
+  for (let i = d; i < size; i++) {
+    if (c[i] > maxval) { maxval = c[i]; maxpos = i; }
+  }
+
+  let t0 = maxpos;
+  const x1 = c[t0 - 1], x2 = c[t0], x3 = c[t0 + 1];
+  const a = (x1 + x3 - 2 * x2) / 2;
+  const b = (x3 - x1) / 2;
+  if (a) t0 = t0 - b / (2 * a);
+
+  return sampleRate / t0;
+}
+
+function noteFromFreq(freq) {
+  const noteNum = 12 * (Math.log(freq / 440) / Math.log(2));
+  return Math.round(noteNum) + 69;
+}
+
+function noteString(note) {
+  return NOTE_STRINGS[note % 12] + Math.floor(note / 12 - 1);
+}
+
+function centsOff(freq, note) {
+  return Math.floor(1200 * Math.log(freq / (440 * Math.pow(2, (note - 69) / 12))) / Math.log(2));
+}
+
+// ─── NOTE MAPPING ─────────────────────────────────────────
+// Controls:
+// C major arpeggio = movement (C=up, E=left, G=right, B=down)
+// F = attack (slashes in facing direction)
+// F-A-C-E sequence = fireball spell (must play in order, no other notes between)
+const NOTE_ACTIONS = {
+  // Movement
+  'C3': { type: 'move', dir: 'up' },
+  'E3': { type: 'move', dir: 'left' },
+  'G3': { type: 'move', dir: 'right' },
+  'B3': { type: 'move', dir: 'down' },
+  // Single note attack
+  'F3': { type: 'attack' },
+  // Also allow other octaves for movement
+  'C4': { type: 'move', dir: 'up' },
+  'E4': { type: 'move', dir: 'left' },
+  'G4': { type: 'move', dir: 'right' },
+  'B4': { type: 'move', dir: 'down' },
+  'F4': { type: 'attack' },
+};
+
+// Spell sequence tracking
+const SPELL_SEQUENCE = ['F', 'A', 'C', 'E']; // F major arpeggio
+let noteSequence = [];
+let lastNoteTime = 0;
+const SEQUENCE_TIMEOUT = 1500; // ms to complete the sequence
+
+// ─── GAME CONSTANTS ───────────────────────────────────────
+const TILE_SIZE = 40;
+const PLAYER_SPEED = 3;
+const ENEMY_SPEED_BASE = 1;
+const ATTACK_RANGE = 60;
+const ATTACK_DURATION = 200;
+const ATTACK_COOLDOWN = 400;
+const INVINCIBILITY_TIME = 1000;
+const KNOCKBACK_FORCE = 8;
+
+const ENEMIES = [
+  { name: 'Rat', icon: '🐀', hp: 8, atk: 2, xp: 3, speed: 1.2, color: '#8B4513' },
+  { name: 'Goblin', icon: '👹', hp: 12, atk: 3, xp: 5, speed: 1, color: '#228B22' },
+  { name: 'Skeleton', icon: '💀', hp: 15, atk: 4, xp: 8, speed: 0.9, color: '#D3D3D3' },
+  { name: 'Slime', icon: '🟢', hp: 10, atk: 2, xp: 4, speed: 0.7, color: '#32CD32' },
+  { name: 'Bat', icon: '🦇', hp: 6, atk: 3, xp: 3, speed: 1.5, color: '#4B0082' },
+  { name: 'Spider', icon: '🕷️', hp: 12, atk: 3, xp: 5, speed: 1.1, color: '#800080' },
+  { name: 'Ghost', icon: '👻', hp: 14, atk: 4, xp: 7, speed: 0.8, color: '#E0E0E0' },
+  { name: 'Orc', icon: '👾', hp: 25, atk: 6, xp: 15, speed: 0.9, color: '#006400' },
+];
+
+// ─── GAME STATE ───────────────────────────────────────────
+const canvas = document.getElementById('game-canvas');
+const ctx = canvas.getContext('2d');
+
+let game = {
+  running: false,
+  map: [],
+  mapW: 20,
+  mapH: 15,
+  camera: { x: 0, y: 0 },
+  
+  player: {
+    x: 0, y: 0,
+    vx: 0, vy: 0,
+    hp: 20, maxHp: 20,
+    xp: 0, xpNext: 10,
+    level: 1,
+    atk: 4,
+    facing: 'down',
+    attacking: false,
+    attackTime: 0,
+    attackDir: null,
+    lastAttackTime: 0,
+    invincible: false,
+    invincibleUntil: 0,
+  },
+  
+  enemies: [],
+  particles: [],
+  projectiles: [], // fireballs, etc.
+  
+  floor: 1,
+  lastNote: '',
+  lastNoteTime: 0,
+};
+
+// ─── MAP GENERATION ───────────────────────────────────────
+function generateMap() {
+  const w = game.mapW, h = game.mapH;
+  const map = Array.from({length: h}, () => Array(w).fill(1));
+  
+  // Carve rooms
+  function carveRoom(x1, y1, x2, y2) {
+    for (let y = y1; y <= y2; y++)
+      for (let x = x1; x <= x2; x++)
+        if (y > 0 && y < h-1 && x > 0 && x < w-1)
+          map[y][x] = 0;
+  }
+  
+  // Create rooms
+  const rooms = [];
+  const roomCount = 4 + Math.floor(Math.random() * 3);
+  for (let i = 0; i < roomCount; i++) {
+    const rw = 3 + Math.floor(Math.random() * 4);
+    const rh = 3 + Math.floor(Math.random() * 3);
+    const rx = 1 + Math.floor(Math.random() * (w - rw - 2));
+    const ry = 1 + Math.floor(Math.random() * (h - rh - 2));
+    carveRoom(rx, ry, rx + rw, ry + rh);
+    rooms.push({ cx: Math.floor(rx + rw/2), cy: Math.floor(ry + rh/2), w: rw, h: rh });
+  }
+  
+  // Connect rooms with corridors
+  for (let i = 0; i < rooms.length - 1; i++) {
+    let {cx: x1, cy: y1} = rooms[i];
+    let {cx: x2, cy: y2} = rooms[i+1];
+    while (x1 !== x2) { map[y1][x1] = 0; x1 += x1 < x2 ? 1 : -1; }
+    while (y1 !== y2) { map[y1][x1] = 0; y1 += y1 < y2 ? 1 : -1; }
+    map[y1][x1] = 0;
+  }
+  
+  // Player start
+  game.player.x = rooms[0].cx * TILE_SIZE + TILE_SIZE/2;
+  game.player.y = rooms[0].cy * TILE_SIZE + TILE_SIZE/2;
+  game.player.hp = game.player.maxHp;
+  
+  // Spawn enemies
+  game.enemies = [];
+  const enemyCount = 4 + Math.floor(game.floor * 1.5);
+  for (let i = 0; i < enemyCount; i++) {
+    const room = rooms[1 + Math.floor(Math.random() * (rooms.length - 1))];
+    const enemyType = ENEMIES[Math.min(Math.floor(Math.random() * ENEMIES.length), ENEMIES.length - 1)];
+    const ex = (room.cx + (Math.random() - 0.5) * room.w) * TILE_SIZE + TILE_SIZE/2;
+    const ey = (room.cy + (Math.random() - 0.5) * room.h) * TILE_SIZE + TILE_SIZE/2;
+    
+    game.enemies.push({
+      x: ex, y: ey,
+      vx: 0, vy: 0,
+      ...enemyType,
+      maxHp: enemyType.hp + Math.floor(game.floor * 1.5),
+      hp: enemyType.hp + Math.floor(game.floor * 1.5),
+      state: 'idle', // idle, chase, attack, knockback
+      stateTime: 0,
+      knockbackX: 0, knockbackY: 0,
+      attackCooldown: 0,
+      id: Math.random(),
+    });
+  }
+  
+  game.map = map;
+  game.particles = [];
+  game.projectiles = [];
+  noteSequence = [];
+}
+
+function isWall(tx, ty) {
+  if (tx < 0 || tx >= game.mapW || ty < 0 || ty >= game.mapH) return true;
+  return game.map[ty][tx] === 1;
+}
+
+function canMove(x, y, radius = 12) {
+  const checks = [
+    { x: x - radius, y: y - radius },
+    { x: x + radius, y: y - radius },
+    { x: x - radius, y: y + radius },
+    { x: x + radius, y: y + radius },
+  ];
+  
+  for (const p of checks) {
+    const tx = Math.floor(p.x / TILE_SIZE);
+    const ty = Math.floor(p.y / TILE_SIZE);
+    if (isWall(tx, ty)) return false;
+  }
+  return true;
+}
+
+function resolveCollision(x, y, radius = 12) {
+  // Simple sliding collision
+  const tx = Math.floor(x / TILE_SIZE);
+  const ty = Math.floor(y / TILE_SIZE);
+  
+  if (!isWall(tx, ty)) return { x, y };
+  
+  // Try to slide along walls
+  const testPositions = [
+    { x: x, y: y },
+    { x: x + radius, y: y },
+    { x: x - radius, y: y },
+    { x: x, y: y + radius },
+    { x: x, y: y - radius },
+  ];
+  
+  for (const p of testPositions) {
+    const ttx = Math.floor(p.x / TILE_SIZE);
+    const tty = Math.floor(p.y / TILE_SIZE);
+    if (!isWall(ttx, tty)) return p;
+  }
+  
+  return { x: game.player.x, y: game.player.y };
+}
+
+// ─── COMBAT ───────────────────────────────────────────────
+function performAttack(dir) {
+  const now = Date.now();
+  if (now - game.player.lastAttackTime < ATTACK_COOLDOWN) return;
+  
+  game.player.attacking = true;
+  game.player.attackTime = now;
+  game.player.attackDir = dir;
+  game.player.lastAttackTime = now;
+  game.player.facing = dir;
+  
+  // Check for hits after a short delay (swing animation)
+  setTimeout(() => checkAttackHits(dir), 100);
+}
+
+function checkAttackHits(dir) {
+  const dirs = { 'up': [0,-1], 'right': [1,0], 'down': [0,1], 'left': [-1,0] };
+  const [dx, dy] = dirs[dir];
+  
+  // Attack hitbox position
+  const hitX = game.player.x + dx * 25;
+  const hitY = game.player.y + dy * 25;
+  
+  let hitCount = 0;
+  game.enemies.forEach(enemy => {
+    const dist = Math.hypot(enemy.x - hitX, enemy.y - hitY);
+    if (dist < ATTACK_RANGE) {
+      // Hit!
+      const dmg = game.player.atk + Math.floor(Math.random() * 3);
+      enemy.hp -= dmg;
+      enemy.state = 'knockback';
+      enemy.knockbackX = dx * KNOCKBACK_FORCE;
+      enemy.knockbackY = dy * KNOCKBACK_FORCE;
+      enemy.stateTime = Date.now();
+      
+      // Visual feedback
+      spawnParticles(enemy.x, enemy.y, enemy.color, 5);
+      log(`⚔ Hit ${enemy.name} for ${dmg}!`, 'combat');
+      hitCount++;
+      
+      if (enemy.hp <= 0) {
+        enemy.dead = true;
+        spawnParticles(enemy.x, enemy.y, '#FFD700', 10);
+        log(`🏆 ${enemy.name} defeated! +${enemy.xp} XP`, 'loot');
+        gainXp(enemy.xp);
+      }
+    }
+  });
+  
+  if (hitCount === 0) {
+    // Miss sound/visual
+    spawnParticles(hitX, hitY, '#888', 3);
+  }
+}
+
+function castFireball() {
+  const dirs = { 'up': [0,-1], 'right': [1,0], 'down': [0,1], 'left': [-1,0] };
+  const [dx, dy] = dirs[game.player.facing] || [0,1];
+  
+  game.projectiles.push({
+    x: game.player.x + dx * 20,
+    y: game.player.y + dy * 20,
+    vx: dx * 8,
+    vy: dy * 8,
+    type: 'fireball',
+    damage: game.player.atk * 2 + 5,
+    radius: 15,
+    life: 60, // frames
+    color: '#ff6b35',
+  });
+  
+  log('🔥 FIREBALL!', 'loot');
+  spawnParticles(game.player.x, game.player.y, '#ff6b35', 8);
+}
+
+function enemyAttackPlayer(enemy) {
+  if (game.player.invincible) return;
+  
+  const dmg = enemy.atk + Math.floor(Math.random() * 2);
+  game.player.hp -= dmg;
+  game.player.invincible = true;
+  game.player.invincibleUntil = Date.now() + INVINCIBILITY_TIME;
+  
+  // Knockback
+  const dx = game.player.x - enemy.x;
+  const dy = game.player.y - enemy.y;
+  const dist = Math.hypot(dx, dy) || 1;
+  game.player.vx = (dx / dist) * KNOCKBACK_FORCE;
+  game.player.vy = (dy / dist) * KNOCKBACK_FORCE;
+  
+  // Visual feedback
+  document.getElementById('damage-overlay').classList.add('active');
+  setTimeout(() => document.getElementById('damage-overlay').classList.remove('active'), 100);
+  
+  spawnParticles(game.player.x, game.player.y, '#e04040', 8);
+  log(`💥 ${enemy.name} hits you for ${dmg}!`, 'combat');
+  updateStats();
+  
+  if (game.player.hp <= 0) {
+    gameOver();
+  }
+}
+
+// ─── PARTICLES ────────────────────────────────────────────
+function spawnParticles(x, y, color, count) {
+  for (let i = 0; i < count; i++) {
+    game.particles.push({
+      x, y,
+      vx: (Math.random() - 0.5) * 6,
+      vy: (Math.random() - 0.5) * 6,
+      life: 30 + Math.random() * 20,
+      color,
+      size: 2 + Math.random() * 4,
+    });
+  }
+}
+
+function updateParticles() {
+  game.particles = game.particles.filter(p => {
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vx *= 0.95;
+    p.vy *= 0.95;
+    p.life--;
+    return p.life > 0;
+  });
+}
+
+// ─── GAME LOOP ────────────────────────────────────────────
+function update() {
+  const now = Date.now();
+  const player = game.player;
+  
+  // Update player position
+  player.x += player.vx;
+  player.y += player.vy;
+  player.vx *= 0.85;
+  player.vy *= 0.85;
+  
+  // Player collision
+  if (!canMove(player.x, player.y)) {
+    const resolved = resolveCollision(player.x, player.y);
+    player.x = resolved.x;
+    player.y = resolved.y;
+    player.vx *= 0.5;
+    player.vy *= 0.5;
+  }
+  
+  // Invincibility
+  if (player.invincible && now > player.invincibleUntil) {
+    player.invincible = false;
+  }
+  
+  // Attack state
+  if (player.attacking && now - player.attackTime > ATTACK_DURATION) {
+    player.attacking = false;
+  }
+  
+  // Update camera to follow player
+  const canvasW = canvas.width;
+  const canvasH = canvas.height;
+  game.camera.x = player.x - canvasW / 2;
+  game.camera.y = player.y - canvasH / 2;
+  
+  // Update enemies
+  game.enemies = game.enemies.filter(e => !e.dead);
+  
+  game.enemies.forEach(enemy => {
+    const dist = Math.hypot(player.x - enemy.x, player.y - enemy.y);
+    const stateAge = now - enemy.stateTime;
+    
+    switch (enemy.state) {
+      case 'idle':
+        if (dist < 200) {
+          enemy.state = 'chase';
+        }
+        // Wander randomly
+        if (Math.random() < 0.02) {
+          enemy.vx = (Math.random() - 0.5) * enemy.speed;
+          enemy.vy = (Math.random() - 0.5) * enemy.speed;
+        }
+        break;
+        
+      case 'chase':
+        if (dist > 250) {
+          enemy.state = 'idle';
+          break;
+        }
+        
+        // Move towards player
+        const dx = player.x - enemy.x;
+        const dy = player.y - enemy.y;
+        const d = Math.hypot(dx, dy) || 1;
+        enemy.vx += (dx / d) * enemy.speed * 0.3;
+        enemy.vy += (dy / d) * enemy.speed * 0.3;
+        
+        // Attack if close
+        if (dist < 25 && now > enemy.attackCooldown) {
+          enemyAttackPlayer(enemy);
+          enemy.attackCooldown = now + 1000;
+        }
+        break;
+        
+      case 'knockback':
+        enemy.x += enemy.knockbackX;
+        enemy.y += enemy.knockbackY;
+        enemy.knockbackX *= 0.8;
+        enemy.knockbackY *= 0.8;
+        
+        if (stateAge > 300) {
+          enemy.state = dist < 200 ? 'chase' : 'idle';
+        }
+        break;
+    }
+    
+    // Apply velocity
+    enemy.x += enemy.vx;
+    enemy.y += enemy.vy;
+    enemy.vx *= 0.9;
+    enemy.vy *= 0.9;
+    
+    // Enemy collision
+    if (!canMove(enemy.x, enemy.y, 10)) {
+      enemy.x -= enemy.vx;
+      enemy.y -= enemy.vy;
+      enemy.vx *= -0.5;
+      enemy.vy *= -0.5;
+    }
+    
+    // Keep enemies from overlapping too much
+    game.enemies.forEach(other => {
+      if (other === enemy) return;
+      const odx = enemy.x - other.x;
+      const ody = enemy.y - other.y;
+      const odist = Math.hypot(odx, ody);
+      if (odist < 20 && odist > 0) {
+        enemy.x += (odx / odist) * 0.5;
+        enemy.y += (ody / odist) * 0.5;
+      }
+    });
+  });
+  
+  updateParticles();
+  
+  // Update projectiles
+  game.projectiles = game.projectiles.filter(p => {
+    p.x += p.vx;
+    p.y += p.vy;
+    p.life--;
+    
+    // Trail particles
+    if (p.life % 3 === 0) {
+      spawnParticles(p.x, p.y, p.color, 1);
+    }
+    
+    // Check wall collision
+    const tx = Math.floor(p.x / TILE_SIZE);
+    const ty = Math.floor(p.y / TILE_SIZE);
+    if (isWall(tx, ty)) {
+      spawnParticles(p.x, p.y, p.color, 5);
+      return false;
+    }
+    
+    // Check enemy hits
+    let hit = false;
+    game.enemies.forEach(enemy => {
+      if (hit || enemy.dead) return;
+      const dist = Math.hypot(enemy.x - p.x, enemy.y - p.y);
+      if (dist < p.radius + 12) {
+        enemy.hp -= p.damage;
+        enemy.state = 'knockback';
+        const knockDir = Math.atan2(enemy.y - p.y, enemy.x - p.x);
+        enemy.knockbackX = Math.cos(knockDir) * KNOCKBACK_FORCE * 1.5;
+        enemy.knockbackY = Math.sin(knockDir) * KNOCKBACK_FORCE * 1.5;
+        enemy.stateTime = Date.now();
+        
+        spawnParticles(enemy.x, enemy.y, '#ff6b35', 8);
+        log(`🔥 Fireball hits ${enemy.name} for ${p.damage}!`, 'combat');
+        hit = true;
+        
+        if (enemy.hp <= 0) {
+          enemy.dead = true;
+          spawnParticles(enemy.x, enemy.y, '#FFD700', 10);
+          log(`🏆 ${enemy.name} defeated! +${enemy.xp} XP`, 'loot');
+          gainXp(enemy.xp);
+        }
+      }
+    });
+    
+    return p.life > 0 && !hit;
+  });
+}
+
+function draw() {
+  // Clear
+  ctx.fillStyle = '#0a0a12';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  ctx.save();
+  ctx.translate(-game.camera.x, -game.camera.y);
+  
+  // Draw map
+  const startX = Math.floor(game.camera.x / TILE_SIZE);
+  const startY = Math.floor(game.camera.y / TILE_SIZE);
+  const endX = startX + Math.ceil(canvas.width / TILE_SIZE) + 1;
+  const endY = startY + Math.ceil(canvas.height / TILE_SIZE) + 1;
+  
+  for (let y = startY; y <= endY; y++) {
+    for (let x = startX; x <= endX; x++) {
+      const px = x * TILE_SIZE;
+      const py = y * TILE_SIZE;
+      
+      if (x < 0 || x >= game.mapW || y < 0 || y >= game.mapH) {
+        ctx.fillStyle = '#050508';
+        ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+        continue;
+      }
+      
+      if (game.map[y][x] === 1) {
+        ctx.fillStyle = '#2a2a3a';
+        ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+        ctx.strokeStyle = '#1a1a2a';
+        ctx.strokeRect(px, py, TILE_SIZE, TILE_SIZE);
+      } else {
+        ctx.fillStyle = '#18182a';
+        ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+        ctx.strokeStyle = '#22223a';
+        ctx.strokeRect(px, py, TILE_SIZE, TILE_SIZE);
+      }
+    }
+  }
+  
+  // Draw enemies
+  game.enemies.forEach(enemy => {
+    ctx.font = '24px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(enemy.icon, enemy.x, enemy.y);
+    
+    // HP bar
+    const hpPct = enemy.hp / enemy.maxHp;
+    ctx.fillStyle = '#333';
+    ctx.fillRect(enemy.x - 12, enemy.y - 18, 24, 4);
+    ctx.fillStyle = hpPct > 0.5 ? '#40c060' : hpPct > 0.25 ? '#f0c040' : '#e04040';
+    ctx.fillRect(enemy.x - 12, enemy.y - 18, 24 * hpPct, 4);
+  });
+  
+  // Draw player
+  const player = game.player;
+  ctx.save();
+  ctx.translate(player.x, player.y);
+  
+  // Invincibility flash
+  if (player.invincible && Math.floor(Date.now() / 50) % 2 === 0) {
+    ctx.globalAlpha = 0.5;
+  }
+  
+  ctx.font = '28px Arial';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('🎸', 0, 0);
+  ctx.restore();
+  
+  // Draw attack swing
+  if (player.attacking) {
+    const dirs = { 'up': -Math.PI/2, 'right': 0, 'down': Math.PI/2, 'left': Math.PI };
+    const angle = dirs[player.attackDir] || 0;
+    const progress = (Date.now() - player.attackTime) / ATTACK_DURATION;
+    
+    ctx.save();
+    ctx.translate(player.x, player.y);
+    ctx.rotate(angle + Math.sin(progress * Math.PI) * 0.5 - 0.5);
+    
+    ctx.beginPath();
+    ctx.arc(0, 0, 35, -Math.PI/3, Math.PI/3);
+    ctx.strokeStyle = `rgba(240, 192, 64, ${1 - progress})`;
+    ctx.lineWidth = 4;
+    ctx.stroke();
+    
+    ctx.fillStyle = `rgba(240, 192, 64, ${0.3 * (1 - progress)})`;
+    ctx.fill();
+    ctx.restore();
+  }
+  
+  // Direction indicator
+  ctx.save();
+  ctx.translate(player.x, player.y);
+  const dirs = { 'up': [0,-20], 'right': [20,0], 'down': [0,20], 'left': [-20,0] };
+  const [dx, dy] = dirs[player.facing] || [0,20];
+  ctx.fillStyle = 'rgba(240, 192, 64, 0.3)';
+  ctx.beginPath();
+  ctx.arc(dx, dy, 5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  
+  // Draw projectiles
+  game.projectiles.forEach(p => {
+    ctx.fillStyle = p.color;
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    
+    // Inner core
+    ctx.fillStyle = '#ffff88';
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.radius * 0.5, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  
+  // Draw particles
+  game.particles.forEach(p => {
+    ctx.fillStyle = p.color;
+    ctx.globalAlpha = p.life / 50;
+    ctx.fillRect(p.x - p.size/2, p.y - p.size/2, p.size, p.size);
+    ctx.globalAlpha = 1;
+  });
+  
+  ctx.restore();
+}
+
+function gameLoop() {
+  if (!game.running) return;
+  update();
+  draw();
+  requestAnimationFrame(gameLoop);
+}
+
+// ─── INPUT ────────────────────────────────────────────────
+function handleNote(noteName) {
+  const now = Date.now();
+  if (noteName === game.lastNote && now - game.lastNoteTime < 200) return;
+  game.lastNote = noteName;
+  game.lastNoteTime = now;
+  
+  // Use full note with octave for matching
+  const action = NOTE_ACTIONS[noteName];
+  if (!action) return;
+  
+  // Get base note for display and sequence tracking
+  const baseNote = noteName.replace(/\d/, '');
+  
+  // Update display
+  const noteEl = document.getElementById('note-display');
+  noteEl.textContent = baseNote;
+  noteEl.classList.add('active');
+  setTimeout(() => noteEl.classList.remove('active'), 100);
+  
+  // Check for spell sequence (only track F, A, C, E notes)
+  if (SPELL_SEQUENCE.includes(baseNote)) {
+    // Reset if too much time passed
+    if (now - lastNoteTime > SEQUENCE_TIMEOUT) {
+      noteSequence = [];
+    }
+    lastNoteTime = now;
+    
+    // Check if this is the next expected note in sequence
+    const expectedIndex = noteSequence.length;
+    if (baseNote === SPELL_SEQUENCE[expectedIndex]) {
+      noteSequence.push(baseNote);
+      
+      // Check if spell is complete
+      if (noteSequence.length === SPELL_SEQUENCE.length) {
+        castFireball();
+        noteSequence = [];
+        return; // Don't process as regular action
+      }
+    } else if (baseNote !== SPELL_SEQUENCE[expectedIndex - 1]) {
+      // Wrong note - reset sequence (but allow repeats of same note)
+      noteSequence = [baseNote];
+    }
+  } else {
+    // Non-spell note breaks the sequence
+    noteSequence = [];
+  }
+  
+  if (action.type === 'move') {
+    // Movement - add velocity in that direction
+    const dirs = { 'up': [0,-1], 'left': [-1,0], 'right': [1,0], 'down': [0,1] };
+    const [dx, dy] = dirs[action.dir];
+    game.player.vx += dx * PLAYER_SPEED * 3;
+    game.player.vy += dy * PLAYER_SPEED * 3;
+    game.player.facing = action.dir;
+  } else if (action.type === 'attack') {
+    performAttack(game.player.facing);
+  }
+}
+
+// Keyboard controls
+document.addEventListener('keydown', (e) => {
+  if (!game.running) return;
+  
+  // C major arpeggio for movement
+  if (e.key === 'ArrowUp' || e.key === 'w') handleNote('C3');      // C = up
+  if (e.key === 'ArrowLeft' || e.key === 'a') handleNote('E3');    // E = left
+  if (e.key === 'ArrowRight' || e.key === 'd') handleNote('G3');   // G = right
+  if (e.key === 'ArrowDown' || e.key === 's') handleNote('B3');    // B = down
+  
+  // F = attack
+  if (e.key === ' ' || e.key === 'f') handleNote('F3');
+  
+  // Number keys for spell sequence testing (1=F, 2=A, 3=C, 4=E)
+  if (e.key === '1') handleNote('F3');
+  if (e.key === '2') handleNote('A3');
+  if (e.key === '3') handleNote('C4');
+  if (e.key === '4') handleNote('E4');
+});
+
+// ─── UI ───────────────────────────────────────────────────
+function log(msg, type = 'info') {
+  const logEl = document.getElementById('log');
+  const entry = document.createElement('div');
+  entry.className = `log-entry ${type}`;
+  entry.textContent = msg;
+  logEl.appendChild(entry);
+  logEl.scrollTop = logEl.scrollHeight;
+  while (logEl.children.length > 50) logEl.removeChild(logEl.firstChild);
+}
+
+function gainXp(amount) {
+  game.player.xp += amount;
+  while (game.player.xp >= game.player.xpNext) {
+    game.player.xp -= game.player.xpNext;
+    game.player.level++;
+    game.player.maxHp += 5;
+    game.player.hp = game.player.maxHp;
+    game.player.atk += 1;
+    game.player.xpNext = Math.floor(game.player.xpNext * 1.5);
+    log(`⬆ LEVEL UP! Level ${game.player.level}!`, 'levelup');
+  }
+  updateStats();
+}
+
+function updateStats() {
+  document.getElementById('hp-bar').style.width = `${(game.player.hp / game.player.maxHp) * 100}%`;
+  document.getElementById('hp-val').textContent = `${Math.max(0, game.player.hp)}/${game.player.maxHp}`;
+  document.getElementById('xp-bar').style.width = `${(game.player.xp / game.player.xpNext) * 100}%`;
+  document.getElementById('xp-val').textContent = `${game.player.xp}/${game.player.xpNext}`;
+  document.getElementById('player-level').textContent = game.player.level;
+}
+
+function gameOver() {
+  game.running = false;
+  log(`💀 You fell on floor ${game.floor}...`, 'combat');
+  log(`Reached level ${game.player.level}.`, 'info');
+  
+  setTimeout(() => {
+    game.player.hp = 20;
+    game.player.maxHp = 20;
+    game.player.xp = 0;
+    game.player.xpNext = 10;
+    game.player.level = 1;
+    game.player.atk = 4;
+    game.floor = 1;
+    generateMap();
+    updateStats();
+    game.running = true;
+    gameLoop();
+    log('─── NEW ADVENTURE ───', 'loot');
+  }, 3000);
+}
+
+// ─── AUDIO ────────────────────────────────────────────────
+async function startAudio() {
+  try {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    source = audioCtx.createMediaStreamSource(stream);
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 4096;
+    source.connect(analyser);
+    dataArray = new Float32Array(analyser.fftSize);
+
+    function detectPitch() {
+      if (!game.running) {
+        requestAnimationFrame(detectPitch);
+        return;
+      }
+      
+      analyser.getFloatTimeDomainData(dataArray);
+      const freq = autoCorrelate(dataArray, audioCtx.sampleRate);
+
+      if (freq > 60 && freq < 1200) {
+        const midi = noteFromFreq(freq);
+        const name = noteString(midi);
+        const cents = centsOff(freq, midi);
+        if (Math.abs(cents) < 30) {
+          handleNote(name);
+        }
+      }
+
+      requestAnimationFrame(detectPitch);
+    }
+
+    detectPitch();
+    return true;
+  } catch(e) {
+    console.error('Audio error:', e);
+    log('⚠ No mic. Use keyboard: arrows to move, 1-4 to attack', 'info');
+    return false;
+  }
+}
+
+// ─── INIT ─────────────────────────────────────────────────
+document.getElementById('start-btn').addEventListener('click', async () => {
+  document.getElementById('start-screen').style.display = 'none';
+  document.getElementById('game-container').style.display = 'flex';
+  
+  // Setup canvas
+  canvas.width = canvas.offsetWidth;
+  canvas.height = canvas.offsetHeight;
+  
+  await startAudio();
+  generateMap();
+  updateStats();
+  game.running = true;
+  gameLoop();
+  
+  log('─── FRETQUEST ACTION RPG ───', 'loot');
+  log('C=↑ E=← G=→ B=↓ | F=slash | F-A-C-E=fireball', 'info');
+  log('Enemies chase you! Time your strikes!', 'info');
+});
+
+// Handle resize
+window.addEventListener('resize', () => {
+  canvas.width = canvas.offsetWidth;
+  canvas.height = canvas.offsetHeight;
+});
+</script>
+</body>
+</html>

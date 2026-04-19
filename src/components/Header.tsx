@@ -1,218 +1,59 @@
-import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { useUserRole } from '@/hooks/useUserRole';
-import { useRecital } from '@/contexts/RecitalContext';
-import { usePremiumStatus } from '@/hooks/usePremiumStatus';
-import { useGamification } from '@/hooks/useGamification';
-import { Button } from '@/components/ui/button';
-import { Music, Crown, LogIn, LogOut, Home, Menu, X, Radio, GraduationCap, Zap } from 'lucide-react';
-import { SuggestionBox } from '@/components/SuggestionBox';
+import { Link, NavLink, useLocation } from 'react-router-dom';
+import { Map, Play, Sparkles } from 'lucide-react';
+import { useAtomValue } from 'jotai';
+import { availableXpAtom, completionCountAtom, totalXpAtom } from '@/state/skillTreeAtoms';
+import { TOTAL_NODES } from '@/data/skillTree';
+
+const navClass = ({ isActive }: { isActive: boolean }) =>
+  `inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+    isActive
+      ? 'bg-primary text-primary-foreground shadow'
+      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+  }`;
 
 const Header = () => {
-  const { user, signOut } = useAuth();
-  const userRole = useUserRole();
-  const { activeRecital } = useRecital();
-  const { isTrialExpiringSoon, isEnrolled } = usePremiumStatus();
-  const { points, level } = useGamification();
+  const completed = useAtomValue(completionCountAtom);
+  const totalXp = useAtomValue(totalXpAtom);
+  const availableXp = useAtomValue(availableXpAtom);
   const location = useLocation();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const onPractice = location.pathname === '/practice';
 
   return (
-    <header className="max-w-4xl mx-auto relative">
-      <div className="text-center">
-        <div className="flex items-center justify-between mb-2 sm:mb-4">
-          {/* Left: Empty div to balance center logo */}
-          <div className="flex-1 hidden sm:block">
+    <header className="w-full border-b border-white/5 bg-black/60 backdrop-blur-md shrink-0">
+      <div className="max-w-6xl mx-auto px-4 py-2 flex items-center justify-between gap-4">
+        <Link to="/" className="flex items-center gap-2">
+          <img src="/logo2.png" alt="GuitarBrain" className="h-8 w-8 object-contain" />
+          <span className="text-lg font-black tracking-tight text-foreground">
+            Guitar<span className="text-primary">Brain</span>
+          </span>
+        </Link>
+
+        <nav className="flex items-center gap-1">
+          <NavLink to="/" end className={navClass}>
+            <Map className="h-4 w-4" />
+            <span className="hidden sm:inline">Skill Tree</span>
+          </NavLink>
+          <NavLink to="/practice" className={navClass}>
+            <Play className="h-4 w-4" />
+            <span className="hidden sm:inline">Practice</span>
+          </NavLink>
+        </nav>
+
+        <div className="flex items-center gap-3 text-xs font-mono tabular-nums">
+          <div
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/15 border border-primary/30 text-primary"
+            title={`${availableXp} XP available / ${totalXp} total earned`}
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            <span className="font-bold">{availableXp}</span>
+            <span className="text-primary/60">XP</span>
           </div>
-
-          {/* Center: Logo - smaller on mobile */}
-          <Link to="/" className="flex items-center gap-2 sm:gap-3">
-            <div className="flex items-center justify-center h-14 w-14 sm:h-20 sm:w-20 rounded-full bg-primary/15 border border-primary/30 p-1.5 shrink-0">
-              <img src="/logo2.png" alt="Guitar Brain Logo" className="h-full w-full object-contain" />
-            </div>
-            <h1 className="text-2xl sm:text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-              Guitar Brain
-            </h1>
-          </Link>
-
-          {/* Right: Desktop nav buttons */}
-          <div className="flex-1 hidden sm:flex justify-end gap-2">
-            {activeRecital && (
-              <Link to="/recital">
-                <Button variant="outline" className="flex items-center gap-2 text-red-500 border-red-500">
-                  <Radio className="h-4 w-4 animate-pulse" />
-                  Live
-                </Button>
-              </Link>
-            )}
-            {userRole === 'admin' && (
-              <Link to="/admin" state={{ reset: location.pathname.startsWith('/admin') }}>
-                <Button variant="outline" className="flex items-center gap-2">
-                  Admin
-                </Button>
-              </Link>
-            )}
-
-            {/* Trial Expiration Warning */}
-            {isTrialExpiringSoon && (
-              <Link to="/premium" className="hidden lg:flex items-center text-xs font-bold text-orange-500 animate-pulse px-2 bg-orange-500/10 rounded-md border border-orange-500/20 mr-1">
-                Trial ending soon!
-              </Link>
-            )}
-
-            <Link to={!user ? '/auth' : isEnrolled ? '/premium' : '/course'} state={{ reset: location.pathname.startsWith('/premium') }}>
-              <Button variant="outline" className="flex items-center gap-2">
-                <Crown className="h-4 w-4" />
-                Premium
-              </Button>
-            </Link>
-            <Link to="/course?autoplay=1">
-              <Button variant="outline" className="flex items-center gap-2">
-                <GraduationCap className="h-4 w-4" />
-                Course
-              </Button>
-            </Link>
-            {user && (
-              <>
-                <div className="hidden md:flex items-center gap-1.5 px-3 bg-amber-500/10 border border-amber-500/20 text-amber-500 rounded-md text-sm font-bold" title={`Level ${level} - Keep practicing to earn more points!`}>
-                  <Zap className="w-4 h-4 fill-amber-500" />
-                  {points} XP
-                </div>
-                <Link to="/profile">
-                  <Button variant="outline" className="flex items-center gap-2">
-                    Profile
-                  </Button>
-                </Link>
-              </>
-            )}
-            {user ? (
-              <Button
-                variant="outline"
-                onClick={signOut}
-                className="flex items-center gap-2"
-              >
-                <LogOut className="h-4 w-4" />
-                Sign Out
-              </Button>
-            ) : (
-              <Link to="/auth">
-                <Button variant="outline" className="flex items-center gap-2">
-                  <LogIn className="h-4 w-4" />
-                  Sign In
-                </Button>
-              </Link>
-            )}
-            <SuggestionBox />
-          </div>
-
-          {/* Mobile: Hamburger button */}
-          <div className="flex-1 flex justify-end sm:hidden">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-1"
-            >
-              {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-            </Button>
-          </div>
+          {!onPractice && (
+            <span className="text-muted-foreground">
+              {completed} / {TOTAL_NODES}
+            </span>
+          )}
         </div>
-
-        {/* Mobile menu dropdown */}
-        {mobileMenuOpen && (
-          <div className="sm:hidden absolute right-0 top-full z-50 bg-card border rounded-lg shadow-lg p-2 min-w-[160px]">
-            <div className="flex flex-col gap-1">
-              <Link
-                to="/"
-                onClick={() => setMobileMenuOpen(false)}
-                className="px-3 py-2 hover:bg-muted rounded-md text-sm"
-              >
-                Home
-              </Link>
-              {activeRecital && (
-                <Link
-                  to="/recital"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="px-3 py-2 hover:bg-muted rounded-md text-sm flex items-center gap-2 text-red-500"
-                >
-                  <Radio className="h-4 w-4 animate-pulse" />
-                  Live Recital
-                </Link>
-              )}
-              {userRole === 'admin' && (
-                <Link
-                  to="/admin"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="px-3 py-2 hover:bg-muted rounded-md text-sm"
-                >
-                  Admin
-                </Link>
-              )}
-              {isTrialExpiringSoon && (
-                <Link
-                  to="/premium"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="px-3 py-2 hover:bg-muted rounded-md text-sm font-bold text-orange-500 animate-pulse bg-orange-500/10 border-l-2 border-orange-500"
-                >
-                  Trial ending soon!
-                </Link>
-              )}
-              <Link
-                to={!user ? '/auth' : isEnrolled ? '/premium' : '/course'}
-                onClick={() => setMobileMenuOpen(false)}
-                className="px-3 py-2 hover:bg-muted rounded-md text-sm flex items-center gap-2"
-              >
-                <Crown className="h-4 w-4" />
-                Premium
-              </Link>
-              <Link
-                to="/course?autoplay=1"
-                onClick={() => setMobileMenuOpen(false)}
-                className="px-3 py-2 hover:bg-muted rounded-md text-sm flex items-center gap-2"
-              >
-                <GraduationCap className="h-4 w-4" />
-                Course
-              </Link>
-              {user && (
-                <>
-                  <div className="px-3 py-2 text-sm flex items-center gap-2 text-amber-500 font-bold bg-amber-500/5 rounded-md mx-1">
-                    <Zap className="h-4 w-4 fill-amber-500" />
-                    {points} XP (Lvl {level})
-                  </div>
-                  <Link
-                    to="/profile"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="px-3 py-2 hover:bg-muted rounded-md text-sm"
-                  >
-                    Profile
-                  </Link>
-                </>
-              )}
-              {user ? (
-                <button
-                  onClick={() => {
-                    signOut();
-                    setMobileMenuOpen(false);
-                  }}
-                  className="px-3 py-2 hover:bg-muted rounded-md text-sm text-left flex items-center gap-2"
-                >
-                  <LogOut className="h-4 w-4" />
-                  Sign Out
-                </button>
-              ) : (
-                <Link
-                  to="/auth"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="px-3 py-2 hover:bg-muted rounded-md text-sm flex items-center gap-2"
-                >
-                  <LogIn className="h-4 w-4" />
-                  Sign In
-                </Link>
-              )}
-            </div>
-          </div>
-        )}
       </div>
     </header>
   );

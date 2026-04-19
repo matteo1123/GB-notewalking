@@ -1,7 +1,92 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { FRET_COUNT, STRING_COUNT, getNoteFromFret, createChromaticDegreeMap, CHROMATIC_DEGREE_COLORS, DEGREE_COLORS } from '@/lib/musicTheory';
-import { getCagedZones } from '@/lib/cagedSystem';
+import { CagedConstellationFill } from './CagedConstellation';
+import {
+  CAGED_SHAPES,
+  CAGED_SHAPE_HEX,
+  getShapeVoicingPositions,
+  type CagedShape,
+  type ChordToneNode,
+} from '@/lib/cagedSystem';
 import './Fretboard.css';
+
+const FRET_NUMBER_MARKERS = [3, 5, 7, 9, 12, 15, 17, 19, 21];
+
+/**
+ * Renders the row of fret numbers + per-shape letter labels that sits BELOW
+ * the fretboard. Lives in a real in-flow grid (not an SVG overflow band) so
+ * sizing is reliable across the various fretboard parents — overflow gymnastics
+ * with absolutely-positioned SVGs gets clipped/scrolled by ancestor overflow
+ * rules (overflow-x: hidden implicitly promotes overflow-y: visible to auto).
+ */
+function FretboardLabelsStrip({
+  cagedKey,
+  onShapeLabelClick,
+}: {
+  cagedKey: string;
+  onShapeLabelClick?: (shape: CagedShape) => void;
+}) {
+  const shapeLabels = useMemo(() => {
+    return CAGED_SHAPES.map((shape) => {
+      const tones = getShapeVoicingPositions(cagedKey, shape, FRET_COUNT).filter(
+        (t) => t.fret >= 1 && t.fret <= FRET_COUNT,
+      );
+      if (tones.length === 0) return null;
+      const byOct = new Map<number, ChordToneNode[]>();
+      for (const t of tones) {
+        const arr = byOct.get(t.octaveShift) ?? [];
+        arr.push(t);
+        byOct.set(t.octaveShift, arr);
+      }
+      const best = [...byOct.values()].sort((a, b) => b.length - a.length)[0];
+      const minF = Math.min(...best.map((t) => t.fret));
+      const maxF = Math.max(...best.map((t) => t.fret));
+      return { shape, minF, maxF } as { shape: CagedShape; minF: number; maxF: number };
+    }).filter(Boolean) as Array<{ shape: CagedShape; minF: number; maxF: number }>;
+  }, [cagedKey]);
+
+  return (
+    <div className="fretboard-fret-labels">
+      {FRET_NUMBER_MARKERS.filter((f) => f <= FRET_COUNT).map((f) => (
+        <div
+          key={`fnum-${f}`}
+          className="fret-num"
+          style={{ gridColumn: f, gridRow: 1 }}
+        >
+          {f}
+        </div>
+      ))}
+      {shapeLabels.map(({ shape, minF, maxF }) => {
+        const clickable = !!onShapeLabelClick;
+        const className = `shape-lbl${clickable ? ' shape-lbl-clickable' : ''}`;
+        const style: React.CSSProperties = {
+          gridColumn: `${minF} / ${maxF + 1}`,
+          gridRow: 2,
+          color: CAGED_SHAPE_HEX[shape],
+        };
+        if (clickable) {
+          return (
+            <button
+              key={`shp-${shape}`}
+              type="button"
+              className={className}
+              style={style}
+              onClick={() => onShapeLabelClick(shape)}
+              title={`Spotlight ${shape}-shape`}
+            >
+              {shape}-shape
+            </button>
+          );
+        }
+        return (
+          <div key={`shp-${shape}`} className={className} style={style}>
+            {shape}-shape
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 interface Note {
   string: number;
@@ -18,7 +103,8 @@ interface FretboardProps {
   showDegreeNumbers?: boolean;
   degreeMap?: Map<string, number> | null;
   animatedNote?: Note;
-  cagedKey?: string; // If set, renders faint CAGED shape zone overlays
+  cagedKey?: string; // If set, renders the chord-tone constellation overlay
+  onShapeLabelClick?: (shape: CagedShape) => void;
 }
 
 const Fretboard: React.FC<FretboardProps> = ({
@@ -32,24 +118,24 @@ const Fretboard: React.FC<FretboardProps> = ({
   degreeMap,
   animatedNote,
   cagedKey,
+  onShapeLabelClick,
 }) => {
   const chromaticDegreeMap = rootNote ? createChromaticDegreeMap(getNoteFromFret(rootNote.string, rootNote.fret)) : null;
-  const cagedZones = cagedKey ? getCagedZones(cagedKey, FRET_COUNT) : [];
 
-  const renderCagedZones = () => {
-    return cagedZones.map(zone => (
-      <div
-        key={`caged-${zone.shape}-${zone.startFret}`}
-        className="caged-zone"
-        data-shape={zone.shape}
-        style={{
-          gridColumn: `${zone.startFret} / ${zone.endFret + 1}`,
-          gridRow: '1 / -1',
-          backgroundColor: zone.color,
-          '--caged-label-color': zone.labelColor,
-        } as React.CSSProperties}
+  const renderChordConstellations = () => {
+    if (!cagedKey) return null;
+    // Stars + lines only — fret numbers and shape labels are rendered as an
+    // in-flow strip BELOW the fretboard (see FretboardLabelsStrip) so they
+    // don't fight the absolutely-positioned SVG's clipping/scroll behavior.
+    return (
+      <CagedConstellationFill
+        className="caged-constellation-layer"
+        cagedKey={cagedKey}
+        fretCount={FRET_COUNT}
+        showLabels={false}
+        showFretNumbers={false}
       />
-    ));
+    );
   };
 
   const renderFrets = () => {
@@ -179,12 +265,15 @@ const Fretboard: React.FC<FretboardProps> = ({
       </div>
       <div className="fretboard-container">
         <div className="fretboard">
-          {renderCagedZones()}
+          {renderChordConstellations()}
           {renderFrets()}
           {renderStrings()}
           {renderMarkers()}
           {renderNotes(false)}
         </div>
+        {cagedKey && (
+          <FretboardLabelsStrip cagedKey={cagedKey} onShapeLabelClick={onShapeLabelClick} />
+        )}
       </div>
     </div>
   );

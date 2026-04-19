@@ -1,6 +1,9 @@
 .fretboard-area {
   display: flex;
-  align-items: center;
+  /* flex-start so the open-notes column and the fretboard column line up by
+   * their TOP edge; the labels strip below the fretboard then hangs from the
+   * fretboard column without nudging the open-notes strings out of alignment. */
+  align-items: flex-start;
   justify-content: flex-start;
   max-width: 100%;
   overflow: hidden;
@@ -39,8 +42,9 @@
   max-width: 100%;
   flex: 1;
   display: flex;
+  /* Stack the fretboard above the labels strip. */
+  flex-direction: column;
   align-items: stretch;
-  height: 100%;
 }
 
 .fretboard {
@@ -60,26 +64,80 @@
   box-sizing: border-box;
 }
 
-/* CAGED zone background overlays — rendered behind everything */
-.caged-zone {
-  grid-row: 1 / -1;
+/* Chord-tone "constellation" layer — pixel-space SVG wrapper (sized via
+ * ResizeObserver) showing the underlying chord skeleton of all five CAGED
+ * shapes. Shared with the SkillTree HUD so stars use identical coordinates
+ * in both views. Sits inside .fretboard at z-index 0 — above the fretboard
+ * background but beneath the frets (z-1), strings (z-2) and notes (z-3+). */
+.caged-constellation-layer {
+  position: absolute;
+  inset: 0;
   z-index: 0;
   pointer-events: none;
-  position: relative;
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.18));
 }
 
-.caged-zone::after {
-  content: attr(data-shape);
-  position: absolute;
-  bottom: 3px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 9px;
-  font-weight: 700;
-  color: var(--caged-label-color, rgba(255,255,255,0.4));
-  letter-spacing: 0;
-  pointer-events: none;
+/* Fret-number + shape-label strip rendered as an in-flow row directly below
+ * .fretboard. Uses the same 22-column grid so fret numbers line up with the
+ * frets above them, and shape labels span the columns of their home octave. */
+.fretboard-fret-labels {
+  display: grid;
+  grid-template-columns: repeat(22, minmax(0, 1fr));
+  grid-template-rows: auto auto;
+  width: 100%;
+  padding: 2px 0 4px;
+  background-color: transparent;
   user-select: none;
+}
+
+.fretboard-fret-labels .fret-num {
+  text-align: center;
+  font-size: 10px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.55);
+  line-height: 1.2;
+}
+
+.fretboard-fret-labels .shape-lbl {
+  text-align: center;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  opacity: 0.75;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+/* When the parent passes onShapeLabelClick, labels render as <button>s — strip
+ * native chrome and add a subtle hover lift so they read as actionable. */
+.fretboard-fret-labels button.shape-lbl-clickable {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  border: none;
+  padding: 2px 0;
+  margin: 0;
+  cursor: pointer;
+  font: inherit;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  transition: opacity 120ms ease, text-shadow 120ms ease, transform 120ms ease;
+}
+
+.fretboard-fret-labels button.shape-lbl-clickable:hover,
+.fretboard-fret-labels button.shape-lbl-clickable:focus-visible {
+  opacity: 1;
+  text-shadow: 0 0 8px currentColor;
+  transform: translateY(-1px);
+  outline: none;
+}
+
+@media (max-width: 1023px) {
+  .fretboard-fret-labels .fret-num,
+  .fretboard-fret-labels .shape-lbl {
+    font-size: 9px;
+  }
 }
 
 .fret {
@@ -94,9 +152,6 @@
   align-self: center;
   grid-column: 1 / -1;
   z-index: 2;
-  position: relative;
-  top: 50%;
-  transform: translateY(-50%);
 }
 
 .note-container {
@@ -164,8 +219,12 @@
   }
 }
 
-/* ====== DESKTOP STYLES ====== */
-@media (min-height: 700px) {
+/* ====== DESKTOP STYLES ======
+ * NOTE: Must require min-width: 1024px too. Without that, tall mobile phones
+ * (height ≥ 700) pick up these rules and the 25px grid-row minmax forces the
+ * 6-string grid to exceed the 140px force-landscape fretboard height, which
+ * pushes the low-E string off the bottom of the fretboard on mobile. */
+@media (min-width: 1024px) and (min-height: 700px) {
   .fretboard {
     /* Desktop: WIDE and THIN - like a real guitar neck */
     /* Frets (width) >> String spacing (height) */
@@ -311,7 +370,7 @@
 .notewalking-fretboard-override {
   width: 100%;
   max-width: 100%;
-  overflow-x: auto;
+  overflow: hidden;
 }
 
 .notewalking-fretboard-override .fretboard-area {
@@ -326,8 +385,8 @@
 
 .notewalking-fretboard-override .dot {
   background-color: #3f3f46;
-  /* Dim grey scale background */
-  opacity: 0.6;
+  /* Dim grey scale background — shape identity comes from the CAGED polygon behind the note */
+  opacity: 0.75;
 }
 
 .notewalking-fretboard-override .dot.active-note {
@@ -393,6 +452,13 @@
 .notewalking-fretboard-override .fretboard {
   border-left: 5px solid #444;
   /* Darker nut */
+  background-color: rgba(0, 0, 0, 0.45);
+  /* Let the cosmic backdrop bleed through behind the fretboard so the
+   * chord constellations sit inside the same starfield as the skill tree. */
+}
+
+.notewalking-fretboard-override .open-notes-container {
+  background-color: rgba(26, 26, 26, 0.55);
 }
 
 .notewalking-fretboard-override .fret {
@@ -496,4 +562,52 @@
 .fretboard-modal-view .marker {
   width: 18px;
   height: 18px;
+}
+
+/* ======================================================================
+ * Cinematic shape-spotlight overlay
+ *
+ * Triggered when a user clicks a shape label below the fretboard. Three
+ * phases drive the choreography:
+ *   init   — overlay paints in instantly to black; shape stage stays hidden
+ *   solo   — shape's constellation fades up over ~1.5s while overlay holds
+ *   reveal — overlay AND shape fade out together (~800ms) so the live
+ *            fretboard re-emerges underneath. Click/touch on the overlay
+ *            cancels the sequence at any point.
+ * ====================================================================== */
+.cinematic-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  background: #000;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 800ms ease-out;
+}
+
+.cinematic-bg.phase-init,
+.cinematic-bg.phase-solo {
+  opacity: 1;
+}
+
+.cinematic-bg.phase-reveal {
+  opacity: 0;
+}
+
+.cinematic-stage {
+  position: absolute;
+  z-index: 110;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 1500ms ease-in;
+  filter: drop-shadow(0 0 12px rgba(255, 255, 255, 0.25));
+}
+
+.cinematic-stage.phase-solo {
+  opacity: 1;
+}
+
+.cinematic-stage.phase-reveal {
+  opacity: 0;
+  transition: opacity 800ms ease-out;
 }

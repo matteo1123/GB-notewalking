@@ -1,240 +1,95 @@
-import { useCallback, useRef } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useCallback, useRef } from 'react';
+
+const SHARP_TO_FLAT: Record<string, string> = {
+  'C#': 'Db',
+  'D#': 'Eb',
+  'F#': 'Gb',
+  'G#': 'Ab',
+  'A#': 'Bb',
+};
+
+function sharpToFlat(chord: string): string {
+  const match = chord.match(/^([A-G])(#|b)?(m|dim|maj7|m7|7)?$/);
+  if (!match) return chord;
+  const [, root, accidental = '', quality = ''] = match;
+  const pitch = root + accidental;
+  return (SHARP_TO_FLAT[pitch] ?? pitch) + quality;
+}
 
 export function useNotePlayer(audioContext: AudioContext | null) {
-  const audioBufferCache = useRef<Record<string, AudioBuffer>>({});
-
-  const currentSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const bufferCache = useRef<Record<string, AudioBuffer>>({});
   const activeSourcesRef = useRef<AudioBufferSourceNode[]>([]);
-  const activeTimeoutsRef = useRef<NodeJS.Timeout[]>([]);
 
-  const playNote = useCallback(
-    async (note: string, volume: number = 1.0, startTime?: number) => {
-      if (!audioContext) return;
-
-      const noteUrl = `https://idsufbsfywgmcrhldqxq.supabase.co/storage/v1/object/public/Piano/${note}.mp3`;
-      // console.log("Fetching note from:", noteUrl);
-
+  const loadBuffer = useCallback(
+    async (chord: string): Promise<AudioBuffer | null> => {
+      if (!audioContext) return null;
+      const formatted = sharpToFlat(chord);
+      if (bufferCache.current[formatted]) return bufferCache.current[formatted];
+      const url = `/audio/chords/${formatted}.mp3`;
       try {
-        let buffer;
-        if (audioBufferCache.current[noteUrl]) {
-          buffer = audioBufferCache.current[noteUrl];
-        } else {
-          const response = await fetch(noteUrl);
-          const arrayBuffer = await response.arrayBuffer();
-          buffer = await audioContext.decodeAudioData(arrayBuffer);
-          audioBufferCache.current[noteUrl] = buffer;
+        const res = await fetch(url);
+        if (!res.ok) {
+          console.error(`Missing chord audio: ${url}`);
+          return null;
         }
-
-        const source = audioContext.createBufferSource();
-        source.buffer = buffer;
-
-        // Create a gain node for volume control
-        const gainNode = audioContext.createGain();
-        gainNode.gain.value = volume;
-
-        source.connect(gainNode);
-        gainNode.connect(audioContext.destination);
-
-        source.start(startTime !== undefined ? startTime : 0);
-        currentSourceRef.current = source;
-        
-        activeSourcesRef.current.push(source);
-        source.onended = () => {
-          activeSourcesRef.current = activeSourcesRef.current.filter(s => s !== source);
-        };
-      } catch (error) {
-        console.error(`Failed to play note ${note}`, error);
+        const arr = await res.arrayBuffer();
+        const buf = await audioContext.decodeAudioData(arr);
+        bufferCache.current[formatted] = buf;
+        return buf;
+      } catch (err) {
+        console.error(`Failed to load chord ${formatted}`, err);
+        return null;
       }
     },
-    [audioContext]
-  );
-
-  const preloadNotes = useCallback(
-    async (notes: string[]) => {
-      if (!audioContext) return;
-
-      const promises = notes.map(async (note) => {
-        const noteUrl = `https://idsufbsfywgmcrhldqxq.supabase.co/storage/v1/object/public/Piano/${note}.mp3`;
-        if (audioBufferCache.current[noteUrl]) return;
-
-        try {
-          const response = await fetch(noteUrl);
-          const arrayBuffer = await response.arrayBuffer();
-          const buffer = await audioContext.decodeAudioData(arrayBuffer);
-          audioBufferCache.current[noteUrl] = buffer;
-        } catch (error) {
-          console.error(`Failed to preload note ${note}`, error);
-        }
-      });
-
-      await Promise.all(promises);
-    },
-    [audioContext]
+    [audioContext],
   );
 
   const playChord = useCallback(
-    async (chord: string, volume: number = 1.0) => {
+    async (chord: string, volume = 1.0) => {
       if (!audioContext) return;
+      const buffer = await loadBuffer(chord);
+      if (!buffer) return;
 
-      // Ensure proper formatting for sharps/flats if needed. The Guitar bucket has files like C.mp3, Cm.mp3, Db.mp3, Bbm.mp3
-      const formattedChord = chord.replace('#', 'b');
+      const source = audioContext.createBufferSource();
+      source.buffer = buffer;
 
-      try {
-        let buffer;
-        if (audioBufferCache.current[formattedChord]) {
-          buffer = audioBufferCache.current[formattedChord];
-        } else {
-          // Guitar bucket is public — use getPublicUrl for direct access
-          const { data } = supabase.storage.from('Guitar').getPublicUrl(`${formattedChord}.mp3`);
-          if (!data?.publicUrl) {
-            console.error(`Failed to get public URL for chord ${formattedChord}`);
-            return;
-          }
+      const gain = audioContext.createGain();
+      gain.gain.value = volume;
 
-          const response = await fetch(data.publicUrl);
-          const arrayBuffer = await response.arrayBuffer();
-          buffer = await audioContext.decodeAudioData(arrayBuffer);
-          audioBufferCache.current[formattedChord] = buffer;
-        }
+      source.connect(gain);
+      gain.connect(audioContext.destination);
+      source.start(0);
 
-        const source = audioContext.createBufferSource();
-        source.buffer = buffer;
-
-        const gainNode = audioContext.createGain();
-        gainNode.gain.value = volume;
-
-        source.connect(gainNode);
-        gainNode.connect(audioContext.destination);
-
-        source.start(0);
-        // We do not overwrite currentSourceRef so that drone/chord does not immediately stop if playSequence or something else is running concurrently, 
-        //, but keeping track of it could be useful if they want to stop it. 
-        // For drone notes, we usually let them ring out. 
-      } catch (error) {
-        console.error(`Failed to play chord ${chord}`, error);
-      }
+      activeSourcesRef.current.push(source);
+      source.onended = () => {
+        activeSourcesRef.current = activeSourcesRef.current.filter((s) => s !== source);
+      };
     },
-    [audioContext]
+    [audioContext, loadBuffer],
   );
 
   const preloadChords = useCallback(
     async (chords: string[]) => {
       if (!audioContext) return;
-
-      const promises = chords.map(async (chord) => {
-        const formattedChord = chord.replace('#', 'b');
-        if (audioBufferCache.current[formattedChord]) return;
-
-        try {
-          const { data } = supabase.storage.from('Guitar').getPublicUrl(`${formattedChord}.mp3`);
-          if (!data?.publicUrl) return;
-
-          const response = await fetch(data.publicUrl);
-          const arrayBuffer = await response.arrayBuffer();
-          const buffer = await audioContext.decodeAudioData(arrayBuffer);
-          audioBufferCache.current[formattedChord] = buffer;
-        } catch (error) {
-          console.error(`Failed to preload chord ${chord}`, error);
-        }
-      });
-
-      await Promise.all(promises);
+      await Promise.all(chords.map((c) => loadBuffer(c)));
     },
-    [audioContext]
-  );
-
-  const playSequence = useCallback(
-    async (
-      notes: { string: number; fret: number }[],
-      tempo: number = 1.0,
-      volume: number = 1.0,
-      onNoteStart?: (index: number) => void,
-      onComplete?: () => void
-    ) => {
-      if (!audioContext || notes.length === 0) return;
-
-      const getNoteFromFret = (stringNum: number, fret: number): string => {
-        const standardTuning = ["E", "B", "G", "D", "A", "E"];
-        const notes = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
-        const openNotes = ["E4", "B3", "G3", "D3", "A2", "E2"];
-
-        const openNote = openNotes[stringNum - 1];
-        const noteMatch = openNote.match(/([A-G]#?)(\d)/);
-        if (!noteMatch) return "C4";
-
-        const [, noteName, octaveStr] = noteMatch;
-        let octave = parseInt(octaveStr);
-        let noteIndex = notes.indexOf(noteName);
-
-        noteIndex = (noteIndex + fret) % 12;
-        octave += Math.floor((notes.indexOf(noteName) + fret) / 12);
-
-        const finalNote = `${notes[noteIndex]}${octave}`;
-
-        // Convert sharps to flats for file naming (# breaks URLs)
-        return finalNote.replace('C#', 'Db')
-          .replace('D#', 'Eb')
-          .replace('F#', 'Gb')
-          .replace('G#', 'Ab')
-          .replace('A#', 'Bb');
-      };
-
-      const noteDurationMs = 600 / tempo; // Base duration in ms
-      const noteDurationSec = noteDurationMs / 1000;
-
-      // Preload all needed notes to ensure accurate scheduling
-      const noteNames = notes.map(n => getNoteFromFret(n.string, n.fret));
-      await preloadNotes(noteNames);
-
-      const startTime = audioContext.currentTime + 0.1; // Slight delay to ensure clean start
-
-      for (let i = 0; i < notes.length; i++) {
-        const noteName = noteNames[i];
-        const noteStartTime = startTime + i * noteDurationSec;
-        const noteStartMs = (noteStartTime - audioContext.currentTime) * 1000;
-
-        // Schedule the audio playback precisely
-        // We do not await here because it is already preloaded, and we want to schedule them all fast
-        playNote(noteName, volume, noteStartTime);
-
-        // Schedule UI updates
-        const timeoutId = setTimeout(() => {
-          onNoteStart?.(i);
-        }, Math.max(0, noteStartMs));
-        activeTimeoutsRef.current.push(timeoutId);
-      }
-
-      // Schedule completion callback
-      const sequenceDurationMs = notes.length * noteDurationMs;
-      const completeTimeoutId = setTimeout(() => {
-        onComplete?.();
-        activeTimeoutsRef.current = []; // Cleanup
-      }, sequenceDurationMs + 100);
-      activeTimeoutsRef.current.push(completeTimeoutId);
-
-    },
-    [audioContext, playNote]
+    [audioContext, loadBuffer],
   );
 
   const stop = useCallback(() => {
-    if (currentSourceRef.current) {
+    activeSourcesRef.current.forEach((s) => {
       try {
-        currentSourceRef.current.stop();
-      } catch (e) {
-        // Already stopped
+        s.stop();
+      } catch {
+        // already stopped
       }
-      currentSourceRef.current = null;
-    }
-
-    activeSourcesRef.current.forEach(source => {
-      try { source.stop(); } catch (e) {}
     });
     activeSourcesRef.current = [];
-
-    activeTimeoutsRef.current.forEach(timeout => clearTimeout(timeout));
-    activeTimeoutsRef.current = [];
   }, []);
 
-  return { playNote, playChord, playSequence, preloadNotes, preloadChords, stop };
+  const playNote = useCallback(async () => {
+    // no-op: pedal/single-note playback removed in the slim build
+  }, []);
+
+  return { playChord, preloadChords, stop, playNote };
 }

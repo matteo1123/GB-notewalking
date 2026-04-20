@@ -26,7 +26,7 @@ export function useNotePlayer(audioContext: AudioContext | null) {
       if (!audioContext) return null;
       const formatted = sharpToFlat(chord);
       if (bufferCache.current[formatted]) return bufferCache.current[formatted];
-      const url = assetUrl(`/audio/chords/${formatted}.mp3`);
+      const url = assetUrl(`/chords/${formatted}.mp3`);
       try {
         const res = await fetch(url);
         if (!res.ok) {

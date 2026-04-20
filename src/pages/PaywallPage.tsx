@@ -52,7 +52,7 @@ const PaywallPage = () => {
                     navigate('/');
                   }}
                 >
-                  Unlock — $39 (dev bypass)
+                  Unlock — $9.99 (dev bypass)
                 </Button>
                 <p className="text-[11px] text-muted-foreground text-center">
                   Payment integration pending. Clicking unlocks locally for now.

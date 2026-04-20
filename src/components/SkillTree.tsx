@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useAtomValue, useSetAtom } from 'jotai';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { CheckCircle, Lock, Play, PlayCircle, Sparkles } from 'lucide-react';
 import {
   Dialog,
@@ -125,6 +125,7 @@ function ConstellationFretboard({ completed }: { completed: Set<NodeId> }) {
 import {
   availableXpAtom,
   completedSetAtom,
+  isPurchasedAtom,
   toggleNodeAtom,
 } from '@/state/skillTreeAtoms';
 
@@ -136,6 +137,19 @@ export function SkillTree() {
   const completed = useAtomValue(completedSetAtom);
   const availableXp = useAtomValue(availableXpAtom);
   const toggle = useSetAtom(toggleNodeAtom);
+  const purchased = useAtomValue(isPurchasedAtom);
+  const navigate = useNavigate();
+  // Wraps the node-complete toggle with a paywall gate: if the user hasn't
+  // purchased yet, the very first "Start" click (hub-intro) routes them to
+  // /unlock instead of marking the intro complete. Once purchased, the normal
+  // XP-gated flow takes over for every other node.
+  const handleUnlockClick = (id: NodeId) => {
+    if (!purchased) {
+      navigate('/unlock');
+      return;
+    }
+    toggle(id);
+  };
   const [selectedId, setSelectedId] = useState<NodeId | null>(null);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const hasScrolledRef = useRef(false);
@@ -776,7 +790,7 @@ export function SkillTree() {
                     <Button
                       variant="default"
                       disabled={!selectedUnlocked || !selectedCanAfford}
-                      onClick={() => toggle(selected.id)}
+                      onClick={() => handleUnlockClick(selected.id)}
                     >
                       {!selectedUnlocked ? (
                         <>

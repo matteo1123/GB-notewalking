@@ -1,19 +1,24 @@
 import { useEffect } from 'react';
-import { useAtomValue } from 'jotai';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { NotewalkingExercise } from '@/components/NotewalkingExercise';
-import { isPurchasedAtom } from '@/state/skillTreeAtoms';
+import { usePurchaseStatus } from '@/hooks/usePurchaseStatus';
 import { SKILL_NODE_BY_ID, type NodeId } from '@/data/skillTree';
 
 const PracticePage = () => {
-  const purchased = useAtomValue(isPurchasedAtom);
+  const { purchased, isAuthLoaded } = usePurchaseStatus();
   const navigate = useNavigate();
   const [params] = useSearchParams();
 
+  // Wait for the auth state and Convex query to settle before redirecting —
+  // otherwise a paying user momentarily reads `purchased: undefined` on
+  // refresh and gets bounced to /unlock.
   useEffect(() => {
+    if (!isAuthLoaded) return;
+    if (purchased === undefined) return;
     if (!purchased) navigate('/unlock', { replace: true });
-  }, [purchased, navigate]);
+  }, [purchased, isAuthLoaded, navigate]);
 
+  if (!isAuthLoaded || purchased === undefined) return null;
   if (!purchased) return null;
 
   const raw = params.get('node');

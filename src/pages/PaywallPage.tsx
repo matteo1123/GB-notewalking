@@ -1,8 +1,9 @@
-import { useAtom } from 'jotai';
 import { useNavigate } from 'react-router-dom';
+import { SignInButton, SignedIn, SignedOut, UserButton } from '@clerk/clerk-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { isPurchasedAtom } from '@/state/skillTreeAtoms';
+import { usePurchaseStatus } from '@/hooks/usePurchaseStatus';
+import { useStartCheckout } from '@/hooks/useStartCheckout';
 import { Check } from 'lucide-react';
 
 const features = [
@@ -13,14 +14,15 @@ const features = [
 ];
 
 const PaywallPage = () => {
-  const [purchased, setPurchased] = useAtom(isPurchasedAtom);
   const navigate = useNavigate();
+  const { purchased, isAuthLoaded } = usePurchaseStatus();
+  const { start, loading, error } = useStartCheckout();
 
   return (
     <div className="flex-1 flex items-center justify-center p-4">
       <Card className="max-w-lg w-full">
         <CardHeader>
-          <CardTitle className="text-2xl">Unlock FretQuest</CardTitle>
+          <CardTitle className="text-2xl">Unlock GuitarBrain</CardTitle>
           <CardDescription>One-time purchase. Lifetime access to the full app.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -33,30 +35,36 @@ const PaywallPage = () => {
             ))}
           </ul>
           <div className="pt-2 flex flex-col gap-2">
-            {purchased ? (
+            {!isAuthLoaded ? (
+              <Button disabled>Loading…</Button>
+            ) : purchased ? (
               <>
                 <div className="rounded-md bg-primary/10 text-primary p-3 text-sm font-medium">
-                  You own FretQuest. Enjoy.
+                  You own GuitarBrain. Enjoy.
                 </div>
                 <Button onClick={() => navigate('/')}>Continue</Button>
-                <Button variant="ghost" size="sm" onClick={() => setPurchased(false)}>
-                  Reset purchase (dev)
-                </Button>
               </>
             ) : (
               <>
-                <Button
-                  size="lg"
-                  onClick={() => {
-                    setPurchased(true);
-                    navigate('/');
-                  }}
-                >
-                  Unlock — $9.99 (dev bypass)
-                </Button>
-                <p className="text-[11px] text-muted-foreground text-center">
-                  Payment integration pending. Clicking unlocks locally for now.
-                </p>
+                <SignedOut>
+                  <SignInButton mode="modal">
+                    <Button size="lg">Sign in to unlock</Button>
+                  </SignInButton>
+                  <p className="text-[11px] text-muted-foreground text-center">
+                    You'll create an account, then pay $9.99 — one-time, no subscription.
+                  </p>
+                </SignedOut>
+                <SignedIn>
+                  <Button size="lg" onClick={start} disabled={loading}>
+                    {loading ? 'Redirecting…' : 'Unlock — $9.99'}
+                  </Button>
+                  {error && (
+                    <p className="text-xs text-destructive text-center">{error}</p>
+                  )}
+                  <div className="flex justify-center pt-1">
+                    <UserButton afterSignOutUrl="/" />
+                  </div>
+                </SignedIn>
               </>
             )}
           </div>

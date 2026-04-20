@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { Link, useNavigate } from 'react-router-dom';
+import { SignInButton, SignedIn, SignedOut, UserButton } from '@clerk/clerk-react';
 import { CheckCircle, Lock, Play, PlayCircle, Sparkles } from 'lucide-react';
 import {
   Dialog,
@@ -125,9 +126,9 @@ function ConstellationFretboard({ completed }: { completed: Set<NodeId> }) {
 import {
   availableXpAtom,
   completedSetAtom,
-  isPurchasedAtom,
   toggleNodeAtom,
 } from '@/state/skillTreeAtoms';
+import { usePurchaseStatus } from '@/hooks/usePurchaseStatus';
 
 const NODE_SIZE = 80;
 const GAP = 250;
@@ -137,7 +138,7 @@ export function SkillTree() {
   const completed = useAtomValue(completedSetAtom);
   const availableXp = useAtomValue(availableXpAtom);
   const toggle = useSetAtom(toggleNodeAtom);
-  const purchased = useAtomValue(isPurchasedAtom);
+  const { purchased } = usePurchaseStatus();
   const navigate = useNavigate();
   // Wraps the node-complete toggle with a paywall gate: if the user hasn't
   // purchased yet, the very first "Start" click (hub-intro) routes them to
@@ -458,6 +459,12 @@ export function SkillTree() {
           broke panning on phones. */}
       <div className="absolute top-0 left-0 right-0 z-50 p-4 sm:p-6 pointer-events-none flex flex-row flex-wrap sm:flex-nowrap justify-between items-start gap-4 bg-gradient-to-b from-black/60 to-transparent">
         <div className="bg-black/40 backdrop-blur-md border border-white/5 p-4 rounded-2xl shadow-2xl flex flex-col">
+          <div className="flex items-center gap-2 mb-1">
+            <img src="/logo2.png" alt="GuitarBrain" className="h-6 w-6 object-contain" />
+            <span className="text-sm font-black tracking-tight text-foreground">
+              Guitar<span className="text-primary">Brain</span>
+            </span>
+          </div>
           <h1 className="text-xl sm:text-2xl font-black bg-gradient-to-r from-white to-slate-500 bg-clip-text text-transparent">
             THE CAGED TREE
           </h1>
@@ -507,6 +514,16 @@ export function SkillTree() {
               {availableXp} XP
             </span>
           </div>
+          <SignedOut>
+            <SignInButton mode="modal">
+              <button className="bg-black/40 hover:bg-black/60 backdrop-blur-md border border-white/10 hover:border-white/30 px-3 sm:px-4 py-2 rounded-full shadow-lg h-[42px] text-xs font-black tracking-wider text-slate-200 transition-colors">
+                Sign in
+              </button>
+            </SignInButton>
+          </SignedOut>
+          <SignedIn>
+            <UserButton afterSignOutUrl="/" />
+          </SignedIn>
         </div>
       </div>
 

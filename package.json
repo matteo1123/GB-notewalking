@@ -15,6 +15,7 @@
     "test:mobile:ui": "npx playwright test --ui"
   },
   "dependencies": {
+    "@clerk/clerk-react": "^5.61.5",
     "@daily-co/daily-js": "^0.87.0",
     "@daily-co/daily-react": "^0.24.0",
     "@hookform/resolvers": "^3.9.0",
@@ -52,6 +53,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.0.0",
+    "convex": "^1.35.1",
     "date-fns": "^3.6.0",
     "embla-carousel-react": "^8.3.0",
     "input-otp": "^1.2.4",
@@ -70,6 +72,7 @@
     "recharts": "^2.15.4",
     "remark-gfm": "^4.0.1",
     "sonner": "^1.5.0",
+    "stripe": "^22.0.2",
     "tailwind-merge": "^2.5.2",
     "tailwindcss-animate": "^1.0.7",
     "tone": "^15.1.22",

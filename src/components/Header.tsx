@@ -1,6 +1,7 @@
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { Map, Play, Sparkles } from 'lucide-react';
 import { useAtomValue } from 'jotai';
+import { SignInButton, SignedIn, SignedOut, UserButton } from '@clerk/clerk-react';
 import { availableXpAtom, completionCountAtom, totalXpAtom } from '@/state/skillTreeAtoms';
 import { TOTAL_NODES } from '@/data/skillTree';
 
@@ -53,6 +54,16 @@ const Header = () => {
               {completed} / {TOTAL_NODES}
             </span>
           )}
+          <SignedOut>
+            <SignInButton mode="modal">
+              <button className="text-xs font-bold text-primary hover:underline">
+                Sign in
+              </button>
+            </SignInButton>
+          </SignedOut>
+          <SignedIn>
+            <UserButton afterSignOutUrl="/" />
+          </SignedIn>
         </div>
       </div>
     </header>

@@ -4,7 +4,6 @@ import type { NodeId } from '@/data/skillTree';
 import { SKILL_NODES, SKILL_NODE_BY_ID } from '@/data/skillTree';
 
 const STORAGE_KEY = 'fq.skillTree.completed.v1';
-const PURCHASE_KEY = 'fq.purchased.v1';
 const XP_KEY = 'fq.xp.total.v1';
 
 function readCompletedSet(): Set<NodeId> {
@@ -106,26 +105,6 @@ export const toggleNodeAtom = atom(null, (get, set, id: NodeId) => {
   set(completedSetAtom, next);
 });
 
-export const purchasedAtom = atom(
-  () => (typeof window !== 'undefined' ? localStorage.getItem(PURCHASE_KEY) === '1' : false),
-  (_get, _set, purchased: boolean) => {
-    if (typeof window === 'undefined') return;
-    if (purchased) localStorage.setItem(PURCHASE_KEY, '1');
-    else localStorage.removeItem(PURCHASE_KEY);
-  },
-);
-
-const purchasedBase = atom(
-  typeof window !== 'undefined' && localStorage.getItem(PURCHASE_KEY) === '1',
-);
-
-export const isPurchasedAtom = atom(
-  (get) => get(purchasedBase),
-  (_get, set, purchased: boolean) => {
-    if (typeof window !== 'undefined') {
-      if (purchased) localStorage.setItem(PURCHASE_KEY, '1');
-      else localStorage.removeItem(PURCHASE_KEY);
-    }
-    set(purchasedBase, purchased);
-  },
-);
+// Purchase state moved to Convex (see usePurchaseStatus). The localStorage
+// flag was intentionally removed so a stale local value can't unlock the app
+// after a sign-out / device change.

@@ -1,4 +1,5 @@
 import type { CagedShape } from '@/lib/cagedSystem';
+import { assetUrl } from '@/lib/assetUrl';
 
 export type ShapeId = CagedShape;
 
@@ -95,7 +96,7 @@ function buildShapeNodes(): SkillNode[] {
       subtitle: `${name}: ${halfFlavor.bot.suffix}`,
       tagline: halfFlavor.bot.tagline,
       description: `Learn the bass side of the ${name.toLowerCase()}. ${teaser}`,
-      videoSrc: `/videos/${shape.toLowerCase()}-bot.mp4`,
+      videoSrc: assetUrl(`/videos/${shape.toLowerCase()}-bot.mp4`),
       prerequisites: ['hub-intro'],
       shape,
       kind: 'bot',
@@ -110,7 +111,7 @@ function buildShapeNodes(): SkillNode[] {
       subtitle: `${name}: ${halfFlavor.top.suffix}`,
       tagline: halfFlavor.top.tagline,
       description: `Learn the treble side of the ${name.toLowerCase()}. ${teaser}`,
-      videoSrc: `/videos/${shape.toLowerCase()}-top.mp4`,
+      videoSrc: assetUrl(`/videos/${shape.toLowerCase()}-top.mp4`),
       prerequisites: [`${shape}-bot`],
       shape,
       kind: 'top',
@@ -125,7 +126,7 @@ function buildShapeNodes(): SkillNode[] {
       subtitle: `${name}: ${halfFlavor.full.suffix}`,
       tagline: halfFlavor.full.tagline,
       description: `Unite top and bottom halves of the ${name.toLowerCase()} into a single musical voice.`,
-      videoSrc: `/videos/${shape.toLowerCase()}-full.mp4`,
+      videoSrc: assetUrl(`/videos/${shape.toLowerCase()}-full.mp4`),
       prerequisites: [`${shape}-top`],
       shape,
       kind: 'full',
@@ -159,7 +160,7 @@ function buildConnectNodes(): SkillNode[] {
       subtitle: `Connect ${flavor[a].name} → ${flavor[b].name}`,
       tagline: 'Bridge two territories. Move between shapes without breaking the line.',
       description: `Master the seam between ${flavor[a].name} and ${flavor[b].name}. Practice lines that cross the boundary cleanly in both directions.`,
-      videoSrc: `/videos/connect-${a.toLowerCase()}${b.toLowerCase()}.mp4`,
+      videoSrc: assetUrl(`/videos/connect-${a.toLowerCase()}${b.toLowerCase()}.mp4`),
       prerequisites: [`${a}-full`, `${b}-full`],
       kind: 'connect' as UnlockKind,
       connectPair: [a, b] as [ShapeId, ShapeId],
@@ -177,7 +178,7 @@ const HUB_INTRO_NODE: SkillNode = {
   tagline: 'A 90-second tour of the map. Free — just click.',
   description:
     "Short intro to how the tree works: practice earns XP, XP unlocks video lessons, and lessons reveal more of the fretboard. When you're ready, unlock C Shape — Top to start.",
-  videoSrc: '/videos/hub-intro.mp4',
+  videoSrc: assetUrl('/videos/hub-intro.mp4'),
   prerequisites: [],
   kind: 'intro',
   gridRow: 0,

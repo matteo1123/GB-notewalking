@@ -476,6 +476,67 @@
   /* Darker markers */
 }
 
+/* Screenshot mode: while the cinematic plays, hide the underlying
+   constellation (other 4 shapes) and the per-note dots so only the
+   highlighted shape sits over a clean fretboard grid. Wrapper class is
+   toggled by NotewalkingExercise; flip SCREENSHOT_MODE there to disable. */
+.screenshot-cinematic .caged-constellation-layer,
+.screenshot-cinematic .note-container,
+.screenshot-cinematic .fretboard-fret-labels {
+  visibility: hidden;
+}
+
+/* Constellation chord-tones breathe in time with the music. The wrapper
+   sets --throb-duration based on bpm (4 beats per cycle). The default is a
+   gentle sway around full brightness so the always-on effect reads as
+   "alive" rather than "blinking."
+
+   Two flavors:
+   - .cc-tones-uniform: every tone throbs together (HUD strip, dialog
+     backdrop, and any view without an "active chord" concept).
+   - .cc-tones-split: only tones belonging to the currently-playing chord
+     throb; the rest sit quietly at reduced opacity. Driven by activeTones
+     prop in CagedConstellation. */
+.cc-tones-uniform {
+  animation: cc-throb var(--throb-duration, 2400ms) ease-in-out infinite;
+  transform-origin: center;
+}
+
+.cc-tones-split .cc-tone-active {
+  animation: cc-throb var(--throb-duration, 2400ms) ease-in-out infinite;
+  transform-origin: center;
+}
+
+.cc-tones-split .cc-tone-passive {
+  opacity: 0.35;
+}
+
+@keyframes cc-throb {
+  0%, 100% { opacity: 0.78; }
+  50% { opacity: 1; }
+}
+
+/* "None" focus mode: hide the dot overlay so only the breathing
+   constellation remains. The pulse swings deeper here because there's no
+   competing visual content — it becomes the focus instead of ambient. */
+.mode-none .note-container {
+  visibility: hidden;
+}
+
+.mode-none .cc-tones-uniform,
+.mode-none .cc-tones-split .cc-tone-active {
+  animation-name: cc-throb-deep;
+}
+
+.mode-none .cc-tones-split .cc-tone-passive {
+  opacity: 0.18;
+}
+
+@keyframes cc-throb-deep {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}
+
 /* ======================================================================
  * Mobile landscape optimization - LARGER SIZES for visibility
  * @LANDSCAPE-LOCK: Landscape-specific fretboard sizing

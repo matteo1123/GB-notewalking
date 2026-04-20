@@ -104,6 +104,9 @@ interface FretboardProps {
   degreeMap?: Map<string, number> | null;
   animatedNote?: Note;
   cagedKey?: string; // If set, renders the chord-tone constellation overlay
+  /** Set of "string-fret" cells currently sounding (active chord). Drives
+   * the constellation's chord-aware throb — only these tones twinkle. */
+  activeTones?: Set<string>;
   onShapeLabelClick?: (shape: CagedShape) => void;
 }
 
@@ -118,6 +121,7 @@ const Fretboard: React.FC<FretboardProps> = ({
   degreeMap,
   animatedNote,
   cagedKey,
+  activeTones,
   onShapeLabelClick,
 }) => {
   const chromaticDegreeMap = rootNote ? createChromaticDegreeMap(getNoteFromFret(rootNote.string, rootNote.fret)) : null;
@@ -134,6 +138,7 @@ const Fretboard: React.FC<FretboardProps> = ({
         fretCount={FRET_COUNT}
         showLabels={false}
         showFretNumbers={false}
+        activeTones={activeTones}
       />
     );
   };

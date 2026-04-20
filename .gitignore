@@ -33,3 +33,7 @@ supabase/.env.local
 .env.local
 .env
 
+# Bunny CDN upload staging — videos/audio shipped via VITE_ASSET_BASE_URL
+videos/
+audio/
+

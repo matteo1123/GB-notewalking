@@ -53,6 +53,11 @@ interface SizedProps {
    * cinematic shape-reveal overlay. Accepts a single shape or an array (e.g.
    * connect nodes spotlight both adjacent shapes simultaneously). */
   soloShape?: CagedShape | CagedShape[];
+  /** Set of "string-fret" cells whose tone is currently sounding. When
+   * provided, splits the chord-tone visuals into active vs passive groups so
+   * CSS can throb only the active ones (live fretboard use). When omitted,
+   * everything goes into a uniform group (HUD strip / dialog backdrop). */
+  activeTones?: Set<string>;
   className?: string;
 }
 
@@ -69,6 +74,7 @@ export function CagedConstellation({
   labelsInside = false,
   singleOctave = false,
   soloShape,
+  activeTones,
   className,
 }: SizedProps) {
   const fretW = width / fretCount;
@@ -184,11 +190,14 @@ export function CagedConstellation({
         </filter>
       </defs>
 
-      {/* faint per-octave constellation lines, drawn first so stars sit on top.
-       * We only connect ADJACENT strings (string diff === 1) so that when a
-       * voicing note is missing (skipped string, or off-fretboard past the
-       * nut), the polyline simply ends there instead of jumping across the
-       * gap to the next present note. This preserves shape integrity. */}
+      {/* Chord-tone visuals (lines + halos + stars). When `activeTones` is
+       * provided we tag each element 'active' or 'passive' based on whether
+       * its position belongs to the currently-sounding chord; CSS then throbs
+       * only the active ones. Without `activeTones` we fall back to uniform
+       * tagging so the wrapper-level animation breathes everything together
+       * (HUD strip / dialog backdrop case). The wrapper class also flips
+       * between split/uniform so the right CSS rule applies. */}
+      <g className={`cc-tones ${activeTones ? 'cc-tones-split' : 'cc-tones-uniform'}`}>
       {visibleShapeData.flatMap(({ shape, octGroups, lit }) =>
         octGroups.flatMap(({ oct, points }) => {
           if (points.length < 2) return [];
@@ -198,9 +207,19 @@ export function CagedConstellation({
             const b = points[i + 1];
             if (Math.abs(a.string - b.string) !== 1) continue;
             if (!isRevealed(a.string, a.fret) || !isRevealed(b.string, b.fret)) continue;
+            // A line throbs only when BOTH endpoints belong to the active
+            // chord — otherwise the line connects an active and passive star
+            // and reads as a partial chord, which is misleading.
+            const cls = activeTones
+              ? activeTones.has(`${a.string}-${a.fret}`) &&
+                activeTones.has(`${b.string}-${b.fret}`)
+                ? 'cc-tone cc-tone-active'
+                : 'cc-tone cc-tone-passive'
+              : 'cc-tone';
             segs.push(
               <line
                 key={`ln-${shape}-${oct}-${i}`}
+                className={cls}
                 x1={xOf(a.fret)}
                 y1={yOf(a.string)}
                 x2={xOf(b.fret)}
@@ -221,34 +240,51 @@ export function CagedConstellation({
       {visibleShapeData.flatMap(({ shape, allTones, lit }) =>
         allTones
           .filter((t) => isRevealed(t.string, t.fret))
-          .map((t) => (
-            <circle
-              key={`halo-${shape}-${t.octaveShift}-${t.string}-${t.fret}`}
-              cx={xOf(t.fret)}
-              cy={yOf(t.string)}
-              r={t.role === 'R' ? haloR_R : haloR_other}
-              fill={CAGED_SHAPE_HEX[shape]}
-              opacity={lit * 0.35}
-              filter="url(#cc-star-glow)"
-            />
-          )),
+          .map((t) => {
+            const cls = activeTones
+              ? activeTones.has(`${t.string}-${t.fret}`)
+                ? 'cc-tone cc-tone-active'
+                : 'cc-tone cc-tone-passive'
+              : 'cc-tone';
+            return (
+              <circle
+                key={`halo-${shape}-${t.octaveShift}-${t.string}-${t.fret}`}
+                className={cls}
+                cx={xOf(t.fret)}
+                cy={yOf(t.string)}
+                r={t.role === 'R' ? haloR_R : haloR_other}
+                fill={CAGED_SHAPE_HEX[shape]}
+                opacity={lit * 0.35}
+                filter="url(#cc-star-glow)"
+              />
+            );
+          }),
       )}
 
       {/* bright star cores */}
       {visibleShapeData.flatMap(({ shape, allTones, lit }) =>
         allTones
           .filter((t) => isRevealed(t.string, t.fret))
-          .map((t) => (
-            <circle
-              key={`star-${shape}-${t.octaveShift}-${t.string}-${t.fret}`}
-              cx={xOf(t.fret)}
-              cy={yOf(t.string)}
-              r={t.role === 'R' ? coreR_R : coreR_other}
-              fill={`url(#cc-star-${shape})`}
-              opacity={lit}
-            />
-          )),
+          .map((t) => {
+            const cls = activeTones
+              ? activeTones.has(`${t.string}-${t.fret}`)
+                ? 'cc-tone cc-tone-active'
+                : 'cc-tone cc-tone-passive'
+              : 'cc-tone';
+            return (
+              <circle
+                key={`star-${shape}-${t.octaveShift}-${t.string}-${t.fret}`}
+                className={cls}
+                cx={xOf(t.fret)}
+                cy={yOf(t.string)}
+                r={t.role === 'R' ? coreR_R : coreR_other}
+                fill={`url(#cc-star-${shape})`}
+                opacity={lit}
+              />
+            );
+          }),
       )}
+      </g>
 
       {/* subtle fret numbers along a band below the strip */}
       {showFretNumbers &&
@@ -322,6 +358,7 @@ export function CagedConstellationFill({
   labelsInside = false,
   singleOctave = false,
   soloShape,
+  activeTones,
   className,
 }: Omit<SizedProps, 'width' | 'height' | 'openStringW'>) {
   const ref = useRef<HTMLDivElement>(null);
@@ -357,6 +394,7 @@ export function CagedConstellationFill({
           labelsInside={labelsInside}
           singleOctave={singleOctave}
           soloShape={soloShape}
+          activeTones={activeTones}
         />
       )}
     </div>

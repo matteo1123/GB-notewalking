@@ -28,6 +28,21 @@ import { computeRevealedFrets } from '@/lib/fretboardReveal';
 
 const MAJOR_KEYS = ['C', 'D', 'E', 'F', 'G', 'A', 'B', 'C#', 'D#', 'F#', 'G#', 'A#'];
 
+// Temporary screenshot helper: when ON, clicking a shape label runs the
+// cinematic in that shape's HOME KEY (so it lands at the open position with
+// open strings included), with a longer hold to give time to grab a still.
+// Flip back to false to restore normal cinematic behavior.
+const SCREENSHOT_MODE = false;
+const SCREENSHOT_HOLD_MS = 3000; // how long the shape stays at full brightness
+const SCREENSHOT_FRET_COUNT = 6; // narrow window so the shape reads big
+const SHAPE_HOME_KEY: Record<CagedShape, string> = {
+  C: 'C',
+  A: 'A',
+  G: 'G',
+  E: 'E',
+  D: 'D',
+};
+
 const DEGREE_COLORS: Record<number, string> = {
   1: '#FF6B6B',
   2: '#4ECDC4',
@@ -50,7 +65,30 @@ function getGuitarPitch(stringNum: number, fret: number): string {
   return `${names[midi % 12]}${Math.floor(midi / 12) - 1}`;
 }
 
-type FocusMode = 'focused' | 'unlocked' | 'full';
+type FocusMode = 'focused' | 'unlocked' | 'full' | 'none';
+
+// Scale-view filter. Determines WHICH degrees of the key get rendered as dots
+// on the fretboard (independent of which frets are revealed by the focus mode).
+//
+// Arpeggio is intentionally NOT chord-aware — it always shows the I chord's
+// {1,3,5,7}. The pedagogical point is that during the IV chord, the user can
+// see clearly which of the I-arpeggio notes are also tones of the IV (those
+// land in the existing yellow active-note highlight) — building intuition for
+// shared tones across the progression.
+type ScaleView = 'major' | 'pentatonic' | 'arpeggio' | 'none';
+const SCALE_VIEW_ORDER: ScaleView[] = ['arpeggio', 'pentatonic', 'major', 'none'];
+const SCALE_VIEW_DEGREES: Record<ScaleView, Set<number>> = {
+  major: new Set([1, 2, 3, 4, 5, 6, 7]),
+  pentatonic: new Set([1, 2, 3, 5, 6]),
+  arpeggio: new Set([1, 3, 5, 7]),
+  none: new Set(),
+};
+const SCALE_VIEW_LABEL: Record<ScaleView, string> = {
+  major: 'Major',
+  pentatonic: 'Penta',
+  arpeggio: 'Arp',
+  none: 'None',
+};
 
 interface NotewalkingExerciseProps {
   initialNode?: NodeId;
@@ -89,6 +127,15 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
   });
   const xpAccRef = useRef(0);
 
+  // Which scale views participate in the rotation. All four enabled = full
+  // cycle (Major → Penta → Arp → None). One enabled = view stays fixed.
+  // Empty set is disallowed by toggleScaleView so currentScaleView always
+  // resolves to something.
+  const [enabledScaleViews, setEnabledScaleViews] = useState<Set<ScaleView>>(
+    () => new Set(SCALE_VIEW_ORDER),
+  );
+  const [cycleIndex, setCycleIndex] = useState(0);
+
   // Cinematic shape spotlight: clicking a shape label fades the screen black,
   // floats just that shape's constellation in slowly, then fades back to the
   // normal fretboard. Any pointer/key cancels.
@@ -97,6 +144,10 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
     shapes: CagedShape[];
     phase: CinematicPhase;
     rect: { left: number; top: number; width: number; height: number };
+    // Optional overrides — populated by SCREENSHOT_MODE so the constellation
+    // renders in the shape's home key with a narrower fret window.
+    cagedKey?: string;
+    fretCount?: number;
   } | null>(null);
   const fretboardWrapperRef = useRef<HTMLDivElement>(null);
   const stageContainerRef = useRef<HTMLDivElement>(null);
@@ -135,10 +186,26 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
     }
     cinematicTimersRef.current.forEach((t) => clearTimeout(t));
     cinematicTimersRef.current = [];
+    // Screenshot mode: re-anchor the cinematic to the shape's home key with a
+    // narrower fret window, and shrink the stage width so each fret in the
+    // overlay matches the density of the live fretboard. The shape lands on
+    // the left edge of the fretboard — same place it would in its home key.
+    // Also force the live fretboard's key to match so the underlying
+    // constellation/dots align with the highlighted overlay.
+    const useScreenshot = SCREENSHOT_MODE && shapes.length === 1;
+    const stageWidth = useScreenshot
+      ? (SCREENSHOT_FRET_COUNT / 22) * el.offsetWidth
+      : el.offsetWidth;
+    const cinematicCagedKey = useScreenshot ? SHAPE_HOME_KEY[shapes[0]] : undefined;
+    const cinematicFretCount = useScreenshot ? SCREENSHOT_FRET_COUNT : undefined;
+    const soloHoldMs = useScreenshot ? SCREENSHOT_HOLD_MS : 1840;
+    if (useScreenshot) setKey(SHAPE_HOME_KEY[shapes[0]]);
     setCinematic({
       shapes,
       phase: 'init',
-      rect: { left, top, width: el.offsetWidth, height: el.offsetHeight },
+      rect: { left, top, width: stageWidth, height: el.offsetHeight },
+      cagedKey: cinematicCagedKey,
+      fretCount: cinematicFretCount,
     });
     // Phase progression: init (paint black + start fading shape in) → solo
     // (shape at full brightness) → reveal (fade overlay + shape out together).
@@ -150,9 +217,11 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
     cinematicTimersRef.current.push(
       setTimeout(() => {
         setCinematic((c) => (c ? { ...c, phase: 'reveal' } : c));
-      }, 1900),
+      }, 60 + soloHoldMs),
     );
-    cinematicTimersRef.current.push(setTimeout(() => setCinematic(null), 2900));
+    cinematicTimersRef.current.push(
+      setTimeout(() => setCinematic(null), 60 + soloHoldMs + 1000),
+    );
   }, []);
 
   useEffect(() => {
@@ -219,6 +288,45 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
   const { currentChordIndex, currentChord, handleMetronomeTick } = useChordProgression({
     settings,
   });
+
+  // Advance the scale-view rotation each time the chord progression wraps from
+  // the LAST chord back to the FIRST (one full A→B traversal). Using a ref
+  // sidesteps double-firing on Strict Mode mounts; the comparison only triggers
+  // on a real index change anyway.
+  const prevChordIndexRef = useRef(currentChordIndex);
+  useEffect(() => {
+    const wrapsToZero =
+      prevChordIndexRef.current === settings.selectedChords.length - 1 &&
+      currentChordIndex === 0;
+    if (wrapsToZero) setCycleIndex((i) => i + 1);
+    prevChordIndexRef.current = currentChordIndex;
+  }, [currentChordIndex, settings.selectedChords.length]);
+
+  const currentScaleView = useMemo<ScaleView>(() => {
+    const enabled = SCALE_VIEW_ORDER.filter((v) => enabledScaleViews.has(v));
+    if (enabled.length === 0) return 'major';
+    return enabled[cycleIndex % enabled.length];
+  }, [enabledScaleViews, cycleIndex]);
+
+  const allowedDegrees = SCALE_VIEW_DEGREES[currentScaleView];
+
+  const toggleScaleView = useCallback((view: ScaleView) => {
+    setEnabledScaleViews((prev) => {
+      const next = new Set(prev);
+      if (next.has(view)) {
+        // Refuse to disable the last one — empty set has no meaningful render
+        // and cycleIndex math would have nothing to land on.
+        if (next.size === 1) return prev;
+        next.delete(view);
+      } else {
+        next.add(view);
+      }
+      return next;
+    });
+    // Reset rotation so the user immediately sees a deterministic state after
+    // toggling (otherwise they'd see whatever the modulo lands on next).
+    setCycleIndex(0);
+  }, []);
 
   const currentChordA = settings.selectedChords[0] as ChordNumeral;
   const currentChordB = settings.selectedChords[1] as ChordNumeral;
@@ -312,6 +420,12 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
   }, [micEnabled]);
 
   const revealedFrets = useMemo(() => {
+    if (focusMode === 'none') {
+      // Hides all dots so only the constellation remains. The constellation
+      // doesn't read revealedFrets in the live fretboard render, so its stars
+      // stay fully visible underneath the (now empty) dot layer.
+      return new Set<string>();
+    }
     if (focusMode === 'full') {
       const all = new Set<string>();
       for (let s = 1; s <= 6; s++) for (let f = 0; f <= 22; f++) all.add(`${s}-${f}`);
@@ -383,6 +497,10 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
     // Match by note NAME (not octave-specific pitch) so every occurrence of
     // the played/sung/keyed note across all revealed frets lights up.
     Array.from(degreeMap.keys()).forEach((noteName) => {
+      // Scale-view filter: drop notes whose degree isn't in the currently-
+      // displayed view (e.g., during arpeggio mode, only 1/3/5/7 survive).
+      const deg = degreeMap.get(noteName);
+      if (!deg || !allowedDegrees.has(deg)) return;
       findAllNoteOccurrences(noteName).forEach((pos) => {
         const onRevealed = revealedFrets.has(`${pos.string}-${pos.fret}`);
         const isCurrentlyPlaying =
@@ -399,7 +517,7 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
     });
 
     return notes.filter((n) => n.isPlaying || revealedFrets.has(`${n.string}-${n.fret}`));
-  }, [degreeMap, settings.selectedChords, currentChordIndex, highlightedNoteName, revealedFrets]);
+  }, [degreeMap, settings.selectedChords, currentChordIndex, highlightedNoteName, revealedFrets, allowedDegrees]);
 
   const scaleDegree = detectedNote ? calculateDegreeFromRoot(detectedNote, key) : null;
   // Show keyboard-pressed degree in the readout when there's no live mic
@@ -440,6 +558,27 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
     const numeral = settings.selectedChords[currentChordIndex] as ChordNumeral;
     return new Set(getChordTones(numeral));
   }, [settings.selectedChords, currentChordIndex]);
+
+  // Set of "string-fret" cells whose note belongs to the chord that is
+  // currently sounding. Drives the chord-aware constellation throb so only
+  // the active chord's tones twinkle, not every CAGED tone on the board.
+  const activeChordPositions = useMemo(() => {
+    const set = new Set<string>();
+    const degreeToNotes = new Map<number, string[]>();
+    degreeMap.forEach((deg, note) => {
+      if (!degreeToNotes.has(deg)) degreeToNotes.set(deg, []);
+      degreeToNotes.get(deg)!.push(note);
+    });
+    const numeral = settings.selectedChords[currentChordIndex] as ChordNumeral;
+    getChordTones(numeral).forEach((t) => {
+      degreeToNotes.get(t)?.forEach((noteName) => {
+        findAllNoteOccurrences(noteName).forEach((p) => {
+          set.add(`${p.string}-${p.fret}`);
+        });
+      });
+    });
+    return set;
+  }, [degreeMap, settings.selectedChords, currentChordIndex]);
 
   // Award XP only when the user actually hits a chord tone on a revealed fret.
   // Diminishes as more nodes are unlocked (rate = max(0.005, 0.1 * 0.7^paidCount) per hit).
@@ -570,8 +709,15 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
             <div className="flex-1 overflow-hidden flex items-center justify-center p-2 min-h-0">
               <div
                 ref={fretboardWrapperRef}
+                // --throb-duration drives the constellation's chord-tone pulse.
+                // Set to 4 beats (one 4/4 measure) at the current bpm — slow
+                // enough to feel like a breath rather than a metronome flicker,
+                // fast enough to read as "in time with the music."
+                style={{ ['--throb-duration' as string]: `${(60000 / bpm) * 4}ms` }}
                 className={`w-full h-full max-w-[1200px] flex items-center justify-center notewalking-fretboard-override ${
                   currentChordIndex === 0 ? 'active-chord-a' : 'active-chord-b'
+                } ${cinematic && SCREENSHOT_MODE ? 'screenshot-cinematic' : ''} ${
+                  focusMode === 'none' ? 'mode-none' : ''
                 }`}
               >
                 <Fretboard
@@ -580,6 +726,7 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
                   showDegreeNumbers
                   isEditable={false}
                   cagedKey={key}
+                  activeTones={activeChordPositions}
                   onShapeLabelClick={triggerCinematic}
                 />
               </div>
@@ -644,7 +791,7 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
               <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                 Fretboard
               </div>
-              <div className="grid grid-cols-3 gap-1">
+              <div className="grid grid-cols-4 gap-1">
                 <button
                   className={`h-7 text-[10px] rounded font-bold ${
                     focusMode === 'focused'
@@ -679,6 +826,17 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
                 >
                   All
                 </button>
+                <button
+                  className={`h-7 text-[10px] rounded font-bold ${
+                    focusMode === 'none'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted text-muted-foreground'
+                  }`}
+                  onClick={() => setFocusMode('none')}
+                  title="Hide the dots — just the breathing constellations"
+                >
+                  None
+                </button>
               </div>
               {focusMode === 'focused' && (
                 <Select
@@ -697,6 +855,44 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
                   </SelectContent>
                 </Select>
               )}
+            </div>
+
+            <div className="border-t border-gray-800 pt-2 mt-1 flex flex-col gap-1">
+              <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center justify-between">
+                <span>Scale</span>
+                {enabledScaleViews.size > 1 && (
+                  <span className="text-primary normal-case font-semibold tracking-wider">
+                    ▶ {SCALE_VIEW_LABEL[currentScaleView]}
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-4 gap-1">
+                {SCALE_VIEW_ORDER.map((view) => {
+                  const enabled = enabledScaleViews.has(view);
+                  const isCurrent =
+                    currentScaleView === view && enabledScaleViews.size > 1;
+                  return (
+                    <button
+                      key={view}
+                      className={`h-7 text-[10px] rounded font-bold transition-all ${
+                        enabled
+                          ? isCurrent
+                            ? 'bg-primary text-primary-foreground ring-2 ring-yellow-400'
+                            : 'bg-primary text-primary-foreground'
+                          : 'bg-muted text-muted-foreground'
+                      }`}
+                      onClick={() => toggleScaleView(view)}
+                      title={
+                        enabled
+                          ? `Remove ${SCALE_VIEW_LABEL[view]} from cycle`
+                          : `Add ${SCALE_VIEW_LABEL[view]} to cycle`
+                      }
+                    >
+                      {SCALE_VIEW_LABEL[view]}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             <Button
@@ -755,11 +951,15 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
         </div>
         {cinematic && (
           <>
-            <div
-              className={`cinematic-bg phase-${cinematic.phase}`}
-              onClick={cancelCinematic}
-              onTouchStart={cancelCinematic}
-            />
+            {/* Black backdrop is suppressed in screenshot mode so the live
+                fretboard stays visible behind the highlighted shape. */}
+            {!SCREENSHOT_MODE && (
+              <div
+                className={`cinematic-bg phase-${cinematic.phase}`}
+                onClick={cancelCinematic}
+                onTouchStart={cancelCinematic}
+              />
+            )}
             <div
               className={`cinematic-stage phase-${cinematic.phase}`}
               style={{
@@ -770,8 +970,8 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
               }}
             >
               <CagedConstellationFill
-                cagedKey={key}
-                fretCount={22}
+                cagedKey={cinematic.cagedKey ?? key}
+                fretCount={cinematic.fretCount ?? 22}
                 showLabels={false}
                 showFretNumbers={false}
                 soloShape={cinematic.shapes}

@@ -1,4 +1,5 @@
 import { useCallback, useRef } from 'react';
+import { assetUrl } from '@/lib/assetUrl';
 
 const SHARP_TO_FLAT: Record<string, string> = {
   'C#': 'Db',
@@ -25,7 +26,7 @@ export function useNotePlayer(audioContext: AudioContext | null) {
       if (!audioContext) return null;
       const formatted = sharpToFlat(chord);
       if (bufferCache.current[formatted]) return bufferCache.current[formatted];
-      const url = `/audio/chords/${formatted}.mp3`;
+      const url = assetUrl(`/audio/chords/${formatted}.mp3`);
       try {
         const res = await fetch(url);
         if (!res.ok) {

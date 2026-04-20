@@ -34,64 +34,43 @@ const SHAPE_HOME_KEY: Record<CagedShape, string> = {
   D: 'D',
 };
 
-// Shape voicings sit within the first ~5 frets in their home key, so the dialog
-// renders only that window — much more readable than the full 22-fret span.
-const SHAPE_REFERENCE_FRETS = 5;
+// How many frets to show in the dialog backdrop. Wider windows (more frets)
+// space stars further apart, which contributes to the "approaching from light
+// years" feel — the constellation reads as a distant sky, not a chart.
+function backdropFrets(count: number) {
+  if (count <= 1) return 6;
+  if (count === 2) return 9;
+  return 13;
+}
 
 /**
- * One card per shape inside the SkillNode dialog. Pairs a static chord-diagram
- * image with the live constellation rendering, so users can connect "this is
- * the C chord shape" to "this is what it looks like as stars on the fretboard."
- *
- * The chord diagram lives at /chords/<shape>.png; if it isn't there yet we
- * gracefully show a placeholder rather than a broken image.
- *
- * `dense` switches the inner layout from side-by-side (room to breathe) to
- * stacked (img above constellation) — used by the intro card grid where we
- * cram all 5 shapes into one row.
+ * Tiny chord-diagram thumbnail used in the dialog. Just an image (no frame
+ * around the constellation any more — that lives behind the whole dialog
+ * as ambient backdrop). Falls back to the shape letter if the PNG isn't
+ * present yet.
  */
-function ShapeReferenceCard({ shape, dense }: { shape: CagedShape; dense?: boolean }) {
+function SmallChordDiagram({ shape }: { shape: CagedShape }) {
   const [imgFailed, setImgFailed] = useState(false);
   const theme = SHAPE_THEMES[shape];
   return (
-    <div className="flex flex-col gap-2 p-3 bg-black/40 rounded-md border border-white/5">
-      <div
-        className={`text-[10px] font-black tracking-widest uppercase text-center ${theme.text}`}
-      >
-        {shape} Shape
-      </div>
-      <div
-        className={
-          dense
-            ? 'flex flex-col gap-2'
-            : 'grid grid-cols-2 gap-2'
-        }
-      >
-        <div className="aspect-[3/4] bg-black/60 rounded border border-white/5 overflow-hidden flex items-center justify-center">
-          {imgFailed ? (
-            <span className="text-[10px] text-slate-600 px-2 text-center">
-              chord diagram TBD
-            </span>
-          ) : (
-            <img
-              src={`/chords/${shape.toLowerCase()}.png`}
-              alt={`${shape} chord diagram`}
-              className="w-full h-full object-contain"
-              onError={() => setImgFailed(true)}
-            />
-          )}
-        </div>
-        <div className="aspect-[3/4] bg-black/60 rounded border border-white/5 overflow-hidden relative">
-          <CagedConstellationFill
-            cagedKey={SHAPE_HOME_KEY[shape]}
-            fretCount={SHAPE_REFERENCE_FRETS}
-            soloShape={shape}
-            singleOctave
-            showLabels={false}
-            showFretNumbers={false}
+    <div className="flex flex-col items-center gap-1">
+      <div className="w-16 h-16 sm:w-20 sm:h-20 bg-black/70 rounded border border-white/10 overflow-hidden flex items-center justify-center">
+        {imgFailed ? (
+          <span className={`text-base font-black tracking-widest uppercase ${theme.text}`}>
+            {shape}
+          </span>
+        ) : (
+          <img
+            src={`/chords/${shape.toLowerCase()}.png`}
+            alt={`${shape} chord diagram`}
+            className="w-full h-full object-contain"
+            onError={() => setImgFailed(true)}
           />
-        </div>
+        )}
       </div>
+      <span className={`text-[9px] font-black tracking-widest uppercase ${theme.text}`}>
+        {shape}
+      </span>
     </div>
   );
 }
@@ -671,15 +650,12 @@ export function SkillTree() {
 
       {/* Detail dialog */}
       <Dialog open={!!selected} onOpenChange={(open) => !open && setSelectedId(null)}>
-        <DialogContent
-          className={`bg-slate-950 border-white/10 ${
-            selected?.kind === 'intro'
-              ? 'max-w-5xl'
-              : selected?.connectPair
-              ? 'max-w-3xl'
-              : 'max-w-2xl'
-          }`}
-        >
+        {/* Don't add `relative` here — DialogContent already has `fixed`,
+            and tailwind-merge would drop `fixed` in favor of `relative`,
+            kicking the dialog out of its centered overlay position into
+            normal document flow. `fixed` itself is a containing block for
+            absolutely positioned children, so the backdrop still works. */}
+        <DialogContent className="bg-slate-950 border-white/10 max-w-2xl overflow-hidden">
           {selected && (() => {
             // Per-node reference shapes shown alongside the lesson video:
             //  - shape nodes get their own shape
@@ -694,9 +670,41 @@ export function SkillTree() {
                 : selected.shape
                 ? [selected.shape]
                 : [];
-            const dense = refShapes.length >= 3;
+            // Backdrop key: anchor on the FIRST shape's home key so its
+            // voicing sits at the open position, with any companion shapes
+            // sliding up the neck from there. Intro is special-cased to
+            // C-key because that's the canonical CAGED layout.
+            const bgKey =
+              selected.kind === 'intro'
+                ? 'C'
+                : refShapes[0]
+                ? SHAPE_HOME_KEY[refShapes[0]]
+                : 'C';
             return (
             <>
+              {/* Ambient constellation backdrop. Sits behind everything else
+                  in the dialog (z-0) at low opacity so it reads as a distant
+                  star field, not a chart. The dialog's overflow-hidden lets
+                  the wider fret window bleed past the corners — which is the
+                  point: it's OK if some stars/lines are clipped, it sells
+                  the "approaching from many light-years away" feel. */}
+              {refShapes.length > 0 && (
+                <div className="absolute inset-0 z-0 pointer-events-none opacity-30">
+                  <CagedConstellationFill
+                    cagedKey={bgKey}
+                    fretCount={backdropFrets(refShapes.length)}
+                    soloShape={refShapes}
+                    singleOctave
+                    showLabels={false}
+                    showFretNumbers={false}
+                  />
+                </div>
+              )}
+
+              {/* Foreground content — own stacking context above the backdrop.
+                  Recreates the DialogContent's grid+gap so the layout reads
+                  identically to before we wrapped it. */}
+              <div className="relative z-10 grid gap-4">
               <DialogHeader>
                 <DialogTitle className="text-xl">{selected.subtitle}</DialogTitle>
                 <DialogDescription>{selected.tagline}</DialogDescription>
@@ -725,14 +733,9 @@ export function SkillTree() {
               </div>
 
               {refShapes.length > 0 && (
-                <div
-                  className="grid gap-3"
-                  style={{
-                    gridTemplateColumns: `repeat(${refShapes.length}, minmax(0, 1fr))`,
-                  }}
-                >
+                <div className="flex justify-center gap-3 flex-wrap">
                   {refShapes.map((s) => (
-                    <ShapeReferenceCard key={s} shape={s} dense={dense} />
+                    <SmallChordDiagram key={s} shape={s} />
                   ))}
                 </div>
               )}
@@ -793,6 +796,7 @@ export function SkillTree() {
                     </Button>
                   )}
                 </div>
+              </div>
               </div>
             </>
             );

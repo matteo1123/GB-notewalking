@@ -16,4 +16,15 @@ export default defineSchema({
   })
     .index('by_user', ['userId'])
     .index('by_session', ['stripeSessionId']),
+
+  // One row per user — captures progress so users can switch between phone
+  // and desktop. The completedNodes array is bounded (~22 max — total
+  // skill-tree node count), well under Convex's 8192/row limit. We store node
+  // IDs as strings so the schema stays decoupled from data/skillTree.ts.
+  userProgress: defineTable({
+    userId: v.id('users'),
+    totalXp: v.number(),
+    completedNodes: v.array(v.string()),
+    updatedAt: v.number(),
+  }).index('by_user', ['userId']),
 });

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { Link } from 'react-router-dom';
-import { SignedIn, SignedOut, UserButton, useClerk, useAuth } from '@clerk/clerk-react';
+import { UserButton, useClerk, useAuth } from '@clerk/clerk-react';
 import { CheckCircle, Lock, Play, PlayCircle, Sparkles } from 'lucide-react';
 import {
   Dialog,
@@ -131,7 +131,7 @@ import {
   toggleNodeAtom,
 } from '@/state/skillTreeAtoms';
 import { usePurchaseStatus } from '@/hooks/usePurchaseStatus';
-import { useStartCheckout } from '@/hooks/useStartCheckout';
+import { useBuyFlow } from '@/hooks/useBuyFlow';
 
 const NODE_SIZE = 80;
 const GAP = 250;
@@ -143,29 +143,13 @@ export function SkillTree() {
   const toggle = useSetAtom(toggleNodeAtom);
   const addXp = useSetAtom(addXpAtom);
   const { purchased } = usePurchaseStatus();
-  const { isSignedIn } = useAuth();
+  const { isSignedIn, isLoaded: isAuthLoaded } = useAuth();
   const clerk = useClerk();
-  const { start: startCheckout } = useStartCheckout();
-
-  // If a not-signed-in user clicked the buy CTA, we set this flag and open the
-  // Clerk sign-up modal. The effect below picks up the new signed-in state and
-  // continues straight to Stripe — no extra click on the user's part.
-  const [pendingCheckout, setPendingCheckout] = useState(false);
-  useEffect(() => {
-    if (pendingCheckout && isSignedIn) {
-      setPendingCheckout(false);
-      startCheckout();
-    }
-  }, [pendingCheckout, isSignedIn, startCheckout]);
+  const { buy } = useBuyFlow();
 
   const goToCheckout = () => {
     if (purchased) return;
-    if (isSignedIn) {
-      startCheckout();
-    } else {
-      setPendingCheckout(true);
-      clerk.openSignUp({});
-    }
+    buy();
   };
 
   const handleUnlockClick = (id: NodeId) => {
@@ -208,23 +192,30 @@ export function SkillTree() {
     return pos;
   }, [getX, getY]);
 
-  // Center the viewport on the hub on first render. Defer one extra frame
-  // past the first paint — on the landscape-rotated mobile layout, the
-  // scroller's clientWidth/clientHeight reflect the pre-rotation dimensions
-  // until the CSS transform has been applied, so a double-rAF gets us a
-  // stable size before we compute the centering offset.
+  // Center the viewport on the right entry point on first render. If the
+  // landing video hasn't been watched yet, center on it so first-time
+  // visitors immediately see the only thing they're meant to click. Once the
+  // landing video is complete, center on the CAGED hub (the buy CTA when
+  // unpaid, the course root when paid).
+  // Defer one extra frame past the first paint — on the landscape-rotated
+  // mobile layout, the scroller's clientWidth/clientHeight reflect the
+  // pre-rotation dimensions until the CSS transform has been applied, so a
+  // double-rAF gets us a stable size before we compute the centering offset.
   useEffect(() => {
     if (hasScrolledRef.current) return;
     const container = scrollerRef.current;
     if (!container) return;
+    const target = completed.has('landing-video')
+      ? SKILL_NODE_BY_ID['hub-intro']
+      : SKILL_NODE_BY_ID['landing-video'];
     let raf2 = 0;
     const raf1 = requestAnimationFrame(() => {
       raf2 = requestAnimationFrame(() => {
-        const hubX = getX(0) + PAD + NODE_SIZE / 2;
-        const hubY = getY(0) + PAD + NODE_SIZE / 2;
+        const cx = getX(target.gridCol) + PAD + NODE_SIZE / 2;
+        const cy = getY(target.gridRow) + PAD + NODE_SIZE / 2;
         container.scrollTo({
-          left: hubX - container.clientWidth / 2,
-          top: hubY - container.clientHeight / 2,
+          left: cx - container.clientWidth / 2,
+          top: cy - container.clientHeight / 2,
           behavior: 'auto',
         });
         hasScrolledRef.current = true;
@@ -234,7 +225,7 @@ export function SkillTree() {
       cancelAnimationFrame(raf1);
       cancelAnimationFrame(raf2);
     };
-  }, [getX, getY]);
+  }, [getX, getY, completed]);
 
   const selected = selectedId ? SKILL_NODE_BY_ID[selectedId] : null;
   const selectedCompleted = selected ? completed.has(selected.id) : false;
@@ -486,13 +477,14 @@ export function SkillTree() {
         <div className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-purple-500/5 rounded-full blur-[150px]" />
       </div>
 
-      {/* HUD. Everything in here is decorative status — no clickable children —
-          so we leave every child pointer-events-none. On mobile the HUD stacks
-          vertically and can occupy a sizable portion of the screen; if any
-          child trapped pointer events, touches that started on the HUD would
-          die there instead of passing through to the scroller beneath, which
-          broke panning on phones. */}
-      <div className="absolute top-0 left-0 right-0 z-50 p-4 sm:p-6 pointer-events-none flex flex-row flex-wrap sm:flex-nowrap justify-between items-start gap-4 bg-gradient-to-b from-black/60 to-transparent">
+      {/* HUD. `fixed` so it stays pinned even if any ancestor ends up
+          scrolling (mobile WebView, page-zoom, address-bar collapse, etc.).
+          When inside ForceLandscapeWrapper on portrait mobile, the wrapper's
+          `transform` makes IT the containing block for fixed descendants, so
+          this still pins to the rotated layout's top correctly.
+          Everything in here is decorative status with pointer-events-none on
+          children, so panning gestures pass through to the scroller below. */}
+      <div className="fixed top-0 left-0 right-0 z-50 p-4 sm:p-6 pointer-events-none flex flex-row flex-wrap sm:flex-nowrap justify-between items-start gap-4 bg-gradient-to-b from-black/60 to-transparent">
         <div className="bg-black/40 backdrop-blur-md border border-white/5 p-4 rounded-2xl shadow-2xl flex flex-col">
           <div className="flex items-center gap-2 mb-1">
             <img src="/logo2.png" alt="GuitarBrain" className="h-6 w-6 object-contain" />
@@ -507,7 +499,7 @@ export function SkillTree() {
             <div className="flex items-center gap-1.5">
               <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                {completedCount}/{SKILL_NODES.length} Skills Mastered
+                {completedCount}/{SKILL_NODES.length} Lessons Unlocked
               </span>
             </div>
             <div className="w-16 sm:w-24 h-1 bg-white/5 rounded-full overflow-hidden">
@@ -551,23 +543,37 @@ export function SkillTree() {
               {availableXp} XP
             </span>
           </div>
-          <SignedOut>
+          {/* Render auth UI from useAuth() directly rather than <SignedIn>/
+              <SignedOut> so users see SOMETHING even when Clerk's JS bundle
+              fails to load (e.g. DNS misconfig). The Clerk components return
+              null until clerk loads, which made the HUD look like the app
+              had no auth at all. */}
+          {!isAuthLoaded ? (
             <button
-              onClick={() => clerk.openSignUp({})}
-              className="bg-primary text-primary-foreground hover:bg-primary/90 px-4 sm:px-5 py-2 rounded-full shadow-lg h-[42px] text-xs font-black tracking-wider transition-colors"
+              disabled
+              className="bg-black/40 backdrop-blur-md border border-white/10 px-3 sm:px-4 py-2 rounded-full shadow-lg h-[42px] text-xs font-black tracking-wider text-slate-400 cursor-wait"
+              title="Reaching auth server…"
             >
-              Sign up
+              Loading sign-in…
             </button>
-            <button
-              onClick={() => clerk.openSignIn({})}
-              className="bg-black/40 hover:bg-black/60 backdrop-blur-md border border-white/10 hover:border-white/30 px-3 sm:px-4 py-2 rounded-full shadow-lg h-[42px] text-xs font-black tracking-wider text-slate-200 transition-colors"
-            >
-              Sign in
-            </button>
-          </SignedOut>
-          <SignedIn>
+          ) : !isSignedIn ? (
+            <>
+              <button
+                onClick={() => clerk.openSignUp({})}
+                className="bg-primary text-primary-foreground hover:bg-primary/90 px-4 sm:px-5 py-2 rounded-full shadow-lg h-[42px] text-xs font-black tracking-wider transition-colors"
+              >
+                Sign up
+              </button>
+              <button
+                onClick={() => clerk.openSignIn({})}
+                className="bg-black/40 hover:bg-black/60 backdrop-blur-md border border-white/10 hover:border-white/30 px-3 sm:px-4 py-2 rounded-full shadow-lg h-[42px] text-xs font-black tracking-wider text-slate-200 transition-colors"
+              >
+                Sign in
+              </button>
+            </>
+          ) : (
             <UserButton afterSignOutUrl="/" />
-          </SignedIn>
+          )}
         </div>
       </div>
 

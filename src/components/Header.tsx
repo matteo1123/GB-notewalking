@@ -4,6 +4,7 @@ import { useAtomValue } from 'jotai';
 import { SignInButton, SignedIn, SignedOut, UserButton } from '@clerk/clerk-react';
 import { availableXpAtom, completionCountAtom, totalXpAtom } from '@/state/skillTreeAtoms';
 import { TOTAL_NODES } from '@/data/skillTree';
+import { usePurchaseStatus } from '@/hooks/usePurchaseStatus';
 
 const navClass = ({ isActive }: { isActive: boolean }) =>
   `inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
@@ -18,6 +19,7 @@ const Header = () => {
   const availableXp = useAtomValue(availableXpAtom);
   const location = useLocation();
   const onPractice = location.pathname === '/practice';
+  const { purchased } = usePurchaseStatus();
 
   return (
     <header className="w-full border-b border-white/5 bg-black/60 backdrop-blur-md shrink-0">
@@ -34,10 +36,12 @@ const Header = () => {
             <Map className="h-4 w-4" />
             <span className="hidden sm:inline">Skill Tree</span>
           </NavLink>
-          <NavLink to="/practice" className={navClass}>
-            <Play className="h-4 w-4" />
-            <span className="hidden sm:inline">Practice</span>
-          </NavLink>
+          {purchased && (
+            <NavLink to="/practice" className={navClass}>
+              <Play className="h-4 w-4" />
+              <span className="hidden sm:inline">Practice</span>
+            </NavLink>
+          )}
         </nav>
 
         <div className="flex items-center gap-3 text-xs font-mono tabular-nums">

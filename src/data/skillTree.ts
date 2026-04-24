@@ -4,6 +4,7 @@ import { assetUrl } from '@/lib/assetUrl';
 export type ShapeId = CagedShape;
 
 export type NodeId =
+  | 'landing-video'
   | 'hub-intro'
   | `${ShapeId}-top`
   | `${ShapeId}-bot`
@@ -14,7 +15,11 @@ export type NodeId =
   | 'connect-ED'
   | 'connect-DC';
 
-export type UnlockKind = 'intro' | 'top' | 'bot' | 'full' | 'connect';
+export type UnlockKind = 'landing' | 'intro' | 'top' | 'bot' | 'full' | 'connect';
+
+// Free entry-point video grants this much XP the first time it's watched —
+// just enough to make the unlocked CAGED hub feel earned, not given.
+export const LANDING_VIDEO_XP_REWARD = 5;
 
 export interface SkillNode {
   id: NodeId;
@@ -34,6 +39,7 @@ export interface SkillNode {
 }
 
 export const UNLOCK_COST: Record<UnlockKind, number> = {
+  landing: 0,
   intro: 0,
   top: 10,
   bot: 15,
@@ -173,20 +179,39 @@ function buildConnectNodes(): SkillNode[] {
 
 const HUB_INTRO_NODE: SkillNode = {
   id: 'hub-intro',
-  title: 'Start Here',
-  subtitle: 'Welcome to GuitarBrain',
-  tagline: 'A 90-second tour of the map. Free — just click.',
+  title: 'CAGED Overview',
+  subtitle: 'The full course unlocks here',
+  tagline: 'A 90-second tour of the map — and the gateway to the whole course.',
   description:
     "Short intro to how the tree works: practice earns XP, XP unlocks video lessons, and lessons reveal more of the fretboard. When you're ready, unlock C Shape — Top to start.",
   videoSrc: assetUrl('/videos/hub-intro.mp4'),
-  prerequisites: [],
+  prerequisites: ['landing-video'],
   kind: 'intro',
   gridRow: 0,
   gridCol: 0,
   unlockCost: UNLOCK_COST.intro,
 };
 
+// Landing video — south of the hub, no prereqs, free to watch. Watching it
+// grants LANDING_VIDEO_XP_REWARD and unlocks the CAGED hub, which then becomes
+// the paywall trigger.
+const LANDING_VIDEO_NODE: SkillNode = {
+  id: 'landing-video',
+  title: 'Watch the Intro',
+  subtitle: 'Welcome to GuitarBrain',
+  tagline: 'A two-minute look at what this app does.',
+  description:
+    'Quick intro video — no account needed. Watch it to earn 5 XP and reveal the CAGED course above.',
+  videoSrc: assetUrl('/videos/landing-intro.mp4'),
+  prerequisites: [],
+  kind: 'landing',
+  gridRow: 2.4,
+  gridCol: 0,
+  unlockCost: UNLOCK_COST.landing,
+};
+
 export const SKILL_NODES: SkillNode[] = [
+  LANDING_VIDEO_NODE,
   HUB_INTRO_NODE,
   ...buildShapeNodes(),
   ...buildConnectNodes(),

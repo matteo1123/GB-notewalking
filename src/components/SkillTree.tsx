@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useAtomValue, useSetAtom } from 'jotai';
-import { Link, useNavigate } from 'react-router-dom';
-import { SignInButton, SignedIn, SignedOut, UserButton } from '@clerk/clerk-react';
+import { Link } from 'react-router-dom';
+import { SignedIn, SignedOut, UserButton, useClerk, useAuth } from '@clerk/clerk-react';
 import { CheckCircle, Lock, Play, PlayCircle, Sparkles } from 'lucide-react';
 import {
   Dialog,
@@ -13,6 +13,7 @@ import {
 import { Button } from '@/components/ui/button';
 import {
   HUB_THEME,
+  LANDING_VIDEO_XP_REWARD,
   SHAPE_THEMES,
   SKILL_NODES,
   SKILL_NODE_BY_ID,
@@ -124,11 +125,13 @@ function ConstellationFretboard({ completed }: { completed: Set<NodeId> }) {
   );
 }
 import {
+  addXpAtom,
   availableXpAtom,
   completedSetAtom,
   toggleNodeAtom,
 } from '@/state/skillTreeAtoms';
 import { usePurchaseStatus } from '@/hooks/usePurchaseStatus';
+import { useStartCheckout } from '@/hooks/useStartCheckout';
 
 const NODE_SIZE = 80;
 const GAP = 250;
@@ -138,15 +141,47 @@ export function SkillTree() {
   const completed = useAtomValue(completedSetAtom);
   const availableXp = useAtomValue(availableXpAtom);
   const toggle = useSetAtom(toggleNodeAtom);
+  const addXp = useSetAtom(addXpAtom);
   const { purchased } = usePurchaseStatus();
-  const navigate = useNavigate();
-  // Wraps the node-complete toggle with a paywall gate: if the user hasn't
-  // purchased yet, the very first "Start" click (hub-intro) routes them to
-  // /unlock instead of marking the intro complete. Once purchased, the normal
-  // XP-gated flow takes over for every other node.
+  const { isSignedIn } = useAuth();
+  const clerk = useClerk();
+  const { start: startCheckout } = useStartCheckout();
+
+  // If a not-signed-in user clicked the buy CTA, we set this flag and open the
+  // Clerk sign-up modal. The effect below picks up the new signed-in state and
+  // continues straight to Stripe — no extra click on the user's part.
+  const [pendingCheckout, setPendingCheckout] = useState(false);
+  useEffect(() => {
+    if (pendingCheckout && isSignedIn) {
+      setPendingCheckout(false);
+      startCheckout();
+    }
+  }, [pendingCheckout, isSignedIn, startCheckout]);
+
+  const goToCheckout = () => {
+    if (purchased) return;
+    if (isSignedIn) {
+      startCheckout();
+    } else {
+      setPendingCheckout(true);
+      clerk.openSignUp({});
+    }
+  };
+
   const handleUnlockClick = (id: NodeId) => {
+    // Landing video is free and idempotent — first watch grants the reward.
+    if (id === 'landing-video') {
+      if (!completed.has('landing-video')) {
+        toggle(id);
+        addXp(LANDING_VIDEO_XP_REWARD);
+      }
+      setSelectedId(null);
+      return;
+    }
+    // Any non-landing node that the unpaid user tries to "Start" routes them
+    // into the buy flow instead of marking complete.
     if (!purchased) {
-      navigate('/unlock');
+      goToCheckout();
       return;
     }
     toggle(id);
@@ -498,16 +533,18 @@ export function SkillTree() {
             small and in the corner avoids the scroll-blocking issue that
             plagued the larger HUD children. */}
         <div className="flex flex-row gap-2 items-center pointer-events-auto">
-          <Link
-            to="/practice"
-            className="bg-black/40 hover:bg-black/60 backdrop-blur-md border border-white/10 hover:border-white/30 px-3 sm:px-4 py-2 rounded-full flex items-center gap-2 shadow-lg h-[42px] text-slate-200 transition-colors"
-            title="Go to practice"
-          >
-            <Play className="w-4 h-4" />
-            <span className="text-xs font-black tracking-wider whitespace-nowrap hidden sm:inline">
-              Practice
-            </span>
-          </Link>
+          {purchased && (
+            <Link
+              to="/practice"
+              className="bg-black/40 hover:bg-black/60 backdrop-blur-md border border-white/10 hover:border-white/30 px-3 sm:px-4 py-2 rounded-full flex items-center gap-2 shadow-lg h-[42px] text-slate-200 transition-colors"
+              title="Go to practice"
+            >
+              <Play className="w-4 h-4" />
+              <span className="text-xs font-black tracking-wider whitespace-nowrap hidden sm:inline">
+                Practice
+              </span>
+            </Link>
+          )}
           <div className="bg-primary/20 backdrop-blur-md border border-primary/30 px-3 sm:px-5 py-2 rounded-full flex items-center gap-2 shadow-lg h-[42px]">
             <Sparkles className="w-4 h-4 text-primary" />
             <span className="text-xs font-black text-primary tracking-wider whitespace-nowrap">
@@ -515,11 +552,18 @@ export function SkillTree() {
             </span>
           </div>
           <SignedOut>
-            <SignInButton mode="modal">
-              <button className="bg-black/40 hover:bg-black/60 backdrop-blur-md border border-white/10 hover:border-white/30 px-3 sm:px-4 py-2 rounded-full shadow-lg h-[42px] text-xs font-black tracking-wider text-slate-200 transition-colors">
-                Sign in
-              </button>
-            </SignInButton>
+            <button
+              onClick={() => clerk.openSignUp({})}
+              className="bg-primary text-primary-foreground hover:bg-primary/90 px-4 sm:px-5 py-2 rounded-full shadow-lg h-[42px] text-xs font-black tracking-wider transition-colors"
+            >
+              Sign up
+            </button>
+            <button
+              onClick={() => clerk.openSignIn({})}
+              className="bg-black/40 hover:bg-black/60 backdrop-blur-md border border-white/10 hover:border-white/30 px-3 sm:px-4 py-2 rounded-full shadow-lg h-[42px] text-xs font-black tracking-wider text-slate-200 transition-colors"
+            >
+              Sign in
+            </button>
           </SignedOut>
           <SignedIn>
             <UserButton afterSignOutUrl="/" />
@@ -582,6 +626,11 @@ export function SkillTree() {
             const isFree = requiresPurchase && node.unlockCost === 0;
             const theme = themeOf(node);
             const isHub = node.kind === 'intro';
+            // The CAGED hub, unlocked by the landing video but not yet paid
+            // for, is the conversion CTA. It overrides the normal "free" look
+            // with an amber blink and "$9.99" label, and clicking it skips
+            // the dialog and goes straight to checkout.
+            const isBuyCta = node.id === 'hub-intro' && prereqsMet && !isCompleted && !purchased;
 
             return (
               <div
@@ -602,6 +651,8 @@ export function SkillTree() {
                   <p className="text-slate-500 text-[10px] mt-1.5 uppercase tracking-widest">
                     {isCompleted
                       ? '✓ Mastered'
+                      : isBuyCta
+                      ? 'Unlock the full course — $9.99'
                       : isLocked
                       ? 'Prereqs locked'
                       : isFree
@@ -613,11 +664,19 @@ export function SkillTree() {
                 </div>
 
                 <button
-                  onClick={() => setSelectedId(node.id)}
+                  onClick={() => {
+                    if (isBuyCta) {
+                      goToCheckout();
+                      return;
+                    }
+                    setSelectedId(node.id);
+                  }}
                   className={`${isHub ? 'w-28 h-28 sm:w-32 sm:h-32' : 'w-20 h-20 sm:w-24 sm:h-24'} rounded-full flex flex-col items-center justify-center border-2 transition-all duration-700 relative shadow-2xl z-20 hover:scale-110 active:scale-95 group/node
                     ${
                       isCompleted
                         ? 'bg-emerald-500/20 border-emerald-500 shadow-[0_0_30px_rgba(16,185,129,0.4)]'
+                        : isBuyCta
+                        ? 'bg-amber-950/70 border-amber-400 hover:border-amber-200 shadow-[0_0_60px_rgba(245,158,11,0.7)] animate-pulse'
                         : isFree
                         ? 'bg-indigo-950/70 border-indigo-400 hover:border-indigo-200 shadow-[0_0_50px_rgba(99,102,241,0.55)] animate-pulse'
                         : requiresPurchase
@@ -628,6 +687,13 @@ export function SkillTree() {
                 >
                   {isCompleted ? (
                     <CheckCircle className={`${isHub ? 'w-12 h-12' : 'w-10 h-10'} text-emerald-400 drop-shadow-[0_0_12px_rgba(52,211,153,0.8)]`} />
+                  ) : isBuyCta ? (
+                    <div className="flex flex-col items-center">
+                      <PlayCircle className={`${isHub ? 'w-12 h-12' : 'w-9 h-9'} text-amber-300 drop-shadow-[0_0_14px_rgba(251,191,36,0.95)]`} />
+                      <span className="text-[11px] font-black tracking-widest text-amber-200 mt-0.5">
+                        $9.99
+                      </span>
+                    </div>
                   ) : isFree ? (
                     <div className="flex flex-col items-center">
                       <PlayCircle className={`${isHub ? 'w-12 h-12' : 'w-9 h-9'} text-indigo-300 drop-shadow-[0_0_12px_rgba(129,140,248,0.9)]`} />
@@ -655,8 +721,8 @@ export function SkillTree() {
                   )}
 
                   {/* Ping ring for available nodes */}
-                  {requiresPurchase && (canAfford || isFree) && (
-                    <div className={`absolute inset-0 rounded-full border-4 ${isFree ? 'border-indigo-400/50' : 'border-amber-400/50'} animate-ping pointer-events-none`} />
+                  {(isBuyCta || (requiresPurchase && (canAfford || isFree))) && (
+                    <div className={`absolute inset-0 rounded-full border-4 ${isBuyCta ? 'border-amber-300/70' : isFree ? 'border-indigo-400/50' : 'border-amber-400/50'} animate-ping pointer-events-none`} />
                   )}
                 </button>
 
@@ -792,7 +858,10 @@ export function SkillTree() {
               </div>
 
               <div className="flex items-center justify-between gap-2 pt-2">
-                {selectedCompleted && selected.kind !== 'intro' ? (
+                {selectedCompleted &&
+                selected.kind !== 'intro' &&
+                selected.kind !== 'landing' &&
+                purchased ? (
                   <Link
                     to={`/practice?node=${selected.id}`}
                     className="text-sm text-primary hover:underline font-bold"

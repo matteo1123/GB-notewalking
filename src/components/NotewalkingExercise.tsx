@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { useAtomValue, useSetAtom } from 'jotai';
+import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { Play, Pause, Shuffle, Volume2, VolumeX, Map as MapIcon, Mic, MicOff } from 'lucide-react';
 import {
   Select,
@@ -22,7 +22,17 @@ import { ForceLandscapeWrapper } from '@/components/ForceLandscapeWrapper';
 import { createDegreeMap, findAllNoteOccurrences } from '@/lib/musicTheory';
 import { getChordTones, getChordInfo, calculateDegreeFromRoot } from '@/lib/chordProgression';
 import type { ChordNumeral, ChordProgressionSettings } from '@/types/chords';
-import { addXpAtom, completedSetAtom } from '@/state/skillTreeAtoms';
+import {
+  addXpAtom,
+  completedSetAtom,
+  totalXpAtom,
+  xpSpeedAtom,
+  xpSpeedMultiplierAtom,
+  type XpSpeed,
+} from '@/state/skillTreeAtoms';
+import { useMutation } from 'convex/react';
+import { useAuth } from '@clerk/clerk-react';
+import { api } from '../../convex/_generated/api';
 import { SKILL_NODE_BY_ID, type NodeId } from '@/data/skillTree';
 import { computeRevealedFrets } from '@/lib/fretboardReveal';
 
@@ -152,6 +162,9 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
   const fretboardWrapperRef = useRef<HTMLDivElement>(null);
   const stageContainerRef = useRef<HTMLDivElement>(null);
   const cinematicTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  // Which c/a/g/e/d key is currently being held, if any. Populated on
+  // keydown so the cinematic can stay in `solo` phase until keyup.
+  const heldCagedShapeRef = useRef<CagedShape | null>(null);
 
   const cancelCinematic = useCallback(() => {
     cinematicTimersRef.current.forEach((t) => clearTimeout(t));
@@ -159,7 +172,7 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
     setCinematic(null);
   }, []);
 
-  const triggerCinematic = useCallback((input: CagedShape | CagedShape[]) => {
+  const triggerCinematic = useCallback((input: CagedShape | CagedShape[], opts?: { hold?: boolean }) => {
     const shapes = Array.isArray(input) ? input : [input];
     if (shapes.length === 0) return;
     const wrapper = fretboardWrapperRef.current;
@@ -209,18 +222,35 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
     });
     // Phase progression: init (paint black + start fading shape in) → solo
     // (shape at full brightness) → reveal (fade overlay + shape out together).
+    // In `hold` mode the init→solo transition runs as normal, but the
+    // auto-advance to `reveal` is skipped — the caller controls release
+    // via releaseCinematic() (e.g. on keyup) so the shape stays solo for
+    // as long as the key is held.
     cinematicTimersRef.current.push(
       setTimeout(() => {
         setCinematic((c) => (c ? { ...c, phase: 'solo' } : c));
       }, 60),
     );
+    if (!opts?.hold) {
+      cinematicTimersRef.current.push(
+        setTimeout(() => {
+          setCinematic((c) => (c ? { ...c, phase: 'reveal' } : c));
+        }, 60 + soloHoldMs),
+      );
+      cinematicTimersRef.current.push(
+        setTimeout(() => setCinematic(null), 60 + soloHoldMs + 1000),
+      );
+    }
+  }, []);
+
+  // Called on keyup for a held c/a/g/e/d shortcut. Advances a still-active
+  // `solo`-phase cinematic into its fade-out, and schedules the final clear.
+  const releaseCinematic = useCallback(() => {
+    cinematicTimersRef.current.forEach((t) => clearTimeout(t));
+    cinematicTimersRef.current = [];
+    setCinematic((c) => (c ? { ...c, phase: 'reveal' } : c));
     cinematicTimersRef.current.push(
-      setTimeout(() => {
-        setCinematic((c) => (c ? { ...c, phase: 'reveal' } : c));
-      }, 60 + soloHoldMs),
-    );
-    cinematicTimersRef.current.push(
-      setTimeout(() => setCinematic(null), 60 + soloHoldMs + 1000),
+      setTimeout(() => setCinematic(null), 1000),
     );
   }, []);
 
@@ -270,6 +300,16 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
 
   const { playChord, preloadChords, stop: stopPlayer } = useNotePlayer(audioContext);
   const addXp = useSetAtom(addXpAtom);
+  const setTotalXp = useSetAtom(totalXpAtom);
+  const setCompletedSet = useSetAtom(completedSetAtom);
+  const [xpSpeed, setXpSpeed] = useAtom(xpSpeedAtom);
+  const xpSpeedMultiplier = useAtomValue(xpSpeedMultiplierAtom);
+  const setRemoteProgress = useMutation(api.progress.setProgress);
+  const { isSignedIn } = useAuth();
+  // Two-step confirmation state for the destructive "Reset progress" button.
+  // First click arms it; second click (within the timeout window) fires.
+  const [resetArmed, setResetArmed] = useState(false);
+  const resetArmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const settings: ChordProgressionSettings = useMemo(
     () => ({
@@ -465,6 +505,18 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
     return null;
   }, [detectedNote, keyDegree, degreeToNoteName]);
 
+  // Sparkle particle feedback — while `highlightedNoteName` is non-null (mic
+  // hit OR keyboard 1–7 held), we keep firing bursts on a jittery cadence so
+  // a sustained note looks like it's continuously sparking rather than
+  // flashing once. Each burst freezes the cells it paints at trigger time
+  // so overlapping bursts can co-exist without the CSS animation restarting
+  // when React's key changes.
+  const [sparkleBursts, setSparkleBursts] = useState<
+    Array<{ id: number; points: Array<{ string: number; fret: number }> }>
+  >([]);
+  const burstIdRef = useRef(0);
+  const sparkleBurstTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const fretboardNotes = useMemo(() => {
     const degreeToNotes = new Map<number, string[]>();
     degreeMap.forEach((deg, note) => {
@@ -519,6 +571,45 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
     return notes.filter((n) => n.isPlaying || revealedFrets.has(`${n.string}-${n.fret}`));
   }, [degreeMap, settings.selectedChords, currentChordIndex, highlightedNoteName, revealedFrets, allowedDegrees]);
 
+  // While a note is being heard/typed, keep emitting sparkle bursts on a
+  // jittery interval. Each burst is independent and expires itself so
+  // overlapping sparkles stack up — the user sees continuous crazy-random
+  // sparks instead of a single flash. Fret 0 (open strings) is excluded
+  // because those sit in a sibling container, not the main fretboard grid.
+  useEffect(() => {
+    if (!highlightedNoteName) return;
+    const BURST_LIFETIME_MS = 1200; // slightly longer than the longest particle
+    const points = findAllNoteOccurrences(highlightedNoteName).filter(
+      (p) => p.fret >= 1 && revealedFrets.has(`${p.string}-${p.fret}`),
+    );
+    if (points.length === 0) return;
+    const fireBurst = () => {
+      burstIdRef.current += 1;
+      const id = burstIdRef.current;
+      setSparkleBursts((arr) => [...arr, { id, points }]);
+      setTimeout(() => {
+        setSparkleBursts((arr) => arr.filter((b) => b.id !== id));
+      }, BURST_LIFETIME_MS);
+    };
+    // First burst fires immediately so the sparkle appears the instant the
+    // note is detected.
+    fireBurst();
+    const schedule = () => {
+      const delay = 90 + Math.random() * 180; // 90–270ms between bursts
+      sparkleBurstTimerRef.current = setTimeout(() => {
+        fireBurst();
+        schedule();
+      }, delay);
+    };
+    schedule();
+    return () => {
+      if (sparkleBurstTimerRef.current) {
+        clearTimeout(sparkleBurstTimerRef.current);
+        sparkleBurstTimerRef.current = null;
+      }
+    };
+  }, [highlightedNoteName, revealedFrets]);
+
   const scaleDegree = detectedNote ? calculateDegreeFromRoot(detectedNote, key) : null;
   // Show keyboard-pressed degree in the readout when there's no live mic
   // detection — same number, same colour, same fretboard highlight.
@@ -526,10 +617,17 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
   const displayedNoteLabel = detectedPitch ?? (highlightedNoteName ?? '---');
   const degreeColor = displayedDegree ? DEGREE_COLORS[displayedDegree] || '#666' : '#666';
 
-  // Keyboard 1–7 → highlight the matching scale degree across every revealed
-  // occurrence on the fretboard. Auto-clears so the highlight reads as a
-  // brief pulse, matching how the mic detection behaves.
+  // Keyboard shortcuts while the exercise is open:
+  //   1–7  → pulse the matching scale degree on every revealed occurrence
+  //          (feeds highlightedNoteName, which now drives the sparkle burst)
+  //   c/a/g/e/d → hold-to-spotlight that shape. Pressing starts the
+  //               cinematic and pins it in its `solo` phase; releasing
+  //               fades back to the normal view. OS-level key-repeat is
+  //               suppressed so holding doesn't restart the animation.
   useEffect(() => {
+    const isCagedKey = (k: string) =>
+      k === 'C' || k === 'A' || k === 'G' || k === 'E' || k === 'D';
+
     const onKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
       if (target?.closest('input, textarea, select, [contenteditable="true"]')) return;
@@ -539,14 +637,48 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
         setKeyDegree(n);
         if (keyDegreeTimerRef.current) clearTimeout(keyDegreeTimerRef.current);
         keyDegreeTimerRef.current = setTimeout(() => setKeyDegree(null), 700);
+        return;
+      }
+      const k = e.key.toUpperCase();
+      if (isCagedKey(k)) {
+        // OS key-repeat fires keydown over and over while the key is held;
+        // suppress it so the cinematic stays settled in `solo` instead of
+        // re-initing and strobing. heldCagedShapeRef is the authoritative
+        // source — if it already matches, we've already handled this press.
+        if (e.repeat) return;
+        if (heldCagedShapeRef.current === k) return;
+        heldCagedShapeRef.current = k as CagedShape;
+        triggerCinematic(k as CagedShape, { hold: true });
       }
     };
+
+    const onKeyUp = (e: KeyboardEvent) => {
+      const k = e.key.toUpperCase();
+      if (isCagedKey(k) && heldCagedShapeRef.current === k) {
+        heldCagedShapeRef.current = null;
+        releaseCinematic();
+      }
+    };
+
+    // Window-blur safety net: if the user alt-tabs while holding a shape
+    // key, keyup never fires and the cinematic sticks in solo forever.
+    const onBlur = () => {
+      if (heldCagedShapeRef.current) {
+        heldCagedShapeRef.current = null;
+        releaseCinematic();
+      }
+    };
+
     window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('blur', onBlur);
     return () => {
       window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', onBlur);
       if (keyDegreeTimerRef.current) clearTimeout(keyDegreeTimerRef.current);
     };
-  }, []);
+  }, [triggerCinematic, releaseCinematic]);
 
   useEffect(() => {
     return () => {
@@ -580,6 +712,49 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
     return set;
   }, [degreeMap, settings.selectedChords, currentChordIndex]);
 
+  // Destructive "reset all XP + unlocks" action. First click arms a 4-second
+  // confirmation window (the button swaps to a red "Click again to wipe"
+  // state); second click inside the window actually clears things. Purchase
+  // state is untouched — it lives in the `purchases` Convex table, not
+  // `userProgress`, so clearing progress never revokes access.
+  //
+  // Cross-device note: this resets THIS device + the server row. If another
+  // signed-in device still has the old XP/unlocks cached in localStorage, its
+  // next sync will max-merge that stale data back onto the server. A proper
+  // multi-device reset would need a `resetAt` stamp on the server row; for
+  // v1 the single-device path covers the real use-case.
+  const handleResetClick = useCallback(() => {
+    if (!resetArmed) {
+      setResetArmed(true);
+      if (resetArmTimerRef.current) clearTimeout(resetArmTimerRef.current);
+      resetArmTimerRef.current = setTimeout(() => setResetArmed(false), 4000);
+      return;
+    }
+    if (resetArmTimerRef.current) {
+      clearTimeout(resetArmTimerRef.current);
+      resetArmTimerRef.current = null;
+    }
+    setResetArmed(false);
+    setCompletedSet(new Set());
+    setTotalXp(0);
+    xpAccRef.current = 0;
+    // Push zeros to Convex directly. The useSyncProgress hook would do this
+    // anyway via its 500ms debounce, but a direct call makes the intent
+    // explicit and avoids the race where a refresh mid-debounce could leave
+    // the server with stale data.
+    if (isSignedIn) {
+      setRemoteProgress({ totalXp: 0, completedNodes: [] }).catch((err) =>
+        console.error('reset progress server push failed', err),
+      );
+    }
+  }, [resetArmed, setCompletedSet, setTotalXp, isSignedIn, setRemoteProgress]);
+
+  useEffect(() => {
+    return () => {
+      if (resetArmTimerRef.current) clearTimeout(resetArmTimerRef.current);
+    };
+  }, []);
+
   // Award XP only when the user actually hits a chord tone on a revealed fret.
   // Diminishes as more nodes are unlocked (rate = max(0.005, 0.1 * 0.7^paidCount) per hit).
   // The 0.1 multiplier is a global ~10x slowdown — earlier rates were tuned
@@ -597,7 +772,11 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
       (n, id) => n + (SKILL_NODE_BY_ID[id]?.kind === 'intro' ? 0 : 1),
       0,
     );
-    const rate = Math.max(0.005, 0.1 * Math.pow(0.7, paidCount));
+    // `xpSpeedMultiplier` is user-controlled (slow/medium/fast → 1.0/1.3/1.6)
+    // and scales the base rate so players who've already hit the diminishing
+    // floor can still make meaningful progress toward bigger unlocks.
+    const rate =
+      Math.max(0.005, 0.1 * Math.pow(0.7, paidCount)) * xpSpeedMultiplier;
     xpAccRef.current += rate;
     const whole = Math.floor(xpAccRef.current);
     if (whole > 0) {
@@ -728,6 +907,7 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
                   cagedKey={key}
                   activeTones={activeChordPositions}
                   onShapeLabelClick={triggerCinematic}
+                  sparkleBursts={sparkleBursts}
                 />
               </div>
             </div>
@@ -947,6 +1127,52 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
             >
               {muted ? 'Unmute click' : 'Mute click'}
             </button>
+
+            <div className="border-t border-gray-800 pt-2 mt-1 flex flex-col gap-1">
+              <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                XP Speed
+              </div>
+              <div className="grid grid-cols-3 gap-1">
+                {(['slow', 'medium', 'fast'] as XpSpeed[]).map((s) => (
+                  <button
+                    key={s}
+                    className={`h-7 text-[10px] rounded font-bold capitalize ${
+                      xpSpeed === s
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-muted text-muted-foreground'
+                    }`}
+                    onClick={() => setXpSpeed(s)}
+                    title={
+                      s === 'slow'
+                        ? 'Original pacing'
+                        : s === 'medium'
+                        ? '~30% faster XP'
+                        : '~60% faster XP'
+                    }
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="border-t border-gray-800 pt-2 mt-1">
+              <button
+                onClick={handleResetClick}
+                className={`w-full h-8 text-[11px] rounded font-bold transition-colors ${
+                  resetArmed
+                    ? 'bg-red-600 hover:bg-red-700 text-white'
+                    : 'bg-muted/40 text-muted-foreground hover:bg-red-900/40 hover:text-red-300'
+                }`}
+                title={
+                  resetArmed
+                    ? 'Click again to wipe all XP and relock every video'
+                    : 'Reset all XP and relock videos (purchase stays intact)'
+                }
+              >
+                {resetArmed ? 'Click again to confirm' : 'Reset progress'}
+              </button>
+            </div>
           </div>
         </div>
         {cinematic && (

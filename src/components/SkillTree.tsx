@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import {
+  HUB_INTRO_XP_REWARD,
   HUB_THEME,
   LANDING_VIDEO_XP_REWARD,
   SHAPE_THEMES,
@@ -162,6 +163,21 @@ export function SkillTree() {
       setSelectedId(null);
       return;
     }
+    // CAGED Overview is gated behind purchase, then free to watch. The first
+    // completion grants 10 XP so the user arrives at the module ring with 15
+    // XP — just enough to afford a `*-bot` node and actually start learning.
+    if (id === 'hub-intro') {
+      if (!purchased) {
+        goToCheckout();
+        return;
+      }
+      if (!completed.has('hub-intro')) {
+        toggle(id);
+        addXp(HUB_INTRO_XP_REWARD);
+      }
+      setSelectedId(null);
+      return;
+    }
     // Any non-landing node that the unpaid user tries to "Start" routes them
     // into the buy flow instead of marking complete.
     if (!purchased) {
@@ -170,6 +186,24 @@ export function SkillTree() {
     }
     toggle(id);
   };
+
+  // One-shot retroactive grant for users who completed hub-intro in a build
+  // that didn't award its 10 XP. Without this they're stuck at 5 XP (only the
+  // landing reward), which is below every module's unlock cost. We flag the
+  // migration in localStorage so it only runs once per device; the sync
+  // layer's `max(totalXp)` merge keeps multi-device users in lockstep.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const MIG_KEY = 'fq.xp.mig.hub-intro-reward.v1';
+    if (localStorage.getItem(MIG_KEY)) return;
+    if (completed.has('hub-intro')) {
+      addXp(HUB_INTRO_XP_REWARD);
+    }
+    localStorage.setItem(MIG_KEY, '1');
+    // Intentionally run once: we read `completed` on first mount only so the
+    // migration doesn't re-trigger when the set updates during normal play.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [selectedId, setSelectedId] = useState<NodeId | null>(null);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const hasScrolledRef = useRef(false);

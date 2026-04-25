@@ -108,3 +108,35 @@ export const toggleNodeAtom = atom(null, (get, set, id: NodeId) => {
 // Purchase state moved to Convex (see usePurchaseStatus). The localStorage
 // flag was intentionally removed so a stale local value can't unlock the app
 // after a sign-out / device change.
+
+// XP accrual speed — user-selectable in the practice sidebar. `slow` is the
+// original rate (the one tuned against real practice sessions); `medium` and
+// `fast` scale the per-tick reward so advanced players who already have all
+// shapes unlocked don't sit at the diminishing 0.005/tick floor forever.
+export type XpSpeed = 'slow' | 'medium' | 'fast';
+const XP_SPEED_KEY = 'fq.xp.speed.v1';
+const XP_SPEED_MULTIPLIER: Record<XpSpeed, number> = {
+  slow: 1.0,
+  medium: 1.3,
+  fast: 1.6,
+};
+
+function readXpSpeed(): XpSpeed {
+  if (typeof window === 'undefined') return 'slow';
+  const raw = localStorage.getItem(XP_SPEED_KEY);
+  return raw === 'medium' || raw === 'fast' ? raw : 'slow';
+}
+
+const xpSpeedBase = atom<XpSpeed>(readXpSpeed());
+
+export const xpSpeedAtom = atom(
+  (get) => get(xpSpeedBase),
+  (_get, set, next: XpSpeed) => {
+    if (typeof window !== 'undefined') localStorage.setItem(XP_SPEED_KEY, next);
+    set(xpSpeedBase, next);
+  },
+);
+
+export const xpSpeedMultiplierAtom = atom(
+  (get) => XP_SPEED_MULTIPLIER[get(xpSpeedAtom)],
+);

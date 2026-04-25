@@ -1,4 +1,5 @@
-import { Link } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Check, Map, Sparkles } from 'lucide-react';
 import { UserButton, useAuth, useClerk } from '@clerk/clerk-react';
 import { Button } from '@/components/ui/button';
@@ -18,6 +19,18 @@ const WelcomePage = () => {
   const { purchased } = usePurchaseStatus();
   const { isSignedIn, isLoaded } = useAuth();
   const clerk = useClerk();
+  const navigate = useNavigate();
+
+  // A signed-in, paid user landing here is almost always a direct-URL visit
+  // (/welcome typed in, stale bookmark, etc.). Bounce them to the skill tree
+  // — the marketing page has nothing left to offer once they've bought.
+  // Signed-out users and signed-in-but-unpaid users stay put so they can
+  // still hit "Unlock GuitarBrain" if they arrived via a share link.
+  useEffect(() => {
+    if (isLoaded && isSignedIn && purchased === true) {
+      navigate('/', { replace: true });
+    }
+  }, [isLoaded, isSignedIn, purchased, navigate]);
 
   return (
     <div className="min-h-screen bg-[#050505] text-slate-100 flex flex-col">
@@ -64,10 +77,12 @@ const WelcomePage = () => {
             </p>
           </div>
 
-          {/* Hero video */}
+          {/* Hero video — the CAGED Overview. Same 90-second course tour that
+              plays at the center node of the skill tree, so visitors see the
+              actual thing they'd be buying instead of a generic teaser. */}
           <div className="aspect-video bg-black rounded-xl overflow-hidden border border-white/10 shadow-2xl mb-8">
             <video
-              src={assetUrl('/videos/landing-intro.mp4')}
+              src={assetUrl('/videos/hub-intro.mp4')}
               controls
               playsInline
               poster="/logo2.png"

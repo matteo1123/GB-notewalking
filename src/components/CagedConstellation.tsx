@@ -91,14 +91,23 @@ export function CagedConstellation({
   const yOf = (s: number) => (s - 0.5) * stringH;
 
   // Star sizes scale with the smaller of (stringH, fretW/2) so they stay
-  // round regardless of container aspect ratio.
+  // proportional regardless of container aspect ratio.
   const baseUnit = Math.min(stringH, fretW * 0.5);
-  const coreR_R = baseUnit * 0.36;
-  const coreR_other = baseUnit * 0.25;
+  const coreR_R = baseUnit * 0.5;
+  const coreR_other = baseUnit * 0.36;
   const haloR_R = baseUnit * 0.65;
   const haloR_other = baseUnit * 0.5;
   const lineWidth = Math.max(0.6, baseUnit * 0.07);
   const glowBlur = Math.max(0.8, baseUnit * 0.1);
+
+  // 4-point star points — diamond with slight concavity between rays, so the
+  // core reads as a "twinkling star" against the soft circular halo behind it.
+  // Lower indent = pointier star, higher = rounder diamond. 0.32 hits the
+  // sweet spot of sparkly-but-still-recognizably-a-gem.
+  const starPoints = (cx: number, cy: number, r: number) => {
+    const i = r * 0.32;
+    return `${cx},${cy - r} ${cx + i},${cy - i} ${cx + r},${cy} ${cx + i},${cy + i} ${cx},${cy + r} ${cx - i},${cy + i} ${cx - r},${cy} ${cx - i},${cy - i}`;
+  };
 
   const isRevealed = (s: number, f: number) =>
     revealedFrets ? revealedFrets.has(`${s}-${f}`) : true;
@@ -261,7 +270,10 @@ export function CagedConstellation({
           }),
       )}
 
-      {/* bright star cores */}
+      {/* bright star cores — 4-point diamond polygons instead of circles so
+       * each voicing note reads as a twinkling gem. The radial gradient fill
+       * keeps the shiny white center and fades to the shape color at the
+       * diamond tips, so the points look lit from within. */}
       {visibleShapeData.flatMap(({ shape, allTones, lit }) =>
         allTones
           .filter((t) => isRevealed(t.string, t.fret))
@@ -271,13 +283,12 @@ export function CagedConstellation({
                 ? 'cc-tone cc-tone-active'
                 : 'cc-tone cc-tone-passive'
               : 'cc-tone';
+            const r = t.role === 'R' ? coreR_R : coreR_other;
             return (
-              <circle
+              <polygon
                 key={`star-${shape}-${t.octaveShift}-${t.string}-${t.fret}`}
                 className={cls}
-                cx={xOf(t.fret)}
-                cy={yOf(t.string)}
-                r={t.role === 'R' ? coreR_R : coreR_other}
+                points={starPoints(xOf(t.fret), yOf(t.string), r)}
                 fill={`url(#cc-star-${shape})`}
                 opacity={lit}
               />

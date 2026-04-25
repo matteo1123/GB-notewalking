@@ -32,6 +32,7 @@ blob-report/
 supabase/.env.local
 .env.local
 .env
+.env.production
 
 # Bunny CDN upload staging — videos/audio shipped via VITE_ASSET_BASE_URL
 videos/

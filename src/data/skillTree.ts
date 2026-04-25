@@ -21,6 +21,13 @@ export type UnlockKind = 'landing' | 'intro' | 'top' | 'bot' | 'full' | 'connect
 // just enough to make the unlocked CAGED hub feel earned, not given.
 export const LANDING_VIDEO_XP_REWARD = 5;
 
+// CAGED Overview grants this on first watch so a brand-new paid user arrives
+// at the shape nodes with enough XP (5 + 10 = 15) to afford exactly one
+// `*-bot` module — their first real practice unlock. Without this reward the
+// post-purchase flow dead-ends: no module costs 0, and this is the only node
+// between the paywall and the module ring.
+export const HUB_INTRO_XP_REWARD = 10;
+
 export interface SkillNode {
   id: NodeId;
   title: string;
@@ -183,7 +190,7 @@ const HUB_INTRO_NODE: SkillNode = {
   subtitle: 'The full course unlocks here',
   tagline: 'A 90-second tour of the map — and the gateway to the whole course.',
   description:
-    "Short intro to how the tree works: practice earns XP, XP unlocks video lessons, and lessons reveal more of the fretboard. When you're ready, unlock C Shape — Top to start.",
+    "Short intro to how the tree works: practice earns XP, XP unlocks video lessons, and lessons reveal more of the fretboard. Watching this earns 10 XP — enough to unlock your first module.",
   videoSrc: assetUrl('/videos/hub-intro.mp4'),
   prerequisites: ['landing-video'],
   kind: 'intro',

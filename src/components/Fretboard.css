@@ -433,20 +433,73 @@
   border-width: 0px !important;
 }
 
-.notewalking-fretboard-override .dot.playing-note {
-  background-color: #22d3ee !important;
-  /* Piercing Cyan for Active Mic */
-  border: 2px solid #fff !important;
-  box-shadow: 0 0 15px rgba(34, 211, 238, 0.9) !important;
-  opacity: 1 !important;
-  color: #000 !important;
-  transform: translate(-50%, -50%) scale(1.5) !important;
-  z-index: 30 !important;
+/* Old cyan "playing-note" fill removed — the sparkle particle burst
+   (NoteParticles + .sparkle-cell) is now the sole indicator for a heard /
+   typed note. The dot itself reads like any other scale-degree dot; the
+   sparkles fly out over the top to call out every revealed occurrence. */
+
+/* Sparkle particle burst — positioned inside the fretboard grid at the
+   hit cell. Parent re-keys on every note hit so the CSS animation
+   re-triggers from the top instead of repeating for a sustained value. */
+.notewalking-fretboard-override .sparkle-cell {
+  position: relative;
+  pointer-events: none;
+  align-self: center;
+  justify-self: center;
+  width: 0;
+  height: 0;
+  z-index: 40;
 }
 
-.notewalking-fretboard-override .dot.playing-note .degree-number {
-  color: #000 !important;
-  text-shadow: none !important;
+.note-sparkle-burst {
+  position: relative;
+  width: 0;
+  height: 0;
+}
+
+.note-sparkle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--sz, 2px);
+  height: var(--sz, 2px);
+  margin-left: calc(var(--sz, 2px) / -2);
+  margin-top: calc(var(--sz, 2px) / -2);
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    #ffffff 0%,
+    rgba(255, 250, 210, 0.95) 40%,
+    rgba(255, 220, 120, 0) 100%
+  );
+  box-shadow:
+    0 0 4px rgba(255, 255, 220, 0.95),
+    0 0 9px rgba(255, 210, 120, 0.7);
+  opacity: 0;
+  animation: note-sparkle-fly var(--dur, 800ms) ease-out forwards;
+  will-change: transform, opacity;
+}
+
+@keyframes note-sparkle-fly {
+  0% {
+    transform: translate(0, 0) scale(0.35);
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+    transform: translate(calc(var(--dx) * 0.15), calc(var(--dy) * 0.15)) scale(1);
+  }
+  100% {
+    transform: translate(var(--dx), var(--dy)) scale(1);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .note-sparkle {
+    animation-duration: 1ms;
+    opacity: 0;
+  }
 }
 
 .notewalking-fretboard-override .fretboard {
@@ -507,6 +560,21 @@
   transform-origin: center;
 }
 
+/* Active stars (cores + halos) also GROW on the beat, not just flash. Pure
+   opacity change reads as a flicker — adding scale reads as "pulling forward
+   into focus," which is the effect the chord-aware constellation needs to
+   make clear which tones belong to the currently sounding chord.
+   transform-box: fill-box scopes scale-origin to each element's own bounding
+   box instead of the SVG viewport, so each star pulses around its own center.
+   Excluded from lines (chord connections) because scaling a line from its
+   midpoint stretches its endpoints, which reads as the geometry shifting. */
+.cc-tones-split polygon.cc-tone-active,
+.cc-tones-split circle.cc-tone-active {
+  animation-name: cc-throb-grow;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
 .cc-tones-split .cc-tone-passive {
   opacity: 0.35;
 }
@@ -514,6 +582,11 @@
 @keyframes cc-throb {
   0%, 100% { opacity: 0.78; }
   50% { opacity: 1; }
+}
+
+@keyframes cc-throb-grow {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.4); }
 }
 
 /* "None" focus mode: hide the dot overlay so only the breathing
@@ -528,6 +601,14 @@
   animation-name: cc-throb-deep;
 }
 
+/* Mode-none spotlight: the grow effect is the star of the show (pun
+   intended) — passive constellation notes are dimmed harder and the active
+   ones swell more dramatically, since there's no dot overlay competing. */
+.mode-none .cc-tones-split polygon.cc-tone-active,
+.mode-none .cc-tones-split circle.cc-tone-active {
+  animation-name: cc-throb-deep-grow;
+}
+
 .mode-none .cc-tones-split .cc-tone-passive {
   opacity: 0.18;
 }
@@ -535,6 +616,11 @@
 @keyframes cc-throb-deep {
   0%, 100% { opacity: 0.35; }
   50% { opacity: 1; }
+}
+
+@keyframes cc-throb-deep-grow {
+  0%, 100% { opacity: 0.35; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.55); }
 }
 
 /* ======================================================================

@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { FRET_COUNT, STRING_COUNT, getNoteFromFret, createChromaticDegreeMap, CHROMATIC_DEGREE_COLORS, DEGREE_COLORS } from '@/lib/musicTheory';
 import { CagedConstellationFill } from './CagedConstellation';
+import { NoteParticles } from './NoteParticles';
 import {
   CAGED_SHAPES,
   CAGED_SHAPE_HEX,
@@ -27,22 +28,27 @@ function FretboardLabelsStrip({
   onShapeLabelClick?: (shape: CagedShape) => void;
 }) {
   const shapeLabels = useMemo(() => {
-    return CAGED_SHAPES.map((shape) => {
+    // One label PER OCTAVE PER SHAPE — the CAGED letters tile the full
+    // fretboard so a player scanning the neck sees which shape they're inside
+    // no matter where they look, not just at one "home" position.
+    return CAGED_SHAPES.flatMap((shape) => {
       const tones = getShapeVoicingPositions(cagedKey, shape, FRET_COUNT).filter(
         (t) => t.fret >= 1 && t.fret <= FRET_COUNT,
       );
-      if (tones.length === 0) return null;
+      if (tones.length === 0) return [];
       const byOct = new Map<number, ChordToneNode[]>();
       for (const t of tones) {
         const arr = byOct.get(t.octaveShift) ?? [];
         arr.push(t);
         byOct.set(t.octaveShift, arr);
       }
-      const best = [...byOct.values()].sort((a, b) => b.length - a.length)[0];
-      const minF = Math.min(...best.map((t) => t.fret));
-      const maxF = Math.max(...best.map((t) => t.fret));
-      return { shape, minF, maxF } as { shape: CagedShape; minF: number; maxF: number };
-    }).filter(Boolean) as Array<{ shape: CagedShape; minF: number; maxF: number }>;
+      return [...byOct.entries()].map(([octaveShift, points]) => ({
+        shape,
+        octaveShift,
+        minF: Math.min(...points.map((t) => t.fret)),
+        maxF: Math.max(...points.map((t) => t.fret)),
+      }));
+    });
   }, [cagedKey]);
 
   return (
@@ -56,7 +62,7 @@ function FretboardLabelsStrip({
           {f}
         </div>
       ))}
-      {shapeLabels.map(({ shape, minF, maxF }) => {
+      {shapeLabels.map(({ shape, octaveShift, minF, maxF }) => {
         const clickable = !!onShapeLabelClick;
         const className = `shape-lbl${clickable ? ' shape-lbl-clickable' : ''}`;
         const style: React.CSSProperties = {
@@ -67,20 +73,20 @@ function FretboardLabelsStrip({
         if (clickable) {
           return (
             <button
-              key={`shp-${shape}`}
+              key={`shp-${shape}-${octaveShift}`}
               type="button"
               className={className}
               style={style}
               onClick={() => onShapeLabelClick(shape)}
               title={`Spotlight ${shape}-shape`}
             >
-              {shape}-shape
+              {shape}
             </button>
           );
         }
         return (
-          <div key={`shp-${shape}`} className={className} style={style}>
-            {shape}-shape
+          <div key={`shp-${shape}-${octaveShift}`} className={className} style={style}>
+            {shape}
           </div>
         );
       })}
@@ -108,6 +114,15 @@ interface FretboardProps {
    * the constellation's chord-aware throb — only these tones twinkle. */
   activeTones?: Set<string>;
   onShapeLabelClick?: (shape: CagedShape) => void;
+  /** Concurrently-rendered sparkle bursts. Each burst freezes the cells it
+   * paints at trigger time so a burst that started on note A keeps spraying
+   * over A's frets even if the detected pitch has since moved to G. The
+   * parent pushes new bursts and prunes expired ones so overlapping
+   * sparkles co-exist (continuous "crazy" feel rather than one flash). */
+  sparkleBursts?: Array<{
+    id: number;
+    points: Array<{ string: number; fret: number }>;
+  }>;
 }
 
 const Fretboard: React.FC<FretboardProps> = ({
@@ -123,6 +138,7 @@ const Fretboard: React.FC<FretboardProps> = ({
   cagedKey,
   activeTones,
   onShapeLabelClick,
+  sparkleBursts,
 }) => {
   const chromaticDegreeMap = rootNote ? createChromaticDegreeMap(getNoteFromFret(rootNote.string, rootNote.fret)) : null;
 
@@ -249,6 +265,33 @@ const Fretboard: React.FC<FretboardProps> = ({
     return notesToRender;
   };
 
+  const renderSparkles = () => {
+    if (!sparkleBursts || sparkleBursts.length === 0) return null;
+    // Each burst renders its own <NoteParticles> for every frozen cell —
+    // bursts overlap until React unmounts them when the parent prunes
+    // their id from the array. Skip fret 0 (open strings live in a
+    // sibling container, not this grid).
+    return sparkleBursts.flatMap((burst) =>
+      burst.points
+        .filter(
+          (p) =>
+            p.fret >= 1 &&
+            p.fret <= FRET_COUNT &&
+            p.string >= 1 &&
+            p.string <= STRING_COUNT,
+        )
+        .map((p) => (
+          <div
+            key={`sparkle-${burst.id}-${p.string}-${p.fret}`}
+            className="sparkle-cell"
+            style={{ gridColumn: p.fret, gridRow: p.string }}
+          >
+            <NoteParticles burstId={burst.id} />
+          </div>
+        )),
+    );
+  };
+
   const fretMarkers = {
     3: 'single', 5: 'single', 7: 'single', 9: 'single', 12: 'double',
     15: 'single', 17: 'single', 19: 'single', 21: 'single',
@@ -275,6 +318,7 @@ const Fretboard: React.FC<FretboardProps> = ({
           {renderStrings()}
           {renderMarkers()}
           {renderNotes(false)}
+          {renderSparkles()}
         </div>
         {cagedKey && (
           <FretboardLabelsStrip cagedKey={cagedKey} onShapeLabelClick={onShapeLabelClick} />

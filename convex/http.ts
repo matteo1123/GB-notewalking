@@ -23,7 +23,10 @@ http.route({
 
     let event: import('stripe').Stripe.Event;
     try {
-      event = stripe.webhooks.constructEvent(
+      // Convex HTTP actions run in a V8 isolate without Node's sync crypto;
+      // Stripe's sync constructEvent throws "SubtleCryptoProvider cannot be
+      // used in a synchronous context" here. The async variant uses WebCrypto.
+      event = await stripe.webhooks.constructEventAsync(
         rawBody,
         sig,
         process.env.STRIPE_WEBHOOK_SECRET!,

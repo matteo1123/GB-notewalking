@@ -913,7 +913,7 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
             </div>
           </div>
 
-          <div className="w-[180px] shrink-0 flex flex-col gap-2 overflow-hidden bg-black/40 backdrop-blur-sm border border-white/5 rounded p-2">
+          <div className="w-[180px] shrink-0 flex flex-col gap-2 overflow-y-auto bg-black/40 backdrop-blur-sm border border-white/5 rounded p-2">
             <Link
               to="/"
               className="inline-flex items-center justify-center gap-1.5 h-7 text-[11px] rounded font-bold bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"

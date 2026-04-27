@@ -559,7 +559,12 @@ export function SkillTree() {
             small and in the corner avoids the scroll-blocking issue that
             plagued the larger HUD children. */}
         <div className="flex flex-row gap-2 items-center pointer-events-auto">
-          {purchased && (
+          {/* Show the Practice link unless we *know* the user is unpaid.
+              `purchased` from the Convex query is `undefined` while loading;
+              gating on `purchased &&` would briefly hide the button on every
+              fresh load even for paying users. PracticePage itself enforces
+              the paywall on click, so optimistic visibility is safe. */}
+          {purchased !== false && (
             <Link
               to="/practice"
               className="bg-black/40 hover:bg-black/60 backdrop-blur-md border border-white/10 hover:border-white/30 px-3 sm:px-4 py-2 rounded-full flex items-center gap-2 shadow-lg h-[42px] text-slate-200 transition-colors"
@@ -848,25 +853,49 @@ export function SkillTree() {
               </DialogHeader>
 
               <div className="aspect-video bg-black rounded-md overflow-hidden border border-white/5">
-                {selectedUnlocked || selectedCompleted ? (
-                  <video
-                    key={selected.videoSrc}
-                    src={selected.videoSrc}
-                    controls
-                    className="w-full h-full"
-                  />
-                ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center text-slate-500 gap-2">
-                    <Lock className="w-8 h-8" />
-                    <div className="text-sm">Prerequisite not met</div>
-                    <div className="text-xs">
-                      Requires:{' '}
-                      {selected.prerequisites
-                        .map((p) => SKILL_NODE_BY_ID[p]?.title ?? p)
-                        .join(' + ')}
+                {(() => {
+                  // Module videos (bot/top/full/connect) are paywalled with XP:
+                  // the player must spend the unlock cost before the video is
+                  // viewable. landing is free; intro is Stripe-gated and the
+                  // act of clicking Start grants the watch — both stay viewable
+                  // on prerequisite-met so the Start CTA shows the actual reel.
+                  const isFreePreview =
+                    selected.kind === 'landing' || selected.kind === 'intro';
+                  const canWatch = selectedCompleted || (isFreePreview && selectedUnlocked);
+                  if (canWatch) {
+                    return (
+                      <video
+                        key={selected.videoSrc}
+                        src={selected.videoSrc}
+                        controls
+                        className="w-full h-full"
+                      />
+                    );
+                  }
+                  if (!selectedUnlocked) {
+                    return (
+                      <div className="w-full h-full flex flex-col items-center justify-center text-slate-500 gap-2">
+                        <Lock className="w-8 h-8" />
+                        <div className="text-sm">Prerequisite not met</div>
+                        <div className="text-xs">
+                          Requires:{' '}
+                          {selected.prerequisites
+                            .map((p) => SKILL_NODE_BY_ID[p]?.title ?? p)
+                            .join(' + ')}
+                        </div>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div className="w-full h-full flex flex-col items-center justify-center text-slate-500 gap-2">
+                      <Lock className="w-8 h-8" />
+                      <div className="text-sm">Locked</div>
+                      <div className="text-xs">
+                        Unlock for {selected.unlockCost} XP to watch
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
               </div>
 
               {refShapes.length > 0 && (
@@ -898,10 +927,15 @@ export function SkillTree() {
               </div>
 
               <div className="flex items-center justify-between gap-2 pt-2">
+                {/* Practice this node — visible for any unlocked, non-video
+                    module the user is paid for. We allow `purchased`
+                    to be `undefined` (Convex query loading) so the link
+                    doesn't blink out on every fresh page load; the
+                    PracticePage itself enforces the paywall on click. */}
                 {selectedCompleted &&
                 selected.kind !== 'intro' &&
                 selected.kind !== 'landing' &&
-                purchased ? (
+                purchased !== false ? (
                   <Link
                     to={`/practice?node=${selected.id}`}
                     className="text-sm text-primary hover:underline font-bold"

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Check, Map, Sparkles } from 'lucide-react';
 import { UserButton, useAuth, useClerk } from '@clerk/clerk-react';
@@ -20,6 +20,7 @@ const WelcomePage = () => {
   const { isSignedIn, isLoaded } = useAuth();
   const clerk = useClerk();
   const navigate = useNavigate();
+  const videoRef = useRef<HTMLVideoElement | null>(null);
 
   // A signed-in, paid user landing here is almost always a direct-URL visit
   // (/welcome typed in, stale bookmark, etc.). Bounce them to the skill tree
@@ -31,6 +32,25 @@ const WelcomePage = () => {
       navigate('/', { replace: true });
     }
   }, [isLoaded, isSignedIn, purchased, navigate]);
+
+  // Guarantee the hero video is visible without manual scrolling. On
+  // narrower viewports the headline + tagline can push the video below the
+  // fold; auto-scrolling it into view on mount makes the actual product
+  // demo the first thing the visitor sees. We bail if the video is already
+  // fully visible so desktop users don't get a needless scroll jump.
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      const el = videoRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const vh = window.innerHeight || document.documentElement.clientHeight;
+      const fullyVisible = rect.top >= 0 && rect.bottom <= vh;
+      if (!fullyVisible) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 120);
+    return () => window.clearTimeout(id);
+  }, []);
 
   return (
     <div className="min-h-screen bg-[#050505] text-slate-100 flex flex-col">
@@ -62,16 +82,16 @@ const WelcomePage = () => {
         </div>
       </header>
 
-      <main className="relative z-10 flex-1 flex flex-col items-center px-6 py-8 sm:py-16">
+      <main className="relative z-10 flex-1 flex flex-col items-center px-6 py-4 sm:py-8">
         <div className="max-w-2xl w-full">
           {/* Hero */}
-          <div className="text-center space-y-3 mb-8">
-            <h1 className="text-4xl sm:text-5xl font-black tracking-tight bg-gradient-to-b from-white to-slate-400 bg-clip-text text-transparent">
+          <div className="text-center space-y-2 mb-4 sm:mb-6">
+            <h1 className="text-3xl sm:text-5xl font-black tracking-tight bg-gradient-to-b from-white to-slate-400 bg-clip-text text-transparent">
               Learn the entire fretboard.
               <br />
               <span className="text-primary">In one app.</span>
             </h1>
-            <p className="text-base sm:text-lg text-slate-400 max-w-xl mx-auto">
+            <p className="text-sm sm:text-lg text-slate-400 max-w-xl mx-auto">
               GuitarBrain is the CAGED system as a skill tree — short videos,
               real-time pitch detection, and exercises that meet you where you are.
             </p>
@@ -82,6 +102,7 @@ const WelcomePage = () => {
               actual thing they'd be buying instead of a generic teaser. */}
           <div className="aspect-video bg-black rounded-xl overflow-hidden border border-white/10 shadow-2xl mb-8">
             <video
+              ref={videoRef}
               src={assetUrl('/videos/hub-intro.mp4')}
               controls
               playsInline

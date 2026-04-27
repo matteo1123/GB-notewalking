@@ -48,10 +48,10 @@ export interface SkillNode {
 export const UNLOCK_COST: Record<UnlockKind, number> = {
   landing: 0,
   intro: 0,
-  top: 10,
+  top: 15,
   bot: 15,
-  full: 25,
-  connect: 40,
+  full: 15,
+  connect: 15,
 };
 
 const SHAPES: ShapeId[] = ['C', 'A', 'G', 'E', 'D'];

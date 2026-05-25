@@ -22,6 +22,7 @@ import { ForceLandscapeWrapper } from '@/components/ForceLandscapeWrapper';
 import { createDegreeMap, findAllNoteOccurrences } from '@/lib/musicTheory';
 import { getChordTones, getChordInfo, calculateDegreeFromRoot } from '@/lib/chordProgression';
 import type { ChordNumeral, ChordProgressionSettings } from '@/types/chords';
+import {
   addXpAtom,
   completedSetAtom,
   totalXpAtom,

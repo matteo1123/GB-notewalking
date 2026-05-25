@@ -10,7 +10,7 @@ if ('serviceWorker' in navigator) {
 }
 
 const clerkPublishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
-const convexUrl = import.meta.env.VITE_CONVEX_URL as string | undefined;
+const convexUrl = (import.meta.env.VITE_CONVEX_URL as string | undefined)?.replace(/\/$/, '');
 
 if (!clerkPublishableKey) {
   // Surfacing this loudly during build/preview is intentional — silently

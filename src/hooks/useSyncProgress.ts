@@ -25,10 +25,20 @@ export function useSyncProgress() {
   const setRemote = useMutation(api.progress.setProgress);
   const mergedRef = useRef(false);
 
-  // Reset the merged flag on sign-out so the next sign-in re-merges fresh.
+  // Reset the merged flag and clear local state on sign-out so the next sign-in starts fresh
+  // instead of inheriting the previous account's progress on this device.
+  const wasSignedIn = useRef(isSignedIn);
   useEffect(() => {
-    if (!isSignedIn) mergedRef.current = false;
-  }, [isSignedIn]);
+    if (wasSignedIn.current && !isSignedIn) {
+      // User just signed out
+      mergedRef.current = false;
+      localStorage.removeItem('fq.skillTree.completed.v1');
+      localStorage.removeItem('fq.xp.total.v1');
+      setCompleted(new Set());
+      setTotalXp(0);
+    }
+    wasSignedIn.current = isSignedIn;
+  }, [isSignedIn, setCompleted, setTotalXp]);
 
   // Step 1+2+3 — one-shot merge once both local and remote are known.
   useEffect(() => {

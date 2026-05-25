@@ -22,13 +22,10 @@ import { ForceLandscapeWrapper } from '@/components/ForceLandscapeWrapper';
 import { createDegreeMap, findAllNoteOccurrences } from '@/lib/musicTheory';
 import { getChordTones, getChordInfo, calculateDegreeFromRoot } from '@/lib/chordProgression';
 import type { ChordNumeral, ChordProgressionSettings } from '@/types/chords';
-import {
   addXpAtom,
   completedSetAtom,
   totalXpAtom,
-  xpSpeedAtom,
   xpSpeedMultiplierAtom,
-  type XpSpeed,
 } from '@/state/skillTreeAtoms';
 import { useMutation } from 'convex/react';
 import { useAuth } from '@clerk/clerk-react';
@@ -302,7 +299,6 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
   const addXp = useSetAtom(addXpAtom);
   const setTotalXp = useSetAtom(totalXpAtom);
   const setCompletedSet = useSetAtom(completedSetAtom);
-  const [xpSpeed, setXpSpeed] = useAtom(xpSpeedAtom);
   const xpSpeedMultiplier = useAtomValue(xpSpeedMultiplierAtom);
   const setRemoteProgress = useMutation(api.progress.setProgress);
   const { isSignedIn } = useAuth();
@@ -1128,33 +1124,7 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
               {muted ? 'Unmute click' : 'Mute click'}
             </button>
 
-            <div className="border-t border-gray-800 pt-2 mt-1 flex flex-col gap-1">
-              <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                XP Speed
-              </div>
-              <div className="grid grid-cols-3 gap-1">
-                {(['slow', 'medium', 'fast'] as XpSpeed[]).map((s) => (
-                  <button
-                    key={s}
-                    className={`h-7 text-[10px] rounded font-bold capitalize ${
-                      xpSpeed === s
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-muted text-muted-foreground'
-                    }`}
-                    onClick={() => setXpSpeed(s)}
-                    title={
-                      s === 'slow'
-                        ? 'Original pacing'
-                        : s === 'medium'
-                        ? '~30% faster XP'
-                        : '~60% faster XP'
-                    }
-                  >
-                    {s}
-                  </button>
-                ))}
-              </div>
-            </div>
+
 
             <div className="border-t border-gray-800 pt-2 mt-1">
               <button

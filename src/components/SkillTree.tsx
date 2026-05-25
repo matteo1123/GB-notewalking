@@ -231,35 +231,76 @@ export function SkillTree() {
   // visitors immediately see the only thing they're meant to click. Once the
   // landing video is complete, center on the CAGED hub (the buy CTA when
   // unpaid, the course root when paid).
-  // Defer one extra frame past the first paint — on the landscape-rotated
-  // mobile layout, the scroller's clientWidth/clientHeight reflect the
-  // pre-rotation dimensions until the CSS transform has been applied, so a
-  // double-rAF gets us a stable size before we compute the centering offset.
+  //
+  // Bulletproofing: the prior version used a fixed double-rAF + manual offset
+  // math from getX/getY. That flaked on slow font loads, mobile orientation
+  // flips, and any layout pass that arrived after the rAF window — leaving
+  // first-time visitors stranded in the corner of the canvas. This version
+  // measures the actual rendered node DOM, retries until both the scroller
+  // and the node have real dimensions, and re-checks once after a 250ms
+  // settle in case a late font swap or image decode shifts positions.
   useEffect(() => {
     if (hasScrolledRef.current) return;
     const container = scrollerRef.current;
     if (!container) return;
-    const target = completed.has('landing-video')
-      ? SKILL_NODE_BY_ID['hub-intro']
-      : SKILL_NODE_BY_ID['landing-video'];
-    let raf2 = 0;
-    const raf1 = requestAnimationFrame(() => {
-      raf2 = requestAnimationFrame(() => {
-        const cx = getX(target.gridCol) + PAD + NODE_SIZE / 2;
-        const cy = getY(target.gridRow) + PAD + NODE_SIZE / 2;
-        container.scrollTo({
-          left: cx - container.clientWidth / 2,
-          top: cy - container.clientHeight / 2,
-          behavior: 'auto',
-        });
-        hasScrolledRef.current = true;
-      });
-    });
-    return () => {
-      cancelAnimationFrame(raf1);
-      cancelAnimationFrame(raf2);
+
+    const targetId = completed.has('landing-video') ? 'hub-intro' : 'landing-video';
+    let attempts = 0;
+    let frame = 0;
+    let timeout = 0;
+
+    const tryCenter = () => {
+      attempts += 1;
+      const node = container.querySelector<HTMLElement>(
+        `[data-node-id="${targetId}"]`,
+      );
+      const cw = container.clientWidth;
+      const ch = container.clientHeight;
+      // Bail out and retry if the scroller hasn't been laid out yet or if
+      // the target node hasn't mounted/positioned. Cap retries so a missing
+      // node (data error) doesn't loop forever.
+      if (!node || cw === 0 || ch === 0) {
+        if (attempts < 30) {
+          frame = requestAnimationFrame(tryCenter);
+        }
+        return;
+      }
+      // offsetLeft/Top are relative to the nearest positioned ancestor —
+      // which is the absolutely-positioned canvas inside the scroller. Add
+      // half the node's box and subtract half the viewport to center.
+      const left =
+        node.offsetLeft + node.offsetWidth / 2 - cw / 2;
+      const top =
+        node.offsetTop + node.offsetHeight / 2 - ch / 2;
+      container.scrollTo({ left, top, behavior: 'auto' });
+      hasScrolledRef.current = true;
+
+      // One late re-check: if a deferred layout (font swap, image load) has
+      // shifted the node's position by the time we get here, fix it up.
+      timeout = window.setTimeout(() => {
+        const recheck = container.querySelector<HTMLElement>(
+          `[data-node-id="${targetId}"]`,
+        );
+        if (!recheck) return;
+        const targetLeft =
+          recheck.offsetLeft + recheck.offsetWidth / 2 - container.clientWidth / 2;
+        const targetTop =
+          recheck.offsetTop + recheck.offsetHeight / 2 - container.clientHeight / 2;
+        if (
+          Math.abs(container.scrollLeft - targetLeft) > 4 ||
+          Math.abs(container.scrollTop - targetTop) > 4
+        ) {
+          container.scrollTo({ left: targetLeft, top: targetTop, behavior: 'auto' });
+        }
+      }, 250);
     };
-  }, [getX, getY, completed]);
+
+    frame = requestAnimationFrame(tryCenter);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.clearTimeout(timeout);
+    };
+  }, [completed]);
 
   const selected = selectedId ? SKILL_NODE_BY_ID[selectedId] : null;
   const selectedCompleted = selected ? completed.has(selected.id) : false;
@@ -680,6 +721,7 @@ export function SkillTree() {
             return (
               <div
                 key={node.id}
+                data-node-id={node.id}
                 className="absolute flex flex-col items-center group"
                 style={{
                   left: pos.x + PAD,

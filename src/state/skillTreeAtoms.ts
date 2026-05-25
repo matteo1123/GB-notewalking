@@ -116,9 +116,9 @@ export const toggleNodeAtom = atom(null, (get, set, id: NodeId) => {
 export type XpSpeed = 'slow' | 'medium' | 'fast';
 const XP_SPEED_KEY = 'fq.xp.speed.v1';
 const XP_SPEED_MULTIPLIER: Record<XpSpeed, number> = {
-  slow: 1.0,
-  medium: 1.3,
-  fast: 1.6,
+  slow: 0.05,
+  medium: 0.10,
+  fast: 0.25,
 };
 
 function readXpSpeed(): XpSpeed {

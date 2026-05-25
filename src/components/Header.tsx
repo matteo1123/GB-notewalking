@@ -1,11 +1,14 @@
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { Map, Play, Sparkles } from 'lucide-react';
-import { useAtom, useAtomValue } from 'jotai';
-import { SignInButton, SignedIn, SignedOut, UserButton } from '@clerk/clerk-react';
-import { availableXpAtom, completionCountAtom, totalXpAtom, xpSpeedAtom, type XpSpeed } from '@/state/skillTreeAtoms';
+import { useAtom, useAtomValue, useSetAtom } from 'jotai';
+import { SignInButton, SignedIn, SignedOut, UserButton, useAuth } from '@clerk/clerk-react';
+import { availableXpAtom, completionCountAtom, totalXpAtom, xpSpeedAtom, completedSetAtom, type XpSpeed } from '@/state/skillTreeAtoms';
 import { TOTAL_NODES } from '@/data/skillTree';
 import { usePurchaseStatus } from '@/hooks/usePurchaseStatus';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { useState, useRef, useCallback, useEffect } from 'react';
+import { useMutation } from 'convex/react';
+import { api } from '../../convex/_generated/api';
 
 const navClass = ({ isActive }: { isActive: boolean }) =>
   `inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
@@ -19,9 +22,45 @@ const Header = () => {
   const totalXp = useAtomValue(totalXpAtom);
   const availableXp = useAtomValue(availableXpAtom);
   const [xpSpeed, setXpSpeed] = useAtom(xpSpeedAtom);
+  const setCompletedSet = useSetAtom(completedSetAtom);
+  const setTotalXp = useSetAtom(totalXpAtom);
   const location = useLocation();
   const onPractice = location.pathname === '/practice';
   const { purchased } = usePurchaseStatus();
+  
+  const { isSignedIn } = useAuth();
+  const setRemoteProgress = useMutation(api.progress.setProgress);
+  
+  const [resetArmed, setResetArmed] = useState(false);
+  const resetArmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleResetClick = useCallback(() => {
+    if (!resetArmed) {
+      setResetArmed(true);
+      if (resetArmTimerRef.current) clearTimeout(resetArmTimerRef.current);
+      resetArmTimerRef.current = setTimeout(() => setResetArmed(false), 4000);
+      return;
+    }
+    if (resetArmTimerRef.current) {
+      clearTimeout(resetArmTimerRef.current);
+      resetArmTimerRef.current = null;
+    }
+    setResetArmed(false);
+    setCompletedSet(new Set());
+    setTotalXp(0);
+    
+    if (isSignedIn) {
+      setRemoteProgress({ totalXp: 0, completedNodes: [] }).catch((err) =>
+        console.error('reset progress server push failed', err),
+      );
+    }
+  }, [resetArmed, setCompletedSet, setTotalXp, isSignedIn, setRemoteProgress]);
+
+  useEffect(() => {
+    return () => {
+      if (resetArmTimerRef.current) clearTimeout(resetArmTimerRef.current);
+    };
+  }, []);
 
   return (
     <header className="w-full border-b border-white/5 bg-black/60 backdrop-blur-md shrink-0">
@@ -77,6 +116,24 @@ const Header = () => {
                       {s}
                     </button>
                   ))}
+                </div>
+                
+                <div className="border-t border-white/10 pt-2 mt-1">
+                  <button
+                    onClick={handleResetClick}
+                    className={`w-full h-8 text-[11px] rounded font-bold transition-colors ${
+                      resetArmed
+                        ? 'bg-red-600 hover:bg-red-700 text-white'
+                        : 'bg-muted/40 text-muted-foreground hover:bg-red-900/40 hover:text-red-300'
+                    }`}
+                    title={
+                      resetArmed
+                        ? 'Click again to wipe all XP and relock every video'
+                        : 'Reset all XP and relock videos (purchase stays intact)'
+                    }
+                  >
+                    {resetArmed ? 'Click again to confirm' : 'Reset progress'}
+                  </button>
                 </div>
               </div>
             </PopoverContent>

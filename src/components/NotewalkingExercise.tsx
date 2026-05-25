@@ -28,9 +28,7 @@ import {
   totalXpAtom,
   xpSpeedMultiplierAtom,
 } from '@/state/skillTreeAtoms';
-import { useMutation } from 'convex/react';
 import { useAuth } from '@clerk/clerk-react';
-import { api } from '../../convex/_generated/api';
 import { SKILL_NODE_BY_ID, type NodeId } from '@/data/skillTree';
 import { computeRevealedFrets } from '@/lib/fretboardReveal';
 
@@ -298,15 +296,8 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
 
   const { playChord, preloadChords, stop: stopPlayer } = useNotePlayer(audioContext);
   const addXp = useSetAtom(addXpAtom);
-  const setTotalXp = useSetAtom(totalXpAtom);
-  const setCompletedSet = useSetAtom(completedSetAtom);
   const xpSpeedMultiplier = useAtomValue(xpSpeedMultiplierAtom);
-  const setRemoteProgress = useMutation(api.progress.setProgress);
   const { isSignedIn } = useAuth();
-  // Two-step confirmation state for the destructive "Reset progress" button.
-  // First click arms it; second click (within the timeout window) fires.
-  const [resetArmed, setResetArmed] = useState(false);
-  const resetArmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const settings: ChordProgressionSettings = useMemo(
     () => ({
@@ -709,48 +700,7 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
     return set;
   }, [degreeMap, settings.selectedChords, currentChordIndex]);
 
-  // Destructive "reset all XP + unlocks" action. First click arms a 4-second
-  // confirmation window (the button swaps to a red "Click again to wipe"
-  // state); second click inside the window actually clears things. Purchase
-  // state is untouched — it lives in the `purchases` Convex table, not
-  // `userProgress`, so clearing progress never revokes access.
-  //
-  // Cross-device note: this resets THIS device + the server row. If another
-  // signed-in device still has the old XP/unlocks cached in localStorage, its
-  // next sync will max-merge that stale data back onto the server. A proper
-  // multi-device reset would need a `resetAt` stamp on the server row; for
-  // v1 the single-device path covers the real use-case.
-  const handleResetClick = useCallback(() => {
-    if (!resetArmed) {
-      setResetArmed(true);
-      if (resetArmTimerRef.current) clearTimeout(resetArmTimerRef.current);
-      resetArmTimerRef.current = setTimeout(() => setResetArmed(false), 4000);
-      return;
-    }
-    if (resetArmTimerRef.current) {
-      clearTimeout(resetArmTimerRef.current);
-      resetArmTimerRef.current = null;
-    }
-    setResetArmed(false);
-    setCompletedSet(new Set());
-    setTotalXp(0);
-    xpAccRef.current = 0;
-    // Push zeros to Convex directly. The useSyncProgress hook would do this
-    // anyway via its 500ms debounce, but a direct call makes the intent
-    // explicit and avoids the race where a refresh mid-debounce could leave
-    // the server with stale data.
-    if (isSignedIn) {
-      setRemoteProgress({ totalXp: 0, completedNodes: [] }).catch((err) =>
-        console.error('reset progress server push failed', err),
-      );
-    }
-  }, [resetArmed, setCompletedSet, setTotalXp, isSignedIn, setRemoteProgress]);
 
-  useEffect(() => {
-    return () => {
-      if (resetArmTimerRef.current) clearTimeout(resetArmTimerRef.current);
-    };
-  }, []);
 
   // Award XP only when the user actually hits a chord tone on a revealed fret.
   // Diminishes as more nodes are unlocked (rate = max(0.005, 0.1 * 0.7^paidCount) per hit).
@@ -1127,23 +1077,7 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
 
 
 
-            <div className="border-t border-gray-800 pt-2 mt-1">
-              <button
-                onClick={handleResetClick}
-                className={`w-full h-8 text-[11px] rounded font-bold transition-colors ${
-                  resetArmed
-                    ? 'bg-red-600 hover:bg-red-700 text-white'
-                    : 'bg-muted/40 text-muted-foreground hover:bg-red-900/40 hover:text-red-300'
-                }`}
-                title={
-                  resetArmed
-                    ? 'Click again to wipe all XP and relock every video'
-                    : 'Reset all XP and relock videos (purchase stays intact)'
-                }
-              >
-                {resetArmed ? 'Click again to confirm' : 'Reset progress'}
-              </button>
-            </div>
+
           </div>
         </div>
         {cinematic && (

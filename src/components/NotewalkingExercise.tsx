@@ -31,6 +31,7 @@ import {
 import { useAuth } from '@clerk/clerk-react';
 import { SKILL_NODE_BY_ID, type NodeId } from '@/data/skillTree';
 import { computeRevealedFrets } from '@/lib/fretboardReveal';
+import { SessionRecorder } from '@/components/recording/SessionRecorder';
 
 const MAJOR_KEYS = ['C', 'D', 'E', 'F', 'G', 'A', 'B', 'C#', 'D#', 'F#', 'G#', 'A#'];
 
@@ -431,7 +432,9 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
     [],
   );
 
-  usePitchDetection({
+  // audioStream is only read by the session recorder so it can reuse this mic
+  // input instead of opening a second, competing one.
+  const { audioStream: micStream } = usePitchDetection({
     isEnabled: micEnabled && !!audioContext,
     onNoteDetected: handlePitchDetected,
     sensitivity: 0.7,
@@ -1074,6 +1077,15 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
             >
               {muted ? 'Unmute click' : 'Mute click'}
             </button>
+
+            <SessionRecorder
+              micStream={micStream}
+              captureRef={stageContainerRef}
+              filenameParts={{
+                key,
+                shape: focusMode === 'focused' ? focusedNode : null,
+              }}
+            />
 
 
 

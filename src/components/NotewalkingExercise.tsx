@@ -32,6 +32,7 @@ import { useAuth } from '@clerk/clerk-react';
 import { SKILL_NODE_BY_ID, type NodeId } from '@/data/skillTree';
 import { computeRevealedFrets } from '@/lib/fretboardReveal';
 import { SessionRecorder } from '@/components/recording/SessionRecorder';
+import { SessionEventLog } from '@/components/recording/sessionEventLog';
 
 const MAJOR_KEYS = ['C', 'D', 'E', 'F', 'G', 'A', 'B', 'C#', 'D#', 'F#', 'G#', 'A#'];
 
@@ -416,9 +417,49 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Session recording log. add() is a no-op unless a recording is running, so
+  // these hooks cost nothing during normal practice.
+  const [recordingLog] = useState(() => new SessionEventLog());
+  const logStateRef = useRef({ key, numeral: currentChordA, isPlaying });
+  logStateRef.current = {
+    key,
+    numeral: settings.selectedChords[currentChordIndex] as ChordNumeral,
+    isPlaying,
+  };
+
+  // Chord timeline: one event when playback starts (the progression resumes
+  // where it paused, so the starting chord isn't always I) and one per change.
+  const lastLoggedChordRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!isPlaying) {
+      if (lastLoggedChordRef.current !== null) recordingLog.add('playback-stop');
+      lastLoggedChordRef.current = null;
+      return;
+    }
+    const sig = `${key}:${currentChordIndex}`;
+    if (lastLoggedChordRef.current === sig) return;
+    const cause = lastLoggedChordRef.current === null ? 'playback-start' : 'change';
+    lastLoggedChordRef.current = sig;
+    const numeral = settings.selectedChords[currentChordIndex] as ChordNumeral;
+    recordingLog.add('chord', { chord: numeral, root: getChordInfo(key, numeral).rootNote, key, bpm, cause });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPlaying, currentChordIndex, key]);
+
   const handlePitchDetected = useCallback(
     (result: { frequency: number; note: string; confidence: number }) => {
       const name = result.note.replace(/\d/g, '');
+      if (recordingLog.active) {
+        const { key: k, numeral, isPlaying: playing } = logStateRef.current;
+        const degree = calculateDegreeFromRoot(name, k);
+        recordingLog.add('note', {
+          note: result.note,
+          freq: Math.round(result.frequency * 10) / 10,
+          degree,
+          chord: playing ? numeral : null,
+          chordTone: playing && degree != null ? getChordTones(numeral).includes(degree) : null,
+          confidence: Math.round(result.confidence * 100) / 100,
+        });
+      }
       setDetectedNote(name);
       setDetectedPitch(result.note);
       // Auto-clear the highlight a beat after the last detection so notes
@@ -429,7 +470,7 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
         setDetectedPitch(null);
       }, 800);
     },
-    [],
+    [recordingLog],
   );
 
   // audioStream is only read by the session recorder so it can reuse this mic
@@ -1085,6 +1126,19 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
                 key,
                 shape: focusMode === 'focused' ? focusedNode : null,
               }}
+              eventLog={recordingLog}
+              getSnapshot={() => ({
+                key,
+                bpm,
+                playing: isPlaying,
+                chord: isPlaying ? settings.selectedChords[currentChordIndex] : null,
+                progression: settings.selectedChords,
+                measuresPerChord: settings.measuresPerChord,
+                focusMode,
+                focusedNode: focusMode === 'focused' ? focusedNode : null,
+                scaleView: currentScaleView,
+                mic: micEnabled,
+              })}
             />
 
 

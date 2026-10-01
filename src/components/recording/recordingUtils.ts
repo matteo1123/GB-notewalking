@@ -43,12 +43,32 @@ export function canCaptureScreen(): boolean {
   return !!navigator.mediaDevices && typeof navigator.mediaDevices.getDisplayMedia === 'function';
 }
 
-export function canShareFile(file: File): boolean {
+export function canShareFiles(files: File[]): boolean {
   try {
-    return typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] });
+    return typeof navigator.canShare === 'function' && navigator.canShare({ files });
   } catch {
     return false;
   }
+}
+
+// Chromium's Web Share only accepts an allowlist of file types, and JSON
+// isn't on it (plain text is). Same bytes, different label.
+export function asShareableText(file: File): File {
+  return new File([file], `${file.name}.txt`, { type: 'text/plain' });
+}
+
+/**
+ * Best set of files the native share sheet will take: video + data as
+ * .json, else video + data as .json.txt, else the video alone (the caller
+ * then has to deliver the data another way).
+ */
+export function pickShareFiles(video: File, data: File): { files: File[]; includesData: boolean } | null {
+  const asJson = [video, data];
+  if (canShareFiles(asJson)) return { files: asJson, includesData: true };
+  const asText = [video, asShareableText(data)];
+  if (canShareFiles(asText)) return { files: asText, includesData: true };
+  if (canShareFiles([video])) return { files: [video], includesData: false };
+  return null;
 }
 
 export interface FilenameParts {

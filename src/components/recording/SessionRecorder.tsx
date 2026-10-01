@@ -12,12 +12,15 @@ import {
 } from '@/components/ui/dialog';
 import { RecordingPreviewDialog } from './RecordingPreviewDialog';
 import { useSessionRecording } from './useSessionRecording';
+import type { SessionEventLog } from './sessionEventLog';
 import { PIP_CORNERS, canRecord, formatElapsed, type FilenameParts, type PipCorner } from './recordingUtils';
 
 interface SessionRecorderProps {
   micStream: MediaStream | null;
   captureRef?: RefObject<Element>;
   filenameParts: FilenameParts;
+  eventLog?: SessionEventLog;
+  getSnapshot?: () => Record<string, unknown>;
 }
 
 const CORNER_LABEL: Record<PipCorner, string> = {
@@ -34,8 +37,8 @@ function nextCorner(c: PipCorner): PipCorner {
 // Record / Stop control for the practice sidebar, plus the setup dialog,
 // the 3-2-1 overlay and the preview + share screen. Self-contained: the host
 // only passes in streams and naming data it already has.
-export function SessionRecorder({ micStream, captureRef, filenameParts }: SessionRecorderProps) {
-  const rec = useSessionRecording({ micStream, captureRef, filenameParts });
+export function SessionRecorder({ micStream, captureRef, filenameParts, eventLog, getSnapshot }: SessionRecorderProps) {
+  const rec = useSessionRecording({ micStream, captureRef, filenameParts, eventLog, getSnapshot });
   const { phase, prefs } = rec;
 
   if (!canRecord()) return null;

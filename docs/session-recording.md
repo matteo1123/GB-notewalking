@@ -10,6 +10,7 @@ Code: `src/components/recording/`. It's mounted in the practice sidebar (`Notewa
 | `SessionRecorder.tsx` | Record/Stop control, setup dialog, 3-2-1 overlay |
 | `RecordingPreviewDialog.tsx` | Preview, Share, Download, upload links, Discard |
 | `recordingUtils.ts` | MIME choice, filename, capability checks, share URLs |
+| `sessionEventLog.ts` | Timestamped event log saved as a sidecar `.json` |
 
 ## How it works
 
@@ -19,6 +20,22 @@ Code: `src/components/recording/`. It's mounted in the practice sidebar (`Notewa
 - **Performance:** if drawing frames gets slow, the compositor steps down from 30 to 24, 20, then 15fps. Resolution stays at 1080p.
 - **Filename:** `guitarbrain_key-E_shape-C-top_2026-09-29.mp4`. The app has no day counter, so `day-NNN` is omitted. `shape` is included only in Focus mode. `#` becomes `sharp` (e.g. `key-Fsharp`).
 - **Facebook group button:** set `VITE_FACEBOOK_GROUP_URL`. The button is hidden when it's unset.
+
+## Session data (.json)
+
+Every recording also produces a JSON file with the same name as the video (`guitarbrain_key-E_..._2026-09-30.json`). `t` is milliseconds from the video's first frame, accurate to about 0.1s. The events, in order:
+
+- `recording-start` (t=0): key, bpm, whether playback is running, current chord, progression, focus mode/node, scale view, mic on/off.
+- `chord`: `{ chord: "IV", root: "A", key: "E", bpm, cause: "playback-start" | "change" }`, logged when Start is pressed and on every chord change.
+- `playback-stop`: Stop was pressed.
+- `note`: `{ note: "A2", freq, degree, chord, chordTone, confidence }`, logged for every note pitch detection reports. `chord`/`chordTone` are `null` while playback is stopped. Notes highlighted with the keyboard (1–7) aren't logged.
+
+Events are held in memory during the recording and written when it stops.
+
+Getting it to Drive with the video:
+- **Share:** sends video + JSON together. Chrome's share sheet won't accept `.json`, so there it's sent as `<name>.json.txt` (same content). If a share target only takes the video, the JSON is downloaded at the same moment.
+- **Download / YouTube / Google Drive buttons:** save both files. Chrome may ask once to "allow multiple downloads". For Drive, drag both files in.
+- **".json only"** in the preview re-downloads just the data file.
 
 ## Browser limitations
 

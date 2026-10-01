@@ -1,5 +1,5 @@
 import { useMemo, useState, type SyntheticEvent } from 'react';
-import { Download, ExternalLink, Share2, Trash2 } from 'lucide-react';
+import { Download, ExternalLink, FileJson, Share2, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -9,7 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { SHARE_TARGETS, canShareFile, formatBytes, formatElapsed } from './recordingUtils';
+import { SHARE_TARGETS, formatBytes, formatElapsed, pickShareFiles } from './recordingUtils';
 import type { RecordingResult } from './useSessionRecording';
 
 interface RecordingPreviewDialogProps {
@@ -32,26 +32,43 @@ function fixUnknownDuration(e: SyntheticEvent<HTMLVideoElement>) {
 }
 
 export function RecordingPreviewDialog({ result, onDiscard }: RecordingPreviewDialogProps) {
-  const { file, url, durationMs } = result;
-  const shareable = useMemo(() => canShareFile(file), [file]);
+  const { file, url, durationMs, dataFile } = result;
+  const shareSet = useMemo(() => pickShareFiles(file, dataFile), [file, dataFile]);
+  const shareable = !!shareSet;
   const [saved, setSaved] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
 
-  const download = () => {
+  const saveFile = (f: File, href?: string) => {
+    const objectUrl = href ?? URL.createObjectURL(f);
     const a = document.createElement('a');
-    a.href = url;
-    a.download = file.name;
+    a.href = objectUrl;
+    a.download = f.name;
     document.body.appendChild(a);
     a.click();
     a.remove();
+    if (!href) setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+  };
+
+  const downloadData = () => saveFile(dataFile);
+
+  // Video + its JSON. The data file goes a beat later: some browsers drop a
+  // second download fired in the same tick (Chrome may ask once to allow
+  // multiple downloads from this site).
+  const download = () => {
+    saveFile(file, url);
+    setTimeout(downloadData, 400);
     setSaved(true);
   };
 
   const share = async () => {
+    if (!shareSet) return;
     setShareError(null);
+    // Share sheet can't take the data file here — save it locally now, while
+    // we still have the click's user activation.
+    if (!shareSet.includesData) downloadData();
     try {
-      await navigator.share({ files: [file], title: 'Guitar Brain practice session' });
+      await navigator.share({ files: shareSet.files, title: 'Guitar Brain practice session' });
       setSaved(true);
     } catch (err) {
       if ((err as DOMException)?.name === 'AbortError') return; // user closed the sheet
@@ -107,6 +124,18 @@ export function RecordingPreviewDialog({ result, onDiscard }: RecordingPreviewDi
             </Button>
           </div>
           {shareError && <div className="text-xs text-red-400">{shareError}</div>}
+          <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+            <span>
+              Session data ({formatBytes(dataFile.size)}) is saved and shared with the video
+              {shareSet && !shareSet.includesData ? ' (downloaded separately when sharing)' : ''}.
+            </span>
+            <button
+              onClick={downloadData}
+              className="inline-flex items-center gap-1 shrink-0 text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
+            >
+              <FileJson className="w-3.5 h-3.5" /> .json only
+            </button>
+          </div>
 
           <div className="flex flex-col gap-1.5">
             <div className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Post it</div>
@@ -124,8 +153,8 @@ export function RecordingPreviewDialog({ result, onDiscard }: RecordingPreviewDi
               )}
             </div>
             <div className="text-[11px] text-muted-foreground">
-              Each button saves the video, then opens the upload page in a new tab. Drag the file in from your
-              downloads.
+              Each button saves the video and its .json, then opens the upload page in a new tab. For Drive,
+              drag both files in from your downloads.
             </div>
           </div>
         </div>

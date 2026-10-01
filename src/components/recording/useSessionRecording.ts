@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { CameraUnavailableError, RecordingEngine } from './RecordingEngine';
+import { serializeSessionLog, type SessionEventLog } from './sessionEventLog';
 import {
   buildRecordingFilename,
   canCaptureScreen,
@@ -29,7 +30,11 @@ export interface RecordingResult {
   file: File;
   url: string;
   durationMs: number;
+  /** Sidecar JSON of what the app did, named to match the video. */
+  dataFile: File;
 }
+
+export const SESSION_LOG_FORMAT = 'guitarbrain-session-log';
 
 const PREFS_KEY = 'gb.recording.prefs.v1';
 const DEFAULT_PREFS: RecordingPrefs = { layout: 'landscape', cameraEnabled: true, corner: 'bottom-right' };
@@ -57,9 +62,19 @@ interface UseSessionRecordingArgs {
   /** Element to crop the tab capture to (Region Capture, Chromium only). */
   captureRef?: RefObject<Element>;
   filenameParts: FilenameParts;
+  /** Host-owned log the host appends chord/note events to. */
+  eventLog?: SessionEventLog;
+  /** State of the app at the first frame; becomes the log's first event. */
+  getSnapshot?: () => Record<string, unknown>;
 }
 
-export function useSessionRecording({ micStream, captureRef, filenameParts }: UseSessionRecordingArgs) {
+export function useSessionRecording({
+  micStream,
+  captureRef,
+  filenameParts,
+  eventLog,
+  getSnapshot,
+}: UseSessionRecordingArgs) {
   const [phase, setPhase] = useState<RecordingPhase>('idle');
   const [prefs, setPrefsState] = useState<RecordingPrefs>(readPrefs);
   const [countdown, setCountdown] = useState(0);
@@ -83,6 +98,10 @@ export function useSessionRecording({ micStream, captureRef, filenameParts }: Us
   const micStreamRef = useRef(micStream);
   micStreamRef.current = micStream;
   const mimeRef = useRef('video/webm');
+  const eventLogRef = useRef(eventLog);
+  eventLogRef.current = eventLog;
+  const getSnapshotRef = useRef(getSnapshot);
+  getSnapshotRef.current = getSnapshot;
 
   const setPrefs = useCallback((update: Partial<RecordingPrefs>) => {
     setPrefsState((prev) => {
@@ -103,6 +122,7 @@ export function useSessionRecording({ micStream, captureRef, filenameParts }: Us
   const teardownEngine = useCallback(() => {
     engineRef.current?.dispose();
     engineRef.current = null;
+    eventLogRef.current?.clear();
     setCameraLive(false);
   }, []);
 
@@ -132,6 +152,9 @@ export function useSessionRecording({ micStream, captureRef, filenameParts }: Us
     if (phaseRef.current !== 'recording') return;
     clearTimers();
     const durationMs = performance.now() - startedAtRef.current;
+    // Close the log before the async encoder flush so nothing after the
+    // Stop click lands in it.
+    const events = eventLogRef.current?.stop() ?? [];
     setPhase('finalizing');
     const blob = await engine.stop();
     teardownEngine();
@@ -142,7 +165,18 @@ export function useSessionRecording({ micStream, captureRef, filenameParts }: Us
     }
     const name = buildRecordingFilename(filenamePartsRef.current, extensionForMime(blob.type || mimeRef.current));
     const file = new File([blob], name, { type: blob.type || mimeRef.current });
-    setResult({ file, url: URL.createObjectURL(file), durationMs });
+    const log = {
+      format: SESSION_LOG_FORMAT,
+      version: 1,
+      video: name,
+      recordedAt: new Date(Date.now() - durationMs).toISOString(),
+      durationMs: Math.round(durationMs),
+      timeBase: 't = milliseconds from the first frame of the video',
+    };
+    const dataFile = new File([serializeSessionLog(log, events)], name.replace(/\.[^.]+$/, '.json'), {
+      type: 'application/json',
+    });
+    setResult({ file, url: URL.createObjectURL(file), durationMs, dataFile });
     setPhase('preview');
   }, [clearTimers, teardownEngine]);
 
@@ -172,6 +206,8 @@ export function useSessionRecording({ micStream, captureRef, filenameParts }: Us
               return;
             }
             startedAtRef.current = performance.now();
+            eventLogRef.current?.start(startedAtRef.current);
+            eventLogRef.current?.add('recording-start', getSnapshotRef.current?.() ?? {});
             setElapsedMs(0);
             elapsedTimerRef.current = setInterval(
               () => setElapsedMs(performance.now() - startedAtRef.current),

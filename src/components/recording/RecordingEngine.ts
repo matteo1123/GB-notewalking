@@ -19,6 +19,22 @@ export interface EngineOptions {
 
 export class CameraUnavailableError extends Error {}
 
+export interface Rect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/** Where each source sits in the output video, in output pixels. */
+export interface LayoutInfo {
+  layout: RecordingLayout;
+  width: number;
+  height: number;
+  screen: Rect | null;
+  camera: Rect | null;
+}
+
 function hiddenVideo(stream: MediaStream): HTMLVideoElement {
   const v = document.createElement('video');
   v.muted = true;
@@ -45,19 +61,25 @@ function videoReady(v: HTMLVideoElement | null): v is HTMLVideoElement {
   return !!v && v.readyState >= 2 && v.videoWidth > 0 && v.videoHeight > 0;
 }
 
-function drawContain(ctx: CanvasRenderingContext2D, v: HTMLVideoElement, x: number, y: number, w: number, h: number) {
+function drawContain(ctx: CanvasRenderingContext2D, v: HTMLVideoElement, x: number, y: number, w: number, h: number): Rect {
   const s = Math.min(w / v.videoWidth, h / v.videoHeight);
   const dw = v.videoWidth * s;
   const dh = v.videoHeight * s;
-  ctx.drawImage(v, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
+  const r = { x: x + (w - dw) / 2, y: y + (h - dh) / 2, w: dw, h: dh };
+  ctx.drawImage(v, r.x, r.y, r.w, r.h);
+  return r;
 }
 
-function drawCover(ctx: CanvasRenderingContext2D, v: HTMLVideoElement, x: number, y: number, w: number, h: number) {
+function drawCover(ctx: CanvasRenderingContext2D, v: HTMLVideoElement, x: number, y: number, w: number, h: number): Rect {
   const s = Math.max(w / v.videoWidth, h / v.videoHeight);
   const sw = w / s;
   const sh = h / s;
   ctx.drawImage(v, (v.videoWidth - sw) / 2, (v.videoHeight - sh) / 2, sw, sh, x, y, w, h);
+  return { x, y, w, h };
 }
+
+const roundRect = (r: Rect | null): Rect | null =>
+  r && { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.w), h: Math.round(r.h) };
 
 function roundedRectPath(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   ctx.beginPath();
@@ -72,6 +94,10 @@ function roundedRectPath(ctx: CanvasRenderingContext2D, x: number, y: number, w:
 export class RecordingEngine {
   opts: EngineOptions;
   onScreenEnded: (() => void) | null = null;
+  /** Fires whenever a source moves/appears/disappears in the output frame. */
+  onLayoutChange: ((info: LayoutInfo) => void) | null = null;
+  private layoutSig = '';
+  layoutInfo: LayoutInfo | null = null;
 
   private displayStream: MediaStream | null = null;
   private cameraStream: MediaStream | null = null;
@@ -242,31 +268,46 @@ export class RecordingEngine {
 
     const screen = videoReady(this.screenVideo) ? this.screenVideo : null;
     const cam = this.opts.cameraVisible && videoReady(this.cameraVideo) ? this.cameraVideo : null;
+    let screenRect: Rect | null = null;
+    let camRect: Rect | null = null;
 
     if (this.opts.layout === 'vertical') {
       if (screen && cam) {
         // Screen on top at full width (capped at half the frame), camera
         // fills everything below it.
         const topH = Math.min(H / 2, (W * screen.videoHeight) / screen.videoWidth);
-        drawContain(ctx, screen, 0, 0, W, topH);
-        drawCover(ctx, cam, 0, topH, W, H - topH);
+        screenRect = drawContain(ctx, screen, 0, 0, W, topH);
+        camRect = drawCover(ctx, cam, 0, topH, W, H - topH);
       } else if (screen) {
-        drawContain(ctx, screen, 0, 0, W, H);
+        screenRect = drawContain(ctx, screen, 0, 0, W, H);
       } else if (cam) {
-        drawCover(ctx, cam, 0, 0, W, H);
+        camRect = drawCover(ctx, cam, 0, 0, W, H);
       }
-      return;
-    }
-
-    if (screen) {
-      drawContain(ctx, screen, 0, 0, W, H);
-      if (cam) this.drawPip(cam, W, H);
+    } else if (screen) {
+      screenRect = drawContain(ctx, screen, 0, 0, W, H);
+      if (cam) camRect = this.drawPip(cam, W, H);
     } else if (cam) {
-      drawCover(ctx, cam, 0, 0, W, H);
+      camRect = drawCover(ctx, cam, 0, 0, W, H);
     }
+    this.reportLayout(screenRect, camRect);
   }
 
-  private drawPip(cam: HTMLVideoElement, W: number, H: number) {
+  private reportLayout(screen: Rect | null, camera: Rect | null) {
+    const info: LayoutInfo = {
+      layout: this.opts.layout,
+      width: this.canvas.width,
+      height: this.canvas.height,
+      screen: roundRect(screen),
+      camera: roundRect(camera),
+    };
+    const sig = JSON.stringify(info);
+    if (sig === this.layoutSig) return;
+    this.layoutSig = sig;
+    this.layoutInfo = info;
+    this.onLayoutChange?.(info);
+  }
+
+  private drawPip(cam: HTMLVideoElement, W: number, H: number): Rect {
     const ctx = this.ctx2d;
     const pw = Math.round(W * 0.24);
     const ph = Math.round((pw * cam.videoHeight) / cam.videoWidth);
@@ -283,6 +324,7 @@ export class RecordingEngine {
     ctx.lineWidth = 3;
     ctx.strokeStyle = 'rgba(255,255,255,0.35)';
     ctx.stroke();
+    return { x, y, w: pw, h: ph };
   }
 
   /** Begin encoding. Returns the MIME type actually used. */

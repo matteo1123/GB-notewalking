@@ -208,6 +208,7 @@ export function useSessionRecording({
             startedAtRef.current = performance.now();
             eventLogRef.current?.start(startedAtRef.current);
             eventLogRef.current?.add('recording-start', getSnapshotRef.current?.() ?? {});
+            if (engine.layoutInfo) eventLogRef.current?.add('layout', { ...engine.layoutInfo });
             setElapsedMs(0);
             elapsedTimerRef.current = setInterval(
               () => setElapsedMs(performance.now() - startedAtRef.current),
@@ -246,6 +247,8 @@ export function useSessionRecording({
       cameraVisible: wantCamera,
     });
     engineRef.current = engine;
+    // Layout events let downstream tools crop the screen and camera apart.
+    engine.onLayoutChange = (info) => eventLogRef.current?.add('layout', { ...info });
     engine.onScreenEnded = () => {
       // User hit the browser's own "Stop sharing" button.
       if (phaseRef.current === 'recording') void stop();

@@ -28,7 +28,8 @@ Every recording also produces a JSON file with the same name as the video (`guit
 - `recording-start` (t=0): key, bpm, whether playback is running, current chord, progression, focus mode/node, scale view, mic on/off.
 - `chord`: `{ chord: "IV", root: "A", key: "E", bpm, cause: "playback-start" | "change" }`, logged when Start is pressed and on every chord change.
 - `playback-stop`: Stop was pressed.
-- `note`: `{ note: "A2", freq, degree, chord, chordTone, confidence }`, logged for every note pitch detection reports. `chord`/`chordTone` are `null` while playback is stopped. Notes highlighted with the keyboard (1–7) aren't logged.
+- `layout` (t=0, and again whenever the camera is toggled or moved): `{ layout, width, height, screen: {x,y,w,h}, camera: {x,y,w,h} | null }`, the exact pixel rectangles of each source in the video, for cropping.
+- `note`: `{ note: "A2", freq, semi, degree, chord, chordTone, confidence }`. `semi` is semitones above the key root (0–11), which also covers chromatic notes; `degree` is the major-scale degree (1–7) or `null`, logged for every note pitch detection reports. `chord`/`chordTone` are `null` while playback is stopped. Notes highlighted with the keyboard (1–7) aren't logged.
 
 Events are held in memory during the recording and written when it stops.
 

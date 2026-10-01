@@ -19,7 +19,7 @@ import Fretboard from '@/components/Fretboard';
 import { CagedConstellationFill } from '@/components/CagedConstellation';
 import type { CagedShape } from '@/lib/cagedSystem';
 import { ForceLandscapeWrapper } from '@/components/ForceLandscapeWrapper';
-import { createDegreeMap, findAllNoteOccurrences } from '@/lib/musicTheory';
+import { CHROMATIC_SCALE, createDegreeMap, findAllNoteOccurrences } from '@/lib/musicTheory';
 import { getChordTones, getChordInfo, calculateDegreeFromRoot } from '@/lib/chordProgression';
 import type { ChordNumeral, ChordProgressionSettings } from '@/types/chords';
 import {
@@ -451,9 +451,14 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
       if (recordingLog.active) {
         const { key: k, numeral, isPlaying: playing } = logStateRef.current;
         const degree = calculateDegreeFromRoot(name, k);
+        const noteIdx = CHROMATIC_SCALE.indexOf(name);
+        const keyIdx = CHROMATIC_SCALE.indexOf(k);
         recordingLog.add('note', {
           note: result.note,
           freq: Math.round(result.frequency * 10) / 10,
+          // Semitones above the key root (0–11). Unlike `degree` (major-scale
+          // 1–7, null otherwise) this also covers chromatic notes like b7.
+          semi: noteIdx >= 0 && keyIdx >= 0 ? (noteIdx - keyIdx + 12) % 12 : null,
           degree,
           chord: playing ? numeral : null,
           chordTone: playing && degree != null ? getChordTones(numeral).includes(degree) : null,

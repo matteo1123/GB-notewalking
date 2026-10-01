@@ -58,16 +58,31 @@ export function asShareableText(file: File): File {
 }
 
 /**
- * Best set of files the native share sheet will take: video + data as
- * .json, else video + data as .json.txt, else the video alone (the caller
- * then has to deliver the data another way).
+ * Best set of files the native share sheet will take, most complete first:
+ * everything with the data as .json, then as .json.txt, then without the
+ * companions, then the video alone. `missing` lists what the caller must
+ * still deliver another way (download).
  */
-export function pickShareFiles(video: File, data: File): { files: File[]; includesData: boolean } | null {
-  const asJson = [video, data];
-  if (canShareFiles(asJson)) return { files: asJson, includesData: true };
-  const asText = [video, asShareableText(data)];
-  if (canShareFiles(asText)) return { files: asText, includesData: true };
-  if (canShareFiles([video])) return { files: [video], includesData: false };
+export function pickShareFiles(
+  video: File,
+  data: File,
+  companions: File[] = [],
+): { files: File[]; missing: File[] } | null {
+  const dataTxt = asShareableText(data);
+  const attempts: File[][] = [
+    [video, ...companions, data],
+    [video, ...companions, dataTxt],
+    [video, data],
+    [video, dataTxt],
+    [video],
+  ];
+  for (const files of attempts) {
+    if (!canShareFiles(files)) continue;
+    const names = new Set(files.map((f) => f.name));
+    const sentData = names.has(data.name) || names.has(dataTxt.name);
+    const missing = [...companions, data].filter((f) => !names.has(f.name) && !(f === data && sentData));
+    return { files, missing };
+  }
   return null;
 }
 

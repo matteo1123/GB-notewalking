@@ -21,6 +21,14 @@ Code: `src/components/recording/`. It's mounted in the practice sidebar (`Notewa
 - **Filename:** `guitarbrain_key-E_shape-C-top_2026-09-29.mp4`. The app has no day counter, so `day-NNN` is omitted. `shape` is included only in Focus mode. `#` becomes `sharp` (e.g. `key-Fsharp`).
 - **Facebook group button:** set `VITE_FACEBOOK_GROUP_URL`. The button is hidden when it's unset.
 
+## Companion files
+
+Each recording also saves:
+- `<name>.camera.mp4`: the raw camera at full resolution (up to 1080p, ~5 Mbps), video only. It keeps recording even when the camera overlay is hidden. If the camera is first switched on mid-recording, the file starts then.
+- `<name>.mic.m4a`: the mic on its own (no chords or metronome), from the same stream pitch detection uses. It's one continuous file; while the mic is toggled off it's silent.
+
+Both start in the same tick as the main video. The JSON header's `companions` block records `{ file, offsetMs }` for each, where `offsetMs` is how long after the main video's first frame the companion's first frame was captured (main time = companion time + offsetMs). WebM is used in browsers that can't write MP4.
+
 ## Session data (.json)
 
 Every recording also produces a JSON file with the same name as the video (`guitarbrain_key-E_..._2026-09-30.json`). `t` is milliseconds from the video's first frame, accurate to about 0.1s. The events, in order:
@@ -34,8 +42,8 @@ Every recording also produces a JSON file with the same name as the video (`guit
 Events are held in memory during the recording and written when it stops.
 
 Getting it to Drive with the video:
-- **Share:** sends video + JSON together. Chrome's share sheet won't accept `.json`, so there it's sent as `<name>.json.txt` (same content). If a share target only takes the video, the JSON is downloaded at the same moment.
-- **Download / YouTube / Google Drive buttons:** save both files. Chrome may ask once to "allow multiple downloads". For Drive, drag both files in.
+- **Share:** sends the video, its companions and the JSON together. Chrome's share sheet won't accept `.json`, so there it's sent as `<name>.json.txt` (same content). If a share target only takes the video, the JSON is downloaded at the same moment.
+- **Download / YouTube / Google Drive buttons:** save all the files. Chrome may ask once to "allow multiple downloads". For Drive, drag both files in.
 - **".json only"** in the preview re-downloads just the data file.
 
 ## Browser limitations

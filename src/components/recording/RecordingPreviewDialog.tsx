@@ -32,8 +32,10 @@ function fixUnknownDuration(e: SyntheticEvent<HTMLVideoElement>) {
 }
 
 export function RecordingPreviewDialog({ result, onDiscard }: RecordingPreviewDialogProps) {
-  const { file, url, durationMs, dataFile } = result;
-  const shareSet = useMemo(() => pickShareFiles(file, dataFile), [file, dataFile]);
+  const { file, url, durationMs, dataFile, companions } = result;
+  const shareSet = useMemo(() => pickShareFiles(file, dataFile, companions), [file, dataFile, companions]);
+  const extras = useMemo(() => [...companions, dataFile], [companions, dataFile]);
+  const extrasSize = extras.reduce((n, f) => n + f.size, 0);
   const shareable = !!shareSet;
   const [saved, setSaved] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
@@ -52,21 +54,23 @@ export function RecordingPreviewDialog({ result, onDiscard }: RecordingPreviewDi
 
   const downloadData = () => saveFile(dataFile);
 
-  // Video + its JSON. The data file goes a beat later: some browsers drop a
-  // second download fired in the same tick (Chrome may ask once to allow
-  // multiple downloads from this site).
+  // Staggered: some browsers drop downloads fired in the same tick (Chrome
+  // may ask once to allow multiple downloads from this site).
+  const saveLater = (files: File[]) => files.forEach((f, i) => setTimeout(() => saveFile(f), 400 * (i + 1)));
+
+  // Video + camera + mic + JSON.
   const download = () => {
     saveFile(file, url);
-    setTimeout(downloadData, 400);
+    saveLater(extras);
     setSaved(true);
   };
 
   const share = async () => {
     if (!shareSet) return;
     setShareError(null);
-    // Share sheet can't take the data file here — save it locally now, while
-    // we still have the click's user activation.
-    if (!shareSet.includesData) downloadData();
+    // Whatever the share sheet can't take is saved locally now, while we
+    // still have the click's user activation.
+    shareSet.missing.forEach((f, i) => setTimeout(() => saveFile(f), 400 * i));
     try {
       await navigator.share({ files: shareSet.files, title: 'Guitar Brain practice session' });
       setSaved(true);
@@ -126,8 +130,9 @@ export function RecordingPreviewDialog({ result, onDiscard }: RecordingPreviewDi
           {shareError && <div className="text-xs text-red-400">{shareError}</div>}
           <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
             <span>
-              Session data ({formatBytes(dataFile.size)}) is saved and shared with the video
-              {shareSet && !shareSet.includesData ? ' (downloaded separately when sharing)' : ''}.
+              {companions.length > 0 ? 'Camera, mic and session data' : 'Session data'} ({formatBytes(extrasSize)}) are
+              saved and shared with the video
+              {shareSet && shareSet.missing.length > 0 ? ' (some are downloaded separately when sharing)' : ''}.
             </span>
             <button
               onClick={downloadData}
@@ -153,8 +158,8 @@ export function RecordingPreviewDialog({ result, onDiscard }: RecordingPreviewDi
               )}
             </div>
             <div className="text-[11px] text-muted-foreground">
-              Each button saves the video and its .json, then opens the upload page in a new tab. For Drive,
-              drag both files in from your downloads.
+              Each button saves the video and its companion files, then opens the upload page in a new tab. For
+              Drive, drag all of them in from your downloads.
             </div>
           </div>
         </div>

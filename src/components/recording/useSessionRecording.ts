@@ -32,6 +32,15 @@ export interface RecordingResult {
   durationMs: number;
   /** Sidecar JSON of what the app did, named to match the video. */
   dataFile: File;
+  /** Full-res camera (`<name>.camera.mp4`) and mic-only audio (`<name>.mic.m4a`), when recorded. */
+  companions: File[];
+}
+
+// Companion filenames: `<name>.camera.<ext>` / `<name>.mic.<ext>`. The
+// pipeline pairs files by everything before the role suffix.
+function companionExt(mime: string, kind: 'camera' | 'mic'): string {
+  if (mime.includes('mp4')) return kind === 'mic' ? 'm4a' : 'mp4';
+  return 'webm';
 }
 
 export const SESSION_LOG_FORMAT = 'guitarbrain-session-log';
@@ -156,7 +165,8 @@ export function useSessionRecording({
     // Stop click lands in it.
     const events = eventLogRef.current?.stop() ?? [];
     setPhase('finalizing');
-    const blob = await engine.stop();
+    const output = await engine.stop();
+    const blob = output.main;
     teardownEngine();
     if (blob.size === 0) {
       setError('The recording came out empty. Please try again.');
@@ -165,6 +175,16 @@ export function useSessionRecording({
     }
     const name = buildRecordingFilename(filenamePartsRef.current, extensionForMime(blob.type || mimeRef.current));
     const file = new File([blob], name, { type: blob.type || mimeRef.current });
+    const stem = name.replace(/\.[^.]+$/, '');
+    const companions: File[] = [];
+    const companionMeta: Record<string, { file: string; offsetMs: number }> = {};
+    for (const kind of ['camera', 'mic'] as const) {
+      const c = output[kind];
+      if (!c) continue;
+      const cname = `${stem}.${kind}.${companionExt(c.blob.type, kind)}`;
+      companions.push(new File([c.blob], cname, { type: c.blob.type }));
+      companionMeta[kind] = { file: cname, offsetMs: c.offsetMs };
+    }
     const log = {
       format: SESSION_LOG_FORMAT,
       version: 1,
@@ -172,11 +192,14 @@ export function useSessionRecording({
       recordedAt: new Date(Date.now() - durationMs).toISOString(),
       durationMs: Math.round(durationMs),
       timeBase: 't = milliseconds from the first frame of the video',
+      // offsetMs: how long after the main video's first frame each companion's
+      // first frame was captured (main time = companion time + offsetMs).
+      companions: companionMeta,
     };
     const dataFile = new File([serializeSessionLog(log, events)], name.replace(/\.[^.]+$/, '.json'), {
       type: 'application/json',
     });
-    setResult({ file, url: URL.createObjectURL(file), durationMs, dataFile });
+    setResult({ file, url: URL.createObjectURL(file), durationMs, dataFile, companions });
     setPhase('preview');
   }, [clearTimers, teardownEngine]);
 

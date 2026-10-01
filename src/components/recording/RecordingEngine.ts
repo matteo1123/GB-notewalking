@@ -11,6 +11,87 @@ const FPS_STEPS = [30, 24, 20, 15];
 const SLOW_FRAME_MS = 10;
 const TIMESLICE_MS = 1000;
 
+// Companion files: the raw camera at full resolution and the mic on its own,
+// so downstream tools get a sharp camera and a guitar-only audio track. Each
+// is a separate MediaRecorder started in the same tick as the main one; the
+// measured start offsets go into the session JSON.
+const CAMERA_MIME_CANDIDATES = [
+  'video/mp4;codecs=avc1.640028',
+  'video/mp4;codecs=avc1',
+  'video/mp4',
+  'video/webm;codecs=vp9',
+  'video/webm;codecs=vp8',
+  'video/webm',
+];
+const MIC_MIME_CANDIDATES = ['audio/mp4;codecs=mp4a.40.2', 'audio/mp4', 'audio/webm;codecs=opus', 'audio/webm'];
+
+function pickMime(candidates: string[]): string | undefined {
+  return candidates.find((m) => MediaRecorder.isTypeSupported(m));
+}
+
+export interface CompanionResult {
+  blob: Blob;
+  /** ms after the main video's first frame that this file's first frame was captured. */
+  offsetMs: number;
+}
+
+export interface RecordingOutput {
+  main: Blob;
+  camera: CompanionResult | null;
+  mic: CompanionResult | null;
+}
+
+/** One MediaRecorder writing ~1s chunks, with its real start time. */
+class ChunkRecorder {
+  readonly rec: MediaRecorder;
+  startedAt = 0;
+  private chunks: Blob[] = [];
+
+  constructor(stream: MediaStream, mimeCandidates: string[], bits: { video?: number; audio?: number }) {
+    const mimeType = pickMime(mimeCandidates);
+    this.rec = new MediaRecorder(stream, {
+      ...(mimeType ? { mimeType } : {}),
+      ...(bits.video ? { videoBitsPerSecond: bits.video } : {}),
+      ...(bits.audio ? { audioBitsPerSecond: bits.audio } : {}),
+    });
+    this.rec.ondataavailable = (e) => {
+      if (e.data && e.data.size > 0) this.chunks.push(e.data);
+    };
+    this.rec.onstart = () => {
+      this.startedAt = performance.now();
+    };
+  }
+
+  start() {
+    this.rec.start(TIMESLICE_MS);
+  }
+
+  stop(): Promise<Blob> {
+    const type = this.rec.mimeType || 'application/octet-stream';
+    if (this.rec.state === 'inactive') return Promise.resolve(new Blob(this.chunks, { type }));
+    return new Promise((resolve) => {
+      this.rec.addEventListener('stop', () => resolve(new Blob(this.chunks, { type })), { once: true });
+      try {
+        this.rec.requestData();
+      } catch {
+        // not all browsers allow requestData right before stop
+      }
+      this.rec.stop();
+    });
+  }
+
+  abort() {
+    if (this.rec.state !== 'inactive') {
+      try {
+        this.rec.stop();
+      } catch {
+        // ignore
+      }
+    }
+    this.chunks = [];
+  }
+}
+
 export interface EngineOptions {
   layout: RecordingLayout;
   corner: PipCorner;
@@ -113,6 +194,9 @@ export class RecordingEngine {
 
   private mixCtx: AudioContext;
   private mixDest: MediaStreamAudioDestinationNode;
+  // Mic only, for the companion audio file. Fed from the same source node as
+  // the mix, so toggling the mic off and on keeps one continuous file.
+  private micOnlyDest: MediaStreamAudioDestinationNode;
   private micSource: MediaStreamAudioSourceNode | null = null;
   private micStream: MediaStream | null = null;
   private appSources: MediaStreamAudioSourceNode[] = [];
@@ -120,6 +204,9 @@ export class RecordingEngine {
 
   private recorder: MediaRecorder | null = null;
   private chunks: Blob[] = [];
+  private mainStartedAt = 0;
+  private cameraRecorder: ChunkRecorder | null = null;
+  private micRecorder: ChunkRecorder | null = null;
   private disposed = false;
 
   // Construct synchronously inside the click handler so the mixing
@@ -134,6 +221,7 @@ export class RecordingEngine {
     this.mixCtx = new AudioContext();
     void this.mixCtx.resume().catch(() => {});
     this.mixDest = this.mixCtx.createMediaStreamDestination();
+    this.micOnlyDest = this.mixCtx.createMediaStreamDestination();
   }
 
   get hasScreen() {
@@ -184,7 +272,8 @@ export class RecordingEngine {
     let stream: MediaStream;
     try {
       stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } },
+        // Full resolution: this feed is also saved as its own file.
+        video: { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } },
         audio: false, // never a second mic — the pitch-detection stream is reused
       });
     } catch (err) {
@@ -205,6 +294,25 @@ export class RecordingEngine {
     }
     this.cameraStream = stream;
     this.cameraVideo = hiddenVideo(stream);
+    // Camera switched on mid-recording: its file starts now, and the offset
+    // records how late.
+    if (this.recorder && this.recorder.state === 'recording') this.startCameraRecorder();
+  }
+
+  private startCameraRecorder() {
+    if (!this.cameraStream || this.cameraRecorder) return;
+    try {
+      this.cameraRecorder = new ChunkRecorder(
+        new MediaStream(this.cameraStream.getVideoTracks()),
+        CAMERA_MIME_CANDIDATES,
+        { video: 5_000_000 },
+      );
+      this.cameraRecorder.start();
+    } catch (err) {
+      // A missing companion file only costs quality downstream; never fail the recording for it.
+      console.warn('[recording] camera file could not start', err);
+      this.cameraRecorder = null;
+    }
   }
 
   setCorner(corner: PipCorner) {
@@ -224,6 +332,7 @@ export class RecordingEngine {
     if (stream && stream.getAudioTracks().some((t) => t.readyState === 'live') && !this.disposed) {
       this.micSource = this.mixCtx.createMediaStreamSource(stream);
       this.micSource.connect(this.mixDest);
+      this.micSource.connect(this.micOnlyDest);
     }
   }
 
@@ -345,12 +454,43 @@ export class RecordingEngine {
     };
     // Timeslice: the browser hands us ~1s Blobs as it goes instead of holding
     // the whole encode in one buffer, and Chromium can page Blobs to disk.
+    this.recorder.onstart = () => {
+      this.mainStartedAt = performance.now();
+    };
     this.recorder.start(TIMESLICE_MS);
+    // Companions start in the same tick; offsets are measured from their own
+    // start events, so a slow encoder start-up is accounted for.
+    this.startCameraRecorder();
+    try {
+      this.micRecorder = new ChunkRecorder(this.micOnlyDest.stream, MIC_MIME_CANDIDATES, { audio: 128_000 });
+      this.micRecorder.start();
+    } catch (err) {
+      console.warn('[recording] mic file could not start', err);
+      this.micRecorder = null;
+    }
     return this.recorder.mimeType || mimeType || 'video/webm';
   }
 
-  /** Stop encoding and return the finished file's Blob. */
-  stop(): Promise<Blob> {
+  /** Stop every encoder and return the main video plus its companion files. */
+  async stop(): Promise<RecordingOutput> {
+    const companion = async (r: ChunkRecorder | null): Promise<CompanionResult | null> => {
+      if (!r) return null;
+      const blob = await r.stop();
+      if (blob.size === 0) return null;
+      const offsetMs = r.startedAt && this.mainStartedAt ? Math.round(r.startedAt - this.mainStartedAt) : 0;
+      return { blob, offsetMs };
+    };
+    const [main, camera, mic] = await Promise.all([
+      this.stopMain(),
+      companion(this.cameraRecorder),
+      companion(this.micRecorder),
+    ]);
+    this.cameraRecorder = null;
+    this.micRecorder = null;
+    return { main, camera, mic };
+  }
+
+  private stopMain(): Promise<Blob> {
     const recorder = this.recorder;
     if (!recorder || recorder.state === 'inactive') {
       return Promise.resolve(new Blob(this.chunks, { type: recorder?.mimeType || 'video/webm' }));
@@ -384,6 +524,10 @@ export class RecordingEngine {
       }
     }
     this.recorder = null;
+    this.cameraRecorder?.abort();
+    this.micRecorder?.abort();
+    this.cameraRecorder = null;
+    this.micRecorder = null;
     this.stopTap?.();
     this.stopTap = null;
     for (const v of [this.screenVideo, this.cameraVideo]) {
@@ -407,6 +551,7 @@ export class RecordingEngine {
     this.appSources.forEach((s) => s.disconnect());
     this.appSources = [];
     this.mixDest.stream.getTracks().forEach((t) => t.stop());
+    this.micOnlyDest.stream.getTracks().forEach((t) => t.stop());
     void this.mixCtx.close().catch(() => {});
     this.chunks = [];
   }

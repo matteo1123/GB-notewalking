@@ -1132,6 +1132,7 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
                 shape: focusMode === 'focused' ? focusedNode : null,
               }}
               eventLog={recordingLog}
+              musicKey={key}
               getSnapshot={() => ({
                 key,
                 bpm,

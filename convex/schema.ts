@@ -27,4 +27,18 @@ export default defineSchema({
     completedNodes: v.array(v.string()),
     updatedAt: v.number(),
   }).index('by_user', ['userId']),
+
+  // Creator-only daily content brief, written by the content pipeline
+  // (gb-content-pipeline) via POST /pipeline/brief. Read only through
+  // creator.currentBrief, which returns null for everyone but the creator.
+  // One row per date; `points` is 2-3 short bullets.
+  creatorBriefs: defineTable({
+    date: v.string(),
+    pillar: v.string(),
+    topic: v.string(),
+    hook: v.string(),
+    points: v.array(v.string()),
+    demo: v.string(),
+    updatedAt: v.number(),
+  }).index('by_date', ['date']),
 });

@@ -94,6 +94,10 @@ export function useSessionRecording({
   const [cameraVisible, setCameraVisible] = useState(true);
   const [corner, setCornerState] = useState<PipCorner>(prefs.corner);
   const [result, setResult] = useState<RecordingResult | null>(null);
+  // Creator-only "Talk" marker: segment start/end events in the session log,
+  // so the pipeline can cut teaching Shorts from the talking parts.
+  const [talking, setTalking] = useState(false);
+  const talkingRef = useRef(false);
 
   const engineRef = useRef<RecordingEngine | null>(null);
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -162,7 +166,10 @@ export function useSessionRecording({
     clearTimers();
     const durationMs = performance.now() - startedAtRef.current;
     // Close the log before the async encoder flush so nothing after the
-    // Stop click lands in it.
+    // Stop click lands in it. An open talk segment ends with the recording.
+    if (talkingRef.current) eventLogRef.current?.add('segment', { kind: 'talk', phase: 'end' });
+    talkingRef.current = false;
+    setTalking(false);
     const events = eventLogRef.current?.stop() ?? [];
     setPhase('finalizing');
     const output = await engine.stop();
@@ -358,6 +365,14 @@ export function useSessionRecording({
     [setPrefs],
   );
 
+  const toggleTalk = useCallback(() => {
+    if (phaseRef.current !== 'recording') return;
+    const next = !talkingRef.current;
+    eventLogRef.current?.add('segment', { kind: 'talk', phase: next ? 'start' : 'end' });
+    talkingRef.current = next;
+    setTalking(next);
+  }, []);
+
   const discard = useCallback(() => {
     clearTimers();
     teardownEngine();
@@ -423,6 +438,8 @@ export function useSessionRecording({
     cameraVisible,
     corner,
     result,
+    talking,
+    toggleTalk,
     screenSupported: canCaptureScreen(),
     micActive: !!micStream && micStream.getAudioTracks().some((t) => t.readyState === 'live'),
     openSetup,

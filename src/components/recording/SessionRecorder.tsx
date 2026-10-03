@@ -1,5 +1,5 @@
 import type { RefObject } from 'react';
-import { Camera, CameraOff, Circle, Loader2, Square, Video } from 'lucide-react';
+import { Camera, CameraOff, Circle, Loader2, MessageCircle, Square, Video } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import {
@@ -13,6 +13,7 @@ import {
 import { RecordingPreviewDialog } from './RecordingPreviewDialog';
 import { useSessionRecording } from './useSessionRecording';
 import type { SessionEventLog } from './sessionEventLog';
+import { CreatorBriefCard, useCreatorBrief, useIsCreator } from './CreatorBrief';
 import { PIP_CORNERS, canRecord, formatElapsed, type FilenameParts, type PipCorner } from './recordingUtils';
 
 interface SessionRecorderProps {
@@ -21,6 +22,8 @@ interface SessionRecorderProps {
   filenameParts: FilenameParts;
   eventLog?: SessionEventLog;
   getSnapshot?: () => Record<string, unknown>;
+  /** The key the app is in, for showing the creator brief's degrees as note names. */
+  musicKey?: string;
 }
 
 const CORNER_LABEL: Record<PipCorner, string> = {
@@ -37,9 +40,20 @@ function nextCorner(c: PipCorner): PipCorner {
 // Record / Stop control for the practice sidebar, plus the setup dialog,
 // the 3-2-1 overlay and the preview + share screen. Self-contained: the host
 // only passes in streams and naming data it already has.
-export function SessionRecorder({ micStream, captureRef, filenameParts, eventLog, getSnapshot }: SessionRecorderProps) {
+export function SessionRecorder({
+  micStream,
+  captureRef,
+  filenameParts,
+  eventLog,
+  getSnapshot,
+  musicKey,
+}: SessionRecorderProps) {
   const rec = useSessionRecording({ micStream, captureRef, filenameParts, eventLog, getSnapshot });
   const { phase, prefs } = rec;
+  // Creator-only extras; for every other account these are false/null and
+  // the recorder looks exactly as before.
+  const isCreator = useIsCreator();
+  const brief = useCreatorBrief(isCreator);
 
   if (!canRecord()) return null;
 
@@ -110,6 +124,20 @@ export function SessionRecorder({ micStream, captureRef, filenameParts, eventLog
               )}
             </div>
           )}
+          {isCreator && phase === 'recording' && (
+            <button
+              className={`h-7 text-[10px] rounded font-bold inline-flex items-center justify-center gap-1 ${
+                rec.talking ? 'bg-amber-500 text-black animate-pulse' : 'bg-muted text-muted-foreground'
+              }`}
+              onClick={rec.toggleTalk}
+              title="Mark the part where you're talking to camera (becomes a teaching Short)"
+            >
+              <MessageCircle className="w-3 h-3" /> {rec.talking ? 'Talking… (tap to end)' : 'Talk'}
+            </button>
+          )}
+          {isCreator && brief && phase === 'recording' && (
+            <CreatorBriefCard brief={brief} musicKey={musicKey} compact />
+          )}
           {rec.cameraError && phase === 'recording' && (
             <div className="text-[10px] text-amber-400 leading-tight">{rec.cameraError}</div>
           )}
@@ -150,6 +178,7 @@ export function SessionRecorder({ micStream, captureRef, filenameParts, eventLog
               </DialogHeader>
 
               <div className="flex flex-col gap-4 text-sm">
+                {isCreator && brief && <CreatorBriefCard brief={brief} musicKey={musicKey} />}
                 <div className="flex flex-col gap-1.5">
                   <div className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Format</div>
                   <div className="grid grid-cols-2 gap-2">

@@ -48,4 +48,51 @@ http.route({
   }),
 });
 
+// Content pipeline -> creator brief. The pipeline sends
+//   Authorization: Bearer <PIPELINE_TOKEN>
+// where PIPELINE_TOKEN is set on the Convex deployment and in the pipeline's
+// .env. Body: { date, pillar, topic, hook, points: string[], demo }.
+function sameSecret(a: string, b: string): boolean {
+  if (!a || !b || a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+http.route({
+  path: '/pipeline/brief',
+  method: 'POST',
+  handler: httpAction(async (ctx, request) => {
+    const expected = process.env.PIPELINE_TOKEN ?? '';
+    const auth = request.headers.get('authorization') ?? '';
+    if (!sameSecret(auth.replace(/^Bearer\s+/i, ''), expected)) {
+      return new Response('Unauthorized', { status: 401 });
+    }
+    let body: Record<string, unknown>;
+    try {
+      body = await request.json();
+    } catch {
+      return new Response('Body must be JSON', { status: 400 });
+    }
+    const str = (k: string) => (typeof body[k] === 'string' ? (body[k] as string).trim() : '');
+    const points = Array.isArray(body.points) ? body.points.filter((p): p is string => typeof p === 'string') : [];
+    const brief = {
+      date: str('date'),
+      pillar: str('pillar'),
+      topic: str('topic'),
+      hook: str('hook'),
+      points: points.slice(0, 5),
+      demo: str('demo'),
+    };
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(brief.date) || !brief.hook || brief.points.length === 0) {
+      return new Response('Need date (YYYY-MM-DD), hook and points', { status: 400 });
+    }
+    await ctx.runMutation(internal.creator.upsertBrief, brief);
+    return new Response(JSON.stringify({ ok: true, date: brief.date }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }),
+});
+
 export default http;

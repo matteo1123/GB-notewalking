@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as creator from "../creator.js";
 import type * as http from "../http.js";
 import type * as progress from "../progress.js";
 import type * as purchases from "../purchases.js";
@@ -21,6 +22,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  creator: typeof creator;
   http: typeof http;
   progress: typeof progress;
   purchases: typeof purchases;

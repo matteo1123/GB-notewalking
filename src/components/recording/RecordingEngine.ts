@@ -10,6 +10,12 @@ import { LAYOUT_SIZE, pickRecorderMimeType, type PipCorner, type RecordingLayout
 const FPS_STEPS = [30, 24, 20, 15];
 const SLOW_FRAME_MS = 10;
 const TIMESLICE_MS = 1000;
+// Bitrates sized for upload, not archive: YouTube/Facebook re-encode anyway,
+// and smaller files keep phones, Drive and the pipeline's disk from filling.
+// ~38 MB/min for the main video (1080p30 of a mostly static app screen) and
+// ~22 MB/min for the camera.
+const MAIN_VIDEO_BPS = 5_000_000;
+const CAMERA_VIDEO_BPS = 3_000_000;
 
 // Companion files: the raw camera at full resolution and the mic on its own,
 // so downstream tools get a sharp camera and a guitar-only audio track. Each
@@ -305,7 +311,7 @@ export class RecordingEngine {
       this.cameraRecorder = new ChunkRecorder(
         new MediaStream(this.cameraStream.getVideoTracks()),
         CAMERA_MIME_CANDIDATES,
-        { video: 5_000_000 },
+        { video: CAMERA_VIDEO_BPS },
       );
       this.cameraRecorder.start();
     } catch (err) {
@@ -442,10 +448,9 @@ export class RecordingEngine {
     const tracks = [...this.canvasStream!.getVideoTracks(), ...this.mixDest.stream.getAudioTracks()];
     const stream = new MediaStream(tracks);
     const mimeType = pickRecorderMimeType();
-    const layoutPixels = this.canvas.width * this.canvas.height;
     this.recorder = new MediaRecorder(stream, {
       ...(mimeType ? { mimeType } : {}),
-      videoBitsPerSecond: layoutPixels >= 1920 * 1080 ? 8_000_000 : 5_000_000,
+      videoBitsPerSecond: MAIN_VIDEO_BPS,
       audioBitsPerSecond: 160_000,
     });
     this.chunks = [];

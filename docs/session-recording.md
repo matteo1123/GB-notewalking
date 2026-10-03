@@ -24,7 +24,7 @@ Code: `src/components/recording/`. It's mounted in the practice sidebar (`Notewa
 ## Companion files
 
 Each recording also saves:
-- `<name>.camera.mp4`: the raw camera at full resolution (up to 1080p, ~5 Mbps), video only. It keeps recording even when the camera overlay is hidden. If the camera is first switched on mid-recording, the file starts then.
+- `<name>.camera.mp4`: the raw camera at full resolution (up to 1080p, ~3 Mbps), video only. It keeps recording even when the camera overlay is hidden. If the camera is first switched on mid-recording, the file starts then.
 - `<name>.mic.m4a`: the mic on its own (no chords or metronome), from the same stream pitch detection uses. It's one continuous file; while the mic is toggled off it's silent.
 
 Both start in the same tick as the main video. The JSON header's `companions` block records `{ file, offsetMs }` for each, where `offsetMs` is how long after the main video's first frame the companion's first frame was captured (main time = companion time + offsetMs). WebM is used in browsers that can't write MP4.
@@ -53,7 +53,7 @@ Getting it to Drive with the video:
 - **Firefox:** MediaRecorder can't write MP4, so it falls back to WebM (VP8/VP9 + Opus). YouTube and Drive accept it; Facebook usually does but is less reliable. `preferCurrentTab` is ignored and there's no Region Capture. `navigator.share` isn't available on desktop, so only Download and the upload links show.
 - **Chrome/Edge 126 and later:** MP4 (H.264 + AAC) output, tab pre-selected, cropped to the stage. Older versions fall back to WebM. Edge/Chrome on Windows show the Share button because they have a native share sheet.
 - **WebM duration:** WebM from MediaRecorder has no duration in its header, so the preview works around it by seeking to find the length. Uploaded files are fine because platforms re-encode.
-- **Long sessions:** 1-second chunks keep the encoder from holding one giant buffer, but the finished video is still a Blob in the browser (about 60MB per minute at 1080p/8Mbps). Chromium pages large Blobs to disk; Safari holds more in RAM. For multi-hour sessions, streaming chunks to OPFS/IndexedDB would be the next step.
+- **Long sessions:** 1-second chunks keep the encoder from holding one giant buffer, but the finished video is still a Blob in the browser (about 38 MB per minute at 1080p/5 Mbps, plus ~22 MB/min for the camera file). Chromium pages large Blobs to disk; Safari holds more in RAM. For multi-hour sessions, streaming chunks to OPFS/IndexedDB would be the next step.
 - **What's in the video:** the recording indicator in the sidebar is part of the captured page, so it appears in the video. The 3-2-1 countdown and the dialogs don't.
 - **Leaving the page:** closing or reloading the tab shows the browser's native warning. In-app links show a confirm while recording, but the browser Back button can't be intercepted (BrowserRouter has no blocker). In that case the recording is cleaned up (camera light off) and discarded.
 - **Verified:** headless Chromium with fake devices produced a 1920×1080 and a 1080×1920 H.264/AAC MP4 with mixed mic and app audio, restored `connect`, and left the mic live. Not tested by hand yet in Safari, Firefox or on a phone.

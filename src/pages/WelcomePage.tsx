@@ -169,7 +169,9 @@ const WelcomePage = () => {
       </main>
 
       <footer className="relative z-10 text-center text-xs text-slate-600 py-6">
-        © GuitarBrain
+        © GuitarBrain ·{' '}
+        <Link to="/privacy" className="hover:text-slate-400 underline-offset-2 hover:underline">Privacy</Link> ·{' '}
+        <Link to="/terms" className="hover:text-slate-400 underline-offset-2 hover:underline">Terms</Link>
       </footer>
     </div>
   );

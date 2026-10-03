@@ -7,6 +7,7 @@ import SkillTreePage from '@/pages/SkillTreePage';
 import PracticePage from '@/pages/PracticePage';
 import PaywallPage from '@/pages/PaywallPage';
 import WelcomePage from '@/pages/WelcomePage';
+import { PrivacyPage, TermsPage } from '@/pages/LegalPages';
 import { useSyncProgress } from '@/hooks/useSyncProgress';
 
 // Empty component whose only job is to mount useSyncProgress at the root,
@@ -28,6 +29,8 @@ const App = () => (
             <Route path="/practice" element={<PracticePage />} />
             <Route path="/unlock" element={<PaywallPage />} />
             <Route path="/welcome" element={<WelcomePage />} />
+            <Route path="/privacy" element={<PrivacyPage />} />
+            <Route path="/terms" element={<TermsPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>

@@ -1,0 +1,58 @@
+/* Skill-tree lesson dialog on phones.
+ *
+ * Phones always show the app in landscape (see force-landscape.css), so the
+ * dialog gets a short, wide box: stacking the video above everything else
+ * pushed the Unlock / Practice buttons off the bottom of the screen. On phones
+ * the video sits on the left and the details and buttons on the right, sized
+ * so the whole thing fits without scrolling (it still scrolls if it must).
+ *
+ * The media query matches force-landscape.css's phone query (a portrait phone,
+ * whose page is rotated into landscape, or a phone held sideways), plus short
+ * laptop windows, where the stacked layout also ran past the bottom.
+ */
+@media screen and (max-width: 900px) and (orientation: portrait),
+       screen and (max-height: 500px) and (orientation: landscape),
+       screen and (max-height: 760px) and (min-aspect-ratio: 4/3) {
+    .node-dialog.node-dialog {
+        padding: 0.75rem;
+        max-width: min(100%, 56rem);
+    }
+
+    /* Video and the buttons on the left; what the lesson is on the right. */
+    .node-dialog .node-dialog-body {
+        grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+        grid-template-areas:
+            "video   header"
+            "video   chords"
+            "video   desc"
+            "meta    desc"
+            "actions desc";
+        grid-template-rows: auto auto 1fr auto auto;
+        column-gap: 0.75rem;
+        row-gap: 0.4rem;
+        align-items: start;
+    }
+
+    .node-dialog .node-dialog-video   { grid-area: video; }
+    .node-dialog .node-dialog-header  { grid-area: header; }
+    .node-dialog .node-dialog-chords  { grid-area: chords; gap: 0.35rem; }
+    .node-dialog .node-dialog-desc    { grid-area: desc; font-size: 0.75rem; line-height: 1.35; }
+    .node-dialog .node-dialog-meta    { grid-area: meta; font-size: 0.7rem; }
+    .node-dialog .node-dialog-actions { grid-area: actions; padding-top: 0; }
+
+    .node-dialog .node-dialog-chord {
+        width: 2.75rem;
+        height: 2.75rem;
+    }
+
+    /* Keep the title clear of the dialog's close (×) button. */
+    .node-dialog .node-dialog-header {
+        padding-right: 1.25rem;
+        text-align: left;
+    }
+
+    .node-dialog .node-dialog-header h2 {
+        font-size: 0.95rem;
+        line-height: 1.2;
+    }
+}

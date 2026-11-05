@@ -99,8 +99,9 @@ const WelcomePage = () => {
 
           {/* Hero video — the CAGED Overview. Same 90-second course tour that
               plays at the center node of the skill tree, so visitors see the
-              actual thing they'd be buying instead of a generic teaser. */}
-          <div className="aspect-video bg-black rounded-xl overflow-hidden border border-white/10 shadow-2xl mb-8">
+              actual thing they'd be buying instead of a generic teaser.
+              Width is capped so a phone held sideways sees the whole video. */}
+          <div className="aspect-video w-full max-w-[calc(85dvh*16/9)] mx-auto bg-black rounded-xl overflow-hidden border border-white/10 shadow-2xl mb-8">
             <video
               ref={videoRef}
               src={assetUrl('/videos/hub-intro.mp4')}

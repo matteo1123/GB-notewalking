@@ -27,11 +27,23 @@ const DialogOverlay = React.forwardRef<
 ))
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 
+// Pages that force landscape on phones (practice, skill tree) rotate and pin
+// a `.force-landscape-container` above everything else. A dialog portaled to
+// <body> would then sit underneath it (and, in portrait, unrotated). Portal
+// into that container when it exists so dialogs turn with the page and stay
+// on top; elsewhere this falls back to <body>.
+function landscapeContainer(): HTMLElement | null {
+  if (typeof document === "undefined") return null
+  return document.querySelector<HTMLElement>(".force-landscape-container")
+}
+
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
-  <DialogPortal>
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
+    container?: HTMLElement | null
+  }
+>(({ className, children, container, ...props }, ref) => (
+  <DialogPortal container={container ?? landscapeContainer()}>
     <DialogOverlay />
     <DialogPrimitive.Content
       ref={ref}

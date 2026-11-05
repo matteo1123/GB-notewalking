@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import '@/styles/node-dialog.css';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { Link } from 'react-router-dom';
 import { UserButton, useClerk, useAuth } from '@clerk/clerk-react';
@@ -58,7 +59,7 @@ function SmallChordDiagram({ shape }: { shape: CagedShape }) {
   const theme = SHAPE_THEMES[shape];
   return (
     <div className="flex flex-col items-center gap-1">
-      <div className="w-16 h-16 sm:w-20 sm:h-20 bg-black/70 rounded border border-white/10 overflow-hidden flex items-center justify-center">
+      <div className="node-dialog-chord w-16 h-16 sm:w-20 sm:h-20 bg-black/70 rounded border border-white/10 overflow-hidden flex items-center justify-center">
         {imgFailed ? (
           <span className={`text-base font-black tracking-widest uppercase ${theme.text}`}>
             {shape}
@@ -837,7 +838,7 @@ export function SkillTree() {
             kicking the dialog out of its centered overlay position into
             normal document flow. `fixed` itself is a containing block for
             absolutely positioned children, so the backdrop still works. */}
-        <DialogContent className="bg-slate-950 border-white/10 max-w-2xl overflow-hidden">
+        <DialogContent className="node-dialog bg-slate-950 border-white/10 max-w-2xl w-[calc(100%-1rem)] max-h-[calc(100%-1rem)] overflow-y-auto overflow-x-hidden">
           {selected && (() => {
             // Per-node reference shapes shown alongside the lesson video:
             //  - shape nodes get their own shape
@@ -886,13 +887,13 @@ export function SkillTree() {
               {/* Foreground content — own stacking context above the backdrop.
                   Recreates the DialogContent's grid+gap so the layout reads
                   identically to before we wrapped it. */}
-              <div className="relative z-10 grid gap-4">
-              <DialogHeader>
+              <div className="node-dialog-body relative z-10 grid gap-4">
+              <DialogHeader className="node-dialog-header">
                 <DialogTitle className="text-xl">{selected.subtitle}</DialogTitle>
                 <DialogDescription>{selected.tagline}</DialogDescription>
               </DialogHeader>
 
-              <div className="aspect-video bg-black rounded-md overflow-hidden border border-white/5">
+              <div className="node-dialog-video aspect-video bg-black rounded-md overflow-hidden border border-white/5">
                 {(() => {
                   // Module videos (bot/top/full/connect) are paywalled with XP:
                   // the player must spend the unlock cost before the video is
@@ -908,6 +909,7 @@ export function SkillTree() {
                         key={selected.videoSrc}
                         src={selected.videoSrc}
                         controls
+                        playsInline
                         className="w-full h-full"
                       />
                     );
@@ -939,16 +941,16 @@ export function SkillTree() {
               </div>
 
               {refShapes.length > 0 && (
-                <div className="flex justify-center gap-3 flex-wrap">
+                <div className="node-dialog-chords flex justify-center gap-3 flex-wrap">
                   {refShapes.map((s) => (
                     <SmallChordDiagram key={s} shape={s} />
                   ))}
                 </div>
               )}
 
-              <p className="text-sm text-slate-400">{selected.description}</p>
+              <p className="node-dialog-desc text-sm text-slate-400">{selected.description}</p>
 
-              <div className="flex items-center justify-between text-xs">
+              <div className="node-dialog-meta flex items-center justify-between gap-2 text-xs">
                 <div className="text-slate-500">
                   {selected.prerequisites.length > 0 && (
                     <>
@@ -966,7 +968,7 @@ export function SkillTree() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between gap-2 pt-2">
+              <div className="node-dialog-actions flex items-center justify-between gap-2 pt-2">
                 {/* Practice this node — visible for any unlocked, non-video
                     module the user is paid for. We allow `purchased`
                     to be `undefined` (Convex query loading) so the link

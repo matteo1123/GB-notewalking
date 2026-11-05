@@ -130,6 +130,7 @@ export function formatBytes(bytes: number): string {
 // pre-attaches a file to any of these, so the flow is download-then-open.
 export const SHARE_TARGETS = {
   youtube: 'https://www.youtube.com/upload',
-  drive: 'https://drive.google.com/drive/my-drive',
+  // The content pipeline's inbox ("gb content start"), same folder Keylight shares to.
+  drive: 'https://drive.google.com/drive/folders/1vrYuSIa39RRMt-cKQepPUUBAd4MLpAFI',
   facebookGroup: (import.meta.env.VITE_FACEBOOK_GROUP_URL as string | undefined)?.trim() || '',
 };

@@ -99,6 +99,22 @@
         align-items: center !important;
     }
 
+}
+
+
+/* ==========================================================================
+ * SHARED PHONE COMPACTION — portrait (rotated) AND landscape phones
+ * @LANDSCAPE-LOCK: Compaction applies to both phone orientations
+ *
+ * A phone held sideways is the same small, wide screen as the rotated
+ * portrait view, so it gets the same compact chrome. (Before this, a phone
+ * in real landscape got the desktop layout: ~600px of content in a ~340px
+ * tall screen, with the fretboard pushed below the fold.)
+ * ========================================================================== */
+
+@media screen and (max-width: 900px) and (orientation: portrait),
+       screen and (max-height: 500px) and (orientation: landscape) {
+
     .force-landscape-container .fretboard-container {
         max-width: 100% !important;
         min-width: 0 !important;
@@ -265,10 +281,52 @@
         justify-content: center !important;
     }
 
+    /* The sidebar's −/BPM/+ stepper already shows the tempo; the big BPM
+       readout above the beat dots only collides with its own label here. */
+    .force-landscape-container .beat-visualizer-bpm {
+        display: none !important;
+    }
+
     .force-landscape-container .note-display-container {
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
         height: 100% !important;
+    }
+}
+
+
+/* ==========================================================================
+ * LANDSCAPE PHONES — fill the screen, no rotation needed
+ * @LANDSCAPE-LOCK: Landscape phone full-screen layout
+ *
+ * Same full-screen sheet as the rotated portrait view (covering the site
+ * header, which the practice sidebar's Skill Tree button replaces), sized to
+ * the real viewport. dvh tracks the mobile address bar showing/hiding.
+ * ========================================================================== */
+
+@media screen and (max-height: 500px) and (orientation: landscape) {
+    .force-landscape-container {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        height: 100dvh;
+        z-index: 9999;
+        background: hsl(var(--background));
+        overflow: hidden;
+        padding-left: env(safe-area-inset-left);
+        padding-right: env(safe-area-inset-right);
+    }
+
+    .force-landscape-container .fretboard-area {
+        max-width: 100% !important;
+        width: 100% !important;
+        margin: 0 auto !important;
+        flex-shrink: 0 !important;
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
     }
 }

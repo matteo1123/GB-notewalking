@@ -65,7 +65,7 @@ export function BeatVisualizer({
 
   return (
     <div className="flex flex-col items-center justify-center h-full">
-      <div className="text-center">
+      <div className="text-center beat-visualizer-bpm">
         {canEdit && isEditing ? (
           <input
             className={cn(

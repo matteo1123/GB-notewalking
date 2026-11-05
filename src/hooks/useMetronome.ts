@@ -1,12 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-
-// Supabase storage URLs for drum samples
-const SUPABASE_STORAGE_URL = "https://idsufbsfywgmcrhldqxq.supabase.co/storage/v1/object/public/drums";
-const DRUM_SAMPLES = {
-  ride: `${SUPABASE_STORAGE_URL}/Ride.wav`,
-  kick: `${SUPABASE_STORAGE_URL}/Kick.wav`,
-  snare: `${SUPABASE_STORAGE_URL}/Snare.wav`,
-};
+import { synthesizeDrumKit } from "@/lib/drumSynth";
 
 export interface MetronomeState {
   isPlaying: boolean;
@@ -90,39 +83,21 @@ export function useMetronome(settings: MetronomeSettings) {
     return audioContextRef.current;
   }, []);
 
-  // Load drum samples
-  const loadDrumSamples = useCallback(async () => {
+  // Build the drum kit (synthesized; see lib/drumSynth.ts for why not samples)
+  const loadDrumSamples = useCallback(() => {
     if (samplesLoadedRef.current) return;
 
     const audioContext = initAudioContext();
     if (!audioContext) return;
 
     try {
-      const responses = await Promise.all([
-        fetch(DRUM_SAMPLES.ride),
-        fetch(DRUM_SAMPLES.kick),
-        fetch(DRUM_SAMPLES.snare),
-      ]);
-
-      // Check if any fetch failed
-      for (const response of responses) {
-        if (!response.ok) {
-          console.error(`Failed to fetch drum sample: ${response.url} (${response.status} ${response.statusText})`);
-          throw new Error(`Failed to fetch ${response.url}`);
-        }
-      }
-
-      const [rideBuffer, kickBuffer, snareBuffer] = await Promise.all(
-        responses.map(async (res) => audioContext.decodeAudioData(await res.arrayBuffer()))
-      );
-
-      rideBufferRef.current = rideBuffer;
-      kickBufferRef.current = kickBuffer;
-      snareBufferRef.current = snareBuffer;
+      const kit = synthesizeDrumKit(audioContext);
+      rideBufferRef.current = kit.ride;
+      kickBufferRef.current = kit.kick;
+      snareBufferRef.current = kit.snare;
       samplesLoadedRef.current = true;
-      console.log("Drum samples loaded successfully");
     } catch (error) {
-      console.error("Failed to load drum samples:", error);
+      console.error("Failed to build drum kit:", error);
     }
   }, [initAudioContext]);
 

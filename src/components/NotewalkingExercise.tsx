@@ -29,7 +29,7 @@ import {
   xpSpeedMultiplierAtom,
 } from '@/state/skillTreeAtoms';
 import { useAuth } from '@clerk/clerk-react';
-import { SKILL_NODE_BY_ID, type NodeId } from '@/data/skillTree';
+import { SKILL_NODES, SKILL_NODE_BY_ID, type NodeId } from '@/data/skillTree';
 import { computeRevealedFrets } from '@/lib/fretboardReveal';
 import { SessionRecorder } from '@/components/recording/SessionRecorder';
 import { SessionEventLog } from '@/components/recording/sessionEventLog';
@@ -74,6 +74,20 @@ function getGuitarPitch(stringNum: number, fret: number): string {
 }
 
 type FocusMode = 'focused' | 'unlocked' | 'full' | 'none';
+
+// Nodes that map to a region of the fretboard. The landing video and the
+// CAGED overview are videos only; focusing on them would reveal nothing.
+function isPracticeable(id: NodeId): boolean {
+  const n = SKILL_NODE_BY_ID[id];
+  return !!n && n.kind !== 'intro' && n.kind !== 'landing';
+}
+
+// Most recently unlocked practiceable node (Set keeps insertion order).
+function latestPracticeable(completed: Set<NodeId>): NodeId | null {
+  let latest: NodeId | null = null;
+  for (const id of completed) if (isPracticeable(id)) latest = id;
+  return latest;
+}
 
 // Scale-view filter. Determines WHICH degrees of the key get rendered as dots
 // on the fretboard (independent of which frets are revealed by the focus mode).
@@ -123,16 +137,22 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
   const keyDegreeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const detectedNoteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const completed = useAtomValue(completedSetAtom);
-  const [focusMode, setFocusMode] = useState<FocusMode>(initialNode ? 'focused' : 'unlocked');
-  const [focusedNode, setFocusedNode] = useState<NodeId | null>(() => {
-    if (initialNode) return initialNode;
-    // Pick the most-recently-unlocked practiceable node as a sensible default
-    const practiceable = [...completed].filter((id) => {
-      const n = SKILL_NODE_BY_ID[id];
-      return n && n.kind !== 'intro';
-    });
-    return practiceable.length > 0 ? (practiceable[practiceable.length - 1] as NodeId) : null;
-  });
+  // Practice opens focused on ONE section of the fretboard: the node the user
+  // came in on, or else their most recently unlocked shape. "Unlocked" (the
+  // union of everything they own) and "All" are opt-in widenings.
+  const [focusMode, setFocusMode] = useState<FocusMode>('focused');
+  const [focusedNode, setFocusedNode] = useState<NodeId | null>(
+    () => initialNode ?? latestPracticeable(completed),
+  );
+  // Progress can arrive after mount (the Convex merge on sign-in), or the
+  // focused node can be reset away. Re-anchor on the latest unlocked shape
+  // whenever the current focus isn't something the user actually owns.
+  useEffect(() => {
+    if (focusedNode && completed.has(focusedNode)) return;
+    if (focusedNode && focusedNode === initialNode) return;
+    const next = latestPracticeable(completed);
+    if (next !== focusedNode) setFocusedNode(next);
+  }, [completed, focusedNode, initialNode]);
   const xpAccRef = useRef(0);
 
   // Which scale views participate in the rotation. All four enabled = full
@@ -516,9 +536,8 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
 
   const practiceableNodes = useMemo(
     () =>
-      [...completed]
-        .map((id) => SKILL_NODE_BY_ID[id])
-        .filter((n) => n && n.kind !== 'intro'),
+      // Skill-tree order, so the picker reads C → A → G → E → D.
+      SKILL_NODES.filter((n) => completed.has(n.id) && isPracticeable(n.id)),
     [completed],
   );
 
@@ -881,7 +900,18 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
               />
             </div>
 
-            <div className="flex-1 overflow-hidden flex items-center justify-center p-2 min-h-0">
+            <div className="relative flex-1 overflow-hidden flex items-center justify-center p-2 min-h-0">
+              {practiceableNodes.length === 0 && (focusMode === 'focused' || focusMode === 'unlocked') && (
+                // No shape unlocked yet, so there's nothing to reveal. Say so
+                // instead of leaving a bare constellation that looks broken.
+                <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 text-center text-[11px] bg-black/70 border border-white/10 rounded px-3 py-1.5 text-slate-300">
+                  Unlock your first shape in the{' '}
+                  <Link to="/" className="text-primary font-bold hover:underline">
+                    Skill Tree
+                  </Link>{' '}
+                  to light up its notes, or press <b>All</b> to see the whole board.
+                </div>
+              )}
               <div
                 ref={fretboardWrapperRef}
                 // --throb-duration drives the constellation's chord-tone pulse.
@@ -1014,7 +1044,7 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
                   None
                 </button>
               </div>
-              {focusMode === 'focused' && (
+              {focusMode === 'focused' && practiceableNodes.length > 0 && (
                 <Select
                   value={focusedNode ?? undefined}
                   onValueChange={(v) => setFocusedNode((v || null) as NodeId | null)}

@@ -195,6 +195,8 @@ export function useSessionRecording({
     const log = {
       format: SESSION_LOG_FORMAT,
       version: 1,
+      // Which Guitar Brain app made this (Keylight writes 'keylight').
+      app: 'notewalking',
       video: name,
       recordedAt: new Date(Date.now() - durationMs).toISOString(),
       durationMs: Math.round(durationMs),
@@ -210,12 +212,41 @@ export function useSessionRecording({
     setPhase('preview');
   }, [clearTimers, teardownEngine]);
 
+  // Whether the 3-2-1 runs before recording. The setup dialog's Start button
+  // counts down; the creator's logo trigger starts right away.
+  const useCountdownRef = useRef(true);
+
   const beginCountdown = useCallback(() => {
     const engine = engineRef.current;
     if (!engine) return;
     engine.setMicStream(micStreamRef.current);
     engine.startCompositing();
+    const roll = () => {
+      if (engineRef.current !== engine) return;
+      try {
+        mimeRef.current = engine.startRecording();
+      } catch (err) {
+        console.error('[recording] MediaRecorder failed to start', err);
+        teardownEngine();
+        setError('This browser could not start the video encoder.');
+        setPhase('setup');
+        return;
+      }
+      startedAtRef.current = performance.now();
+      eventLogRef.current?.start(startedAtRef.current);
+      eventLogRef.current?.add('recording-start', getSnapshotRef.current?.() ?? {});
+      if (engine.layoutInfo) eventLogRef.current?.add('layout', { ...engine.layoutInfo });
+      setElapsedMs(0);
+      elapsedTimerRef.current = setInterval(() => setElapsedMs(performance.now() - startedAtRef.current), 250);
+      setPhase('recording');
+    };
     setPhase('countdown');
+    if (!useCountdownRef.current) {
+      setCountdown(0);
+      // One beat for the compositor to paint its first frame.
+      timersRef.current.push(setTimeout(roll, 150));
+      return;
+    }
     setCountdown(3);
     timersRef.current.push(setTimeout(() => setCountdown(2), 1000));
     timersRef.current.push(setTimeout(() => setCountdown(1), 2000));
@@ -223,30 +254,7 @@ export function useSessionRecording({
       setTimeout(() => {
         setCountdown(0);
         // Give the overlay a moment to unpaint so "1" isn't the first frame.
-        timersRef.current.push(
-          setTimeout(() => {
-            if (engineRef.current !== engine) return;
-            try {
-              mimeRef.current = engine.startRecording();
-            } catch (err) {
-              console.error('[recording] MediaRecorder failed to start', err);
-              teardownEngine();
-              setError('This browser could not start the video encoder.');
-              setPhase('setup');
-              return;
-            }
-            startedAtRef.current = performance.now();
-            eventLogRef.current?.start(startedAtRef.current);
-            eventLogRef.current?.add('recording-start', getSnapshotRef.current?.() ?? {});
-            if (engine.layoutInfo) eventLogRef.current?.add('layout', { ...engine.layoutInfo });
-            setElapsedMs(0);
-            elapsedTimerRef.current = setInterval(
-              () => setElapsedMs(performance.now() - startedAtRef.current),
-              250,
-            );
-            setPhase('recording');
-          }, 150),
-        );
+        timersRef.current.push(setTimeout(roll, 150));
       }, 3000),
     );
   }, [teardownEngine]);
@@ -263,8 +271,10 @@ export function useSessionRecording({
     setPhase('idle');
   }, [clearTimers, teardownEngine]);
 
-  // Called directly from the Start button's click handler.
-  const start = useCallback(async () => {
+  // Called directly from a click handler (the setup dialog's Start button or
+  // the creator's logo), so the browser's screen-share prompt is allowed.
+  const start = useCallback(async ({ countdown = true }: { countdown?: boolean } = {}) => {
+    useCountdownRef.current = countdown;
     setError(null);
     setCameraError(null);
     filenamePartsRef.current = filenameParts;
@@ -440,6 +450,8 @@ export function useSessionRecording({
     result,
     talking,
     toggleTalk,
+    /** Started from the logo (no setup dialog, no countdown). */
+    quickStart: !useCountdownRef.current,
     screenSupported: canCaptureScreen(),
     micActive: !!micStream && micStream.getAudioTracks().some((t) => t.readyState === 'live'),
     openSetup,

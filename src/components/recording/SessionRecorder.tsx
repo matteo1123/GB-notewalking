@@ -1,5 +1,5 @@
-import type { RefObject } from 'react';
-import { Camera, CameraOff, Circle, Loader2, MessageCircle, Square, Video } from 'lucide-react';
+import { useEffect, type RefObject } from 'react';
+import { Circle, Loader2, Video } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import {
@@ -14,7 +14,8 @@ import { RecordingPreviewDialog } from './RecordingPreviewDialog';
 import { useSessionRecording } from './useSessionRecording';
 import type { SessionEventLog } from './sessionEventLog';
 import { CreatorBriefCard, useCreatorBrief, useIsCreator } from './CreatorBrief';
-import { PIP_CORNERS, canRecord, formatElapsed, type FilenameParts, type PipCorner } from './recordingUtils';
+import { canRecord, type FilenameParts, type PipCorner } from './recordingUtils';
+import { publishRecorder } from './recorderBridge';
 
 interface SessionRecorderProps {
   micStream: MediaStream | null;
@@ -33,13 +34,11 @@ const CORNER_LABEL: Record<PipCorner, string> = {
   'bottom-right': 'Bottom right',
 };
 
-function nextCorner(c: PipCorner): PipCorner {
-  return PIP_CORNERS[(PIP_CORNERS.indexOf(c) + 1) % PIP_CORNERS.length];
-}
-
-// Record / Stop control for the practice sidebar, plus the setup dialog,
-// the 3-2-1 overlay and the preview + share screen. Self-contained: the host
-// only passes in streams and naming data it already has.
+// Creator-only session recorder for the practice view. There is no button
+// here: the GuitarBrain logo in the header is the trigger (see BrandLogo), and
+// this component publishes the recorder to it. What renders here is the setup
+// dialog (right-click / Shift-click the logo), the 3-2-1 overlay, and the
+// preview + share screen. Renders nothing for every other account.
 export function SessionRecorder({
   micStream,
   captureRef,
@@ -55,98 +54,25 @@ export function SessionRecorder({
   const isCreator = useIsCreator();
   const brief = useCreatorBrief(isCreator);
 
-  if (!canRecord()) return null;
+  const enabled = isCreator && canRecord();
+  // Hand the recorder to the header logo, which is the creator's record button.
+  // Re-published every render so the logo always sees the current phase/timer.
+  useEffect(() => {
+    if (enabled) publishRecorder({ rec, musicKey });
+  });
+  useEffect(() => {
+    if (!enabled) return;
+    return () => publishRecorder(null);
+  }, [enabled]);
 
-  const setupOpen = phase === 'setup' || phase === 'acquiring' || phase === 'camera-denied';
-  const isLive = phase === 'recording' || phase === 'countdown' || phase === 'finalizing';
+  if (!enabled) return null;
+
+  // A logo start goes straight to the browser's share prompt, with no dialog.
+  const setupOpen =
+    phase === 'setup' || phase === 'camera-denied' || (phase === 'acquiring' && !rec.quickStart);
 
   return (
-    <div className="border-t border-gray-800 pt-2 mt-1 flex flex-col gap-1">
-      <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Record</div>
-
-      {!isLive ? (
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-8 text-xs"
-          onClick={rec.openSetup}
-          disabled={phase === 'preview'}
-          title="Record this session as a video"
-        >
-          <Circle className="w-3.5 h-3.5 mr-1 fill-red-500 text-red-500" /> Record
-        </Button>
-      ) : (
-        <>
-          <div className="flex items-center gap-1">
-            <div
-              className="flex-1 flex items-center justify-center gap-1.5 h-8 rounded bg-red-600/20 border border-red-600/50 text-red-300 text-xs font-bold tabular-nums"
-              aria-live="polite"
-            >
-              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-              {phase === 'countdown' ? 'Ready…' : phase === 'finalizing' ? 'Saving…' : formatElapsed(rec.elapsedMs)}
-            </div>
-            <Button
-              size="sm"
-              className="h-8 px-2 text-xs bg-red-600 hover:bg-red-700 text-white"
-              onClick={() => void rec.stop()}
-              disabled={phase === 'finalizing'}
-              title={phase === 'countdown' ? 'Cancel' : 'Stop recording'}
-            >
-              {phase === 'finalizing' ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <>
-                  <Square className="w-3 h-3 mr-1 fill-current" /> {phase === 'countdown' ? 'Cancel' : 'Stop'}
-                </>
-              )}
-            </Button>
-          </div>
-          {phase !== 'finalizing' && (
-            <div className="flex items-center gap-1">
-              <button
-                className={`flex-1 h-7 text-[10px] rounded font-bold inline-flex items-center justify-center gap-1 ${
-                  rec.cameraVisible ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
-                }`}
-                onClick={() => void rec.toggleCamera()}
-                title="Show or hide the camera overlay"
-              >
-                {rec.cameraVisible ? <Camera className="w-3 h-3" /> : <CameraOff className="w-3 h-3" />}
-                Cam
-              </button>
-              {prefs.layout === 'landscape' && rec.cameraVisible && (
-                <button
-                  className="flex-1 h-7 text-[10px] rounded font-bold bg-muted text-muted-foreground hover:text-foreground"
-                  onClick={() => rec.setCorner(nextCorner(rec.corner))}
-                  title={`Camera corner: ${CORNER_LABEL[rec.corner]} (click to move)`}
-                >
-                  ↻ {CORNER_LABEL[rec.corner]}
-                </button>
-              )}
-            </div>
-          )}
-          {isCreator && phase === 'recording' && (
-            <button
-              className={`h-7 text-[10px] rounded font-bold inline-flex items-center justify-center gap-1 ${
-                rec.talking ? 'bg-amber-500 text-black animate-pulse' : 'bg-muted text-muted-foreground'
-              }`}
-              onClick={rec.toggleTalk}
-              title="Mark the part where you're talking to camera (becomes a teaching Short)"
-            >
-              <MessageCircle className="w-3 h-3" /> {rec.talking ? 'Talking… (tap to end)' : 'Talk'}
-            </button>
-          )}
-          {isCreator && brief && phase === 'recording' && (
-            <CreatorBriefCard brief={brief} musicKey={musicKey} compact />
-          )}
-          {rec.cameraError && phase === 'recording' && (
-            <div className="text-[10px] text-amber-400 leading-tight">{rec.cameraError}</div>
-          )}
-          {!rec.micActive && phase === 'recording' && (
-            <div className="text-[10px] text-amber-400 leading-tight">Mic is off — guitar isn't being recorded.</div>
-          )}
-        </>
-      )}
-
+    <>
       <Dialog open={setupOpen} onOpenChange={(open) => !open && rec.cancelSetup()}>
         <DialogContent className="max-w-md bg-zinc-950 border-zinc-800 text-slate-100">
           {phase === 'camera-denied' ? (
@@ -293,6 +219,6 @@ export function SessionRecorder({
       {phase === 'preview' && rec.result && (
         <RecordingPreviewDialog result={rec.result} onDiscard={rec.discard} />
       )}
-    </div>
+    </>
   );
 }

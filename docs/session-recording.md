@@ -7,7 +7,8 @@ Code: `src/components/recording/`. It's mounted in the practice sidebar (`Notewa
 | `RecordingEngine.ts` | Streams, 30fps canvas compositor, audio mix, MediaRecorder, full cleanup |
 | `appAudioTap.ts` | Captures chord/metronome/drum output (see below) |
 | `useSessionRecording.ts` | State machine, countdown, timer, leave-page guards |
-| `SessionRecorder.tsx` | Record/Stop control, setup dialog, 3-2-1 overlay |
+| `SessionRecorder.tsx` | Setup dialog, 3-2-1 overlay, preview; publishes the recorder to the logo |
+| `../BrandLogo.tsx` + `recorderBridge.ts` | Creator only: the header logo winks red on page load and is the record button on the practice view (click = start/stop; right-click or Shift-click = options) |
 | `RecordingPreviewDialog.tsx` | Preview, Share, Download, upload links, Discard |
 | `recordingUtils.ts` | MIME choice, filename, capability checks, share URLs |
 | `sessionEventLog.ts` | Timestamped event log saved as a sidecar `.json` |
@@ -31,7 +32,7 @@ Both start in the same tick as the main video. The JSON header's `companions` bl
 
 ## Session data (.json)
 
-Every recording also produces a JSON file with the same name as the video (`guitarbrain_key-E_..._2026-09-30.json`). `t` is milliseconds from the video's first frame, accurate to about 0.1s. The events, in order:
+Every recording also produces a JSON file with the same name as the video (`guitarbrain_key-E_..._2026-09-30.json`). The header has `app: "notewalking"` (Keylight writes `"keylight"`; the content pipeline uses it to tell the two apps apart). `t` is milliseconds from the video's first frame, accurate to about 0.1s. The events, in order:
 
 - `recording-start` (t=0): key, bpm, whether playback is running, current chord, progression, focus mode/node, scale view, mic on/off.
 - `chord`: `{ chord: "IV", root: "A", key: "E", bpm, cause: "playback-start" | "change" }`, logged when Start is pressed and on every chord change.

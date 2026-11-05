@@ -25,6 +25,7 @@ import {
 } from '@/data/skillTree';
 import { CagedConstellation, CagedConstellationFill } from './CagedConstellation';
 import { CAGED_SHAPES, type CagedShape } from '@/lib/cagedSystem';
+import { BrandLogo } from './BrandLogo';
 
 // Each CAGED shape's "home key" — the key in which the shape sits at the open
 // position so its diagram image (which we render in that home key) lines up
@@ -562,10 +563,7 @@ export function SkillTree() {
       <div className="fixed top-0 left-0 right-0 z-50 p-4 sm:p-6 pointer-events-none flex flex-row flex-wrap sm:flex-nowrap justify-between items-start gap-4 bg-gradient-to-b from-black/60 to-transparent">
         <div className="bg-black/40 backdrop-blur-md border border-white/5 p-4 rounded-2xl shadow-2xl flex flex-col">
           <div className="flex items-center gap-2 mb-1">
-            <img src="/logo2.png" alt="GuitarBrain" className="h-6 w-6 object-contain" />
-            <span className="text-sm font-black tracking-tight text-foreground">
-              Guitar<span className="text-primary">Brain</span>
-            </span>
+            <BrandLogo markClass="h-6 w-6" textClass="text-sm" interactive={false} />
           </div>
           <h1 className="text-xl sm:text-2xl font-black bg-gradient-to-r from-white to-slate-500 bg-clip-text text-transparent">
             THE CAGED TREE

@@ -1,4 +1,4 @@
-import { Link, NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import { Map, Play, Sparkles } from 'lucide-react';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { SignInButton, SignedIn, SignedOut, UserButton, useAuth } from '@clerk/clerk-react';
@@ -9,6 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
+import { BrandLogo } from './BrandLogo';
 
 const navClass = ({ isActive }: { isActive: boolean }) =>
   `inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
@@ -65,12 +66,7 @@ const Header = () => {
   return (
     <header className="w-full border-b border-white/5 bg-black/60 backdrop-blur-md shrink-0">
       <div className="max-w-6xl mx-auto px-4 py-2 flex items-center justify-between gap-4">
-        <Link to="/" className="flex items-center gap-2">
-          <img src="/logo2.png" alt="GuitarBrain" className="h-8 w-8 object-contain" />
-          <span className="text-lg font-black tracking-tight text-foreground">
-            Guitar<span className="text-primary">Brain</span>
-          </span>
-        </Link>
+        <BrandLogo markClass="h-8 w-8" textClass="text-lg" />
 
         <nav className="flex items-center gap-1">
           <NavLink to="/" end className={navClass}>

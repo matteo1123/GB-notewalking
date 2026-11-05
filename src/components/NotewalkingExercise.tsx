@@ -1,14 +1,7 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { Fragment, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { Play, Pause, Shuffle, Volume2, VolumeX, Map as MapIcon, Mic, MicOff } from 'lucide-react';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { useMetronome, type MetronomeSettings, type MetronomeState } from '@/hooks/useMetronome';
 import { useNotePlayer } from '@/hooks/useNotePlayer';
 import { usePitchDetection } from '@/hooks/usePitchDetection';
@@ -29,7 +22,7 @@ import {
   xpSpeedMultiplierAtom,
 } from '@/state/skillTreeAtoms';
 import { useAuth } from '@clerk/clerk-react';
-import { SKILL_NODES, SKILL_NODE_BY_ID, type NodeId } from '@/data/skillTree';
+import { SHAPE_THEMES, SKILL_NODES, SKILL_NODE_BY_ID, type NodeId } from '@/data/skillTree';
 import { computeRevealedFrets } from '@/lib/fretboardReveal';
 import { SessionRecorder } from '@/components/recording/SessionRecorder';
 import { SessionEventLog } from '@/components/recording/sessionEventLog';
@@ -80,6 +73,25 @@ type FocusMode = 'focused' | 'unlocked' | 'full' | 'none';
 function isPracticeable(id: NodeId): boolean {
   const n = SKILL_NODE_BY_ID[id];
   return !!n && n.kind !== 'intro' && n.kind !== 'landing';
+}
+
+// Section picker layout: five CAGED shapes × low / high / whole.
+const CAGED_ORDER: CagedShape[] = ['C', 'A', 'G', 'E', 'D'];
+const SECTION_COLS = [
+  { kind: 'bot', label: 'Low', short: '6-4' },
+  { kind: 'top', label: 'High', short: '3-1' },
+  { kind: 'full', label: 'Whole', short: 'All' },
+] as const;
+
+// Remember the last section picked, so practice reopens where you left off.
+const FOCUS_KEY = 'fq.practice.focus.v1';
+function readSavedFocus(completed: Set<NodeId>): NodeId | null {
+  try {
+    const id = localStorage.getItem(FOCUS_KEY) as NodeId | null;
+    return id && completed.has(id) && isPracticeable(id) ? id : null;
+  } catch {
+    return null;
+  }
 }
 
 // Most recently unlocked practiceable node (Set keeps insertion order).
@@ -142,15 +154,18 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
   // union of everything they own) and "All" are opt-in widenings.
   const [focusMode, setFocusMode] = useState<FocusMode>('focused');
   const [focusedNode, setFocusedNode] = useState<NodeId | null>(
-    () => initialNode ?? latestPracticeable(completed),
+    () => initialNode ?? readSavedFocus(completed) ?? latestPracticeable(completed),
   );
+  useEffect(() => {
+    if (focusedNode && completed.has(focusedNode)) localStorage.setItem(FOCUS_KEY, focusedNode);
+  }, [focusedNode, completed]);
   // Progress can arrive after mount (the Convex merge on sign-in), or the
   // focused node can be reset away. Re-anchor on the latest unlocked shape
   // whenever the current focus isn't something the user actually owns.
   useEffect(() => {
     if (focusedNode && completed.has(focusedNode)) return;
     if (focusedNode && focusedNode === initialNode) return;
-    const next = latestPracticeable(completed);
+    const next = readSavedFocus(completed) ?? latestPracticeable(completed);
     if (next !== focusedNode) setFocusedNode(next);
   }, [completed, focusedNode, initialNode]);
   const xpAccRef = useRef(0);
@@ -1006,7 +1021,7 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
                   }`}
                   onClick={() => setFocusMode('focused')}
                   disabled={practiceableNodes.length === 0}
-                  title="Show only the node you're practicing"
+                  title="Show only the section picked below"
                 >
                   Focus
                 </button>
@@ -1044,22 +1059,71 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
                   None
                 </button>
               </div>
-              {focusMode === 'focused' && practiceableNodes.length > 0 && (
-                <Select
-                  value={focusedNode ?? undefined}
-                  onValueChange={(v) => setFocusedNode((v || null) as NodeId | null)}
-                >
-                  <SelectTrigger className="h-9 text-[11px] rounded bg-black border-gray-700 text-white px-2 mt-1">
-                    <SelectValue placeholder="— pick a node —" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-black border-gray-700 text-white">
-                    {practiceableNodes.map((n) => (
-                      <SelectItem key={n.id} value={n.id} className="text-[12px]">
-                        {n.title}
-                      </SelectItem>
+              {/* The 15 CAGED sections: each shape's low strings (6·5·4), high
+                  strings (3·2·1) and the whole shape. Only unlocked sections can
+                  be picked; picking one switches to Focus. */}
+              <div className="grid grid-cols-[1.25rem_1fr_1fr_1fr] gap-0.5 mt-1 items-center">
+                <span />
+                {SECTION_COLS.map((c) => (
+                  <span key={c.kind} className="text-[8px] text-center text-muted-foreground uppercase tracking-wider">
+                    {c.label}
+                  </span>
+                ))}
+                {CAGED_ORDER.map((shape) => (
+                  <Fragment key={shape}>
+                    <span className="text-[10px] font-black text-center" style={{ color: SHAPE_THEMES[shape].color }}>
+                      {shape}
+                    </span>
+                    {SECTION_COLS.map((c) => {
+                      const id = `${shape}-${c.kind}` as NodeId;
+                      const owned = completed.has(id);
+                      const on = focusMode === 'focused' && focusedNode === id;
+                      return (
+                        <button
+                          key={id}
+                          disabled={!owned}
+                          onClick={() => {
+                            setFocusedNode(id);
+                            setFocusMode('focused');
+                          }}
+                          title={owned ? SKILL_NODE_BY_ID[id]?.title : `${SKILL_NODE_BY_ID[id]?.title} (locked)`}
+                          className={`h-5 rounded text-[9px] font-bold ${
+                            on
+                              ? 'bg-primary text-primary-foreground'
+                              : owned
+                                ? 'bg-muted text-foreground hover:bg-muted/70'
+                                : 'bg-muted/20 text-muted-foreground/40 cursor-not-allowed'
+                          }`}
+                        >
+                          {owned ? c.short : '🔒'}
+                        </button>
+                      );
+                    })}
+                  </Fragment>
+                ))}
+              </div>
+              {practiceableNodes.some((n) => n.kind === 'connect') && (
+                <div className="grid grid-cols-5 gap-0.5 mt-0.5">
+                  {practiceableNodes
+                    .filter((n) => n.kind === 'connect')
+                    .map((n) => (
+                      <button
+                        key={n.id}
+                        onClick={() => {
+                          setFocusedNode(n.id);
+                          setFocusMode('focused');
+                        }}
+                        title={n.subtitle}
+                        className={`h-5 rounded text-[8px] font-bold ${
+                          focusMode === 'focused' && focusedNode === n.id
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-muted text-foreground hover:bg-muted/70'
+                        }`}
+                      >
+                        {n.connectPair?.join('·')}
+                      </button>
                     ))}
-                  </SelectContent>
-                </Select>
+                </div>
               )}
             </div>
 

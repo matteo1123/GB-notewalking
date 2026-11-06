@@ -59,6 +59,8 @@ interface SizedProps {
    * everything goes into a uniform group (HUD strip / dialog backdrop). */
   activeTones?: Set<string>;
   className?: string;
+  /** Extra inline style for the svg (e.g. a universe's hue-rotate filter). */
+  style?: React.CSSProperties;
 }
 
 export function CagedConstellation({
@@ -76,6 +78,7 @@ export function CagedConstellation({
   soloShape,
   activeTones,
   className,
+  style,
 }: SizedProps) {
   const fretW = width / fretCount;
   const stringH = height / 6;
@@ -176,7 +179,7 @@ export function CagedConstellation({
       height={totalH}
       viewBox={`0 0 ${totalW} ${totalH}`}
       className={className}
-      style={{ display: 'block', pointerEvents: 'none' }}
+      style={{ display: 'block', pointerEvents: 'none', ...style }}
     >
       <defs>
         {CAGED_SHAPES.map((s) => (
@@ -371,7 +374,7 @@ export function CagedConstellationFill({
   soloShape,
   activeTones,
   className,
-}: Omit<SizedProps, 'width' | 'height' | 'openStringW'>) {
+}: Omit<SizedProps, 'width' | 'height' | 'openStringW' | 'style'>) {
   const ref = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
 

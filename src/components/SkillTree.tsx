@@ -27,6 +27,17 @@ import {
 import { CagedConstellation, CagedConstellationFill } from './CagedConstellation';
 import { CAGED_SHAPES, type CagedShape } from '@/lib/cagedSystem';
 import { BrandLogo } from './BrandLogo';
+import { ExpanseOrb } from './ExpanseOrb';
+import {
+  HOME_UNIVERSE,
+  UNIVERSES,
+  UNIVERSE_BY_ID,
+  isTreeComplete,
+  universeShapeProgress,
+  type PracticeSeconds,
+  type UniverseId,
+} from '@/data/universes';
+import { expanseOpenedAtom, practiceSecondsAtom } from '@/state/practiceTimeAtoms';
 
 // Each CAGED shape's "home key" — the key in which the shape sits at the open
 // position so its diagram image (which we render in that home key) lines up
@@ -101,8 +112,20 @@ const STRIP_H = 6 * STRIP_STRING_H;
  * the same component at the same 22-fret coordinate system, the stars here
  * sit at exactly the same relative positions as on the live fretboard.
  */
-function ConstellationFretboard({ completed }: { completed: Set<NodeId> }) {
+function ConstellationFretboard({
+  completed,
+  universe = HOME_UNIVERSE,
+  seconds,
+}: {
+  completed: Set<NodeId>;
+  /** Post-course: which universe's constellation to show. Home (I–IV) fills
+   * by unlocks as it always has; other universes fill by time played there,
+   * and shift hue — the same stars under a different sky. */
+  universe?: UniverseId;
+  seconds?: PracticeSeconds;
+}) {
   const shapeProgress = useMemo(() => {
+    if (universe !== HOME_UNIVERSE && seconds) return universeShapeProgress(seconds, universe);
     const map = new Map<CagedShape, number>();
     for (const shape of CAGED_SHAPES) {
       const n = (['top', 'bot', 'full'] as const).reduce(
@@ -112,8 +135,9 @@ function ConstellationFretboard({ completed }: { completed: Set<NodeId> }) {
       map.set(shape, n);
     }
     return map;
-  }, [completed]);
+  }, [completed, universe, seconds]);
 
+  const hue = UNIVERSE_BY_ID[universe].hue;
   return (
     <CagedConstellation
       cagedKey={STRIP_KEY}
@@ -123,7 +147,8 @@ function ConstellationFretboard({ completed }: { completed: Set<NodeId> }) {
       openStringW={STRIP_OPEN_W}
       shapeProgress={shapeProgress}
       singleOctave
-      className="block select-none max-w-full h-auto"
+      className="block select-none max-w-full h-auto transition-[filter] duration-700"
+      style={hue ? { filter: `hue-rotate(${hue}deg)` } : undefined}
     />
   );
 }
@@ -143,6 +168,11 @@ const PAD = 500;
 export function SkillTree() {
   const completed = useAtomValue(completedSetAtom);
   const availableXp = useAtomValue(availableXpAtom);
+  const practiceSeconds = useAtomValue(practiceSecondsAtom);
+  const expanseOpened = useAtomValue(expanseOpenedAtom);
+  const treeComplete = useMemo(() => isTreeComplete(completed), [completed]);
+  const [hudUniverse, setHudUniverse] = useState<UniverseId>(HOME_UNIVERSE);
+  const shownUniverse = expanseOpened ? hudUniverse : HOME_UNIVERSE;
   const toggle = useSetAtom(toggleNodeAtom);
   const addXp = useSetAtom(addXpAtom);
   const { purchased } = usePurchaseStatus();
@@ -588,8 +618,34 @@ export function SkillTree() {
         {/* Constellation wraps to its own row on mobile (w-full + order-last)
             so the title card and Practice/XP cluster share the top row. On sm+
             all three sit side-by-side with order reset to source order. */}
-        <div className="flex justify-center w-full sm:w-auto sm:flex-1 sm:mx-4 max-w-full overflow-hidden order-last sm:order-none">
-          <ConstellationFretboard completed={completed} />
+        <div className="flex justify-center items-center gap-3 w-full sm:w-auto sm:flex-1 sm:mx-4 max-w-full overflow-hidden order-last sm:order-none">
+          <div className="flex flex-col items-center min-w-0 max-w-full">
+            <ConstellationFretboard
+              completed={completed}
+              universe={shownUniverse}
+              seconds={practiceSeconds}
+            />
+            {/* Universe tabs — only after the Expanse is opened. */}
+            {expanseOpened && (
+              <div className="pointer-events-auto flex flex-wrap justify-center gap-1 mt-1">
+                {UNIVERSES.map((u) => (
+                  <button
+                    key={u.id}
+                    onClick={() => setHudUniverse(u.id)}
+                    title={u.blurb}
+                    className={`px-2 h-5 rounded-full text-[10px] font-black tracking-wider border transition-colors ${
+                      shownUniverse === u.id
+                        ? 'bg-white/15 border-white/40 text-white'
+                        : 'bg-black/40 border-white/10 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    {u.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          {treeComplete && <ExpanseOrb />}
         </div>
 
         {/* Top-right cluster is the only HUD area that needs pointer events —

@@ -1,10 +1,10 @@
-const CACHE_NAME = 'gb-notewalking-v1';
+const CACHE_NAME = 'gb-notewalking-v2';
 
 // App shell — cache on install so the app works offline
 const APP_SHELL = [
     '/',
     '/manifest.json',
-    '/favicon.svg',
+    '/icons/icon-192.png',
 ];
 
 self.addEventListener('install', (event) => {
@@ -40,7 +40,9 @@ self.addEventListener('fetch', (event) => {
     }
 
     // Network-first for navigation (HTML), cache-first for assets
-    if (request.mode === 'navigate') {
+    // The manifest goes network-first too, so icon/name changes reach phones
+    // that already have the old one cached.
+    if (request.mode === 'navigate' || url.pathname === '/manifest.json') {
         event.respondWith(
             fetch(request)
                 .then((res) => {
@@ -48,7 +50,9 @@ self.addEventListener('fetch', (event) => {
                     caches.open(CACHE_NAME).then((c) => c.put(request, clone));
                     return res;
                 })
-                .catch(() => caches.match('/') )
+                .catch(() =>
+                    caches.match(request).then((hit) => hit || caches.match('/'))
+                )
         );
     } else {
         event.respondWith(
@@ -72,8 +76,8 @@ self.addEventListener('push', (event) => {
             event.waitUntil(
                 self.registration.showNotification(data.title, {
                     body: data.body,
-                    icon: '/favicon.svg',
-                    badge: '/favicon.svg',
+                    icon: '/icons/icon-192.png',
+                    badge: '/icons/icon-192.png',
                     data: { url: data.url || '/' },
                 })
             );

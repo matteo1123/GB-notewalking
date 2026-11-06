@@ -28,6 +28,18 @@ export default defineSchema({
     updatedAt: v.number(),
   }).index('by_user', ['userId']),
 
+  // One row per user — practice time per "universe|section" bucket (e.g.
+  // "I-IV|C-top", "I-V|connect-CA") plus when they opened the Expanse. Kept
+  // apart from userProgress because it's written every ~30s while playing,
+  // and so older clients calling progress.setProgress can't clobber it.
+  // Bounded: 7 universes × 20 sections = 140 keys max.
+  practiceTime: defineTable({
+    userId: v.id('users'),
+    seconds: v.record(v.string(), v.number()),
+    expanseOpenedAt: v.optional(v.number()),
+    updatedAt: v.number(),
+  }).index('by_user', ['userId']),
+
   // Creator-only daily content brief, written by the content pipeline
   // (gb-content-pipeline) via POST /pipeline/brief. Read only through
   // creator.currentBrief, which returns null for everyone but the creator.

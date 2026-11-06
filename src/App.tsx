@@ -9,11 +9,13 @@ import PaywallPage from '@/pages/PaywallPage';
 import WelcomePage from '@/pages/WelcomePage';
 import { PrivacyPage, TermsPage } from '@/pages/LegalPages';
 import { useSyncProgress } from '@/hooks/useSyncProgress';
+import { useSyncPracticeTime } from '@/hooks/useSyncPracticeTime';
 
-// Empty component whose only job is to mount useSyncProgress at the root,
+// Empty component whose only job is to mount the sync hooks at the root,
 // so the merge-and-push runs once for the whole app rather than per-page.
 const ProgressSync = () => {
   useSyncProgress();
+  useSyncPracticeTime();
   return null;
 };
 

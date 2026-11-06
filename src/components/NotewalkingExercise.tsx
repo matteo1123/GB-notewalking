@@ -24,6 +24,22 @@ import {
 import { useAuth } from '@clerk/clerk-react';
 import { SHAPE_THEMES, SKILL_NODES, SKILL_NODE_BY_ID, type NodeId } from '@/data/skillTree';
 import { computeRevealedFrets } from '@/lib/fretboardReveal';
+import {
+  HOME_UNIVERSE,
+  SEASONED_SECONDS,
+  UNIVERSES,
+  UNIVERSE_BY_ID,
+  formatMinutes,
+  isTreeComplete,
+  secondsFor,
+  timeKey,
+} from '@/data/universes';
+import {
+  addPracticeSecondsAtom,
+  expanseOpenedAtom,
+  practiceSecondsAtom,
+  selectedUniverseAtom,
+} from '@/state/practiceTimeAtoms';
 import { SessionRecorder } from '@/components/recording/SessionRecorder';
 import { SessionEventLog } from '@/components/recording/sessionEventLog';
 
@@ -53,6 +69,16 @@ const DEGREE_COLORS: Record<number, string> = {
   6: '#DDA0DD',
   7: '#98D8C8',
 };
+
+// Diatonic chords whose triad is minor — their backing sample is "<root>m".
+const MINOR_NUMERALS = new Set<ChordNumeral>(['ii', 'iii', 'vi']);
+function chordSampleName(numeral: ChordNumeral, rootNote: string): string {
+  return MINOR_NUMERALS.has(numeral) ? `${rootNote}m` : rootNote;
+}
+
+// Practice time only counts if a note was heard this recently (mic on), so a
+// backing track left running in an empty room doesn't fill the constellation.
+const HEARD_WINDOW_MS = 10_000;
 
 function pickRandomKey(exclude?: string): string {
   const pool = exclude ? MAJOR_KEYS.filter((k) => k !== exclude) : MAJOR_KEYS;
@@ -336,10 +362,20 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
   const xpSpeedMultiplier = useAtomValue(xpSpeedMultiplierAtom);
   const { isSignedIn } = useAuth();
 
+  // Universe = which two-chord vamp backs the practice. Everyone plays I–IV
+  // until they've opened the Expanse; after that the saved choice applies.
+  const expanseOpened = useAtomValue(expanseOpenedAtom);
+  const [savedUniverse, setSavedUniverse] = useAtom(selectedUniverseAtom);
+  const universe = expanseOpened ? savedUniverse : HOME_UNIVERSE;
+  const universeChords = UNIVERSE_BY_ID[universe].chords;
+  const treeComplete = useMemo(() => isTreeComplete(completed), [completed]);
+  const practiceSeconds = useAtomValue(practiceSecondsAtom);
+  const addPracticeSeconds = useSetAtom(addPracticeSecondsAtom);
+
   const settings: ChordProgressionSettings = useMemo(
     () => ({
       key,
-      selectedChords: ['I', 'IV'],
+      selectedChords: universeChords,
       measuresPerChord: 4,
       droneEnabled,
       droneVolume: 0.5,
@@ -347,7 +383,7 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
       droneMode: 'chord-major',
       scaleView: 'major',
     }),
-    [key, droneEnabled],
+    [key, droneEnabled, universeChords],
   );
 
   const { currentChordIndex, currentChord, handleMetronomeTick } = useChordProgression({
@@ -400,8 +436,11 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
 
   useEffect(() => {
     if (!audioContext) return;
-    preloadChords([chordInfoA.rootNote, chordInfoB.rootNote]);
-  }, [audioContext, chordInfoA.rootNote, chordInfoB.rootNote, preloadChords]);
+    preloadChords([
+      chordSampleName(chordInfoA.numeral, chordInfoA.rootNote),
+      chordSampleName(chordInfoB.numeral, chordInfoB.rootNote),
+    ]);
+  }, [audioContext, chordInfoA, chordInfoB, preloadChords]);
 
   const metronomeSettings: MetronomeSettings = {
     mode: 'regular',
@@ -414,7 +453,7 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
       setTickCount((t) => t + 1);
       handleMetronomeTick(state);
       if (state.currentBeat === 1 && droneEnabled) {
-        playChord(currentChord.rootNote, settings.droneVolume);
+        playChord(chordSampleName(currentChord.numeral, currentChord.rootNote), settings.droneVolume);
       }
     },
   };
@@ -480,8 +519,10 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPlaying, currentChordIndex, key]);
 
+  const lastHeardRef = useRef(0);
   const handlePitchDetected = useCallback(
     (result: { frequency: number; note: string; confidence: number }) => {
+      lastHeardRef.current = Date.now();
       const name = result.note.replace(/\d/g, '');
       if (recordingLog.active) {
         const { key: k, numeral, isPlaying: playing } = logStateRef.current;
@@ -555,6 +596,46 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
       SKILL_NODES.filter((n) => completed.has(n.id) && isPracticeable(n.id)),
     [completed],
   );
+
+  // Practice-time tracking, per universe × focused section. Runs silently for
+  // everyone (it's what eventually opens the Expanse); a second counts when
+  // the backing is playing, one owned section is focused, the tab is visible,
+  // and — with the mic on — a note was heard in the last few seconds.
+  // Seconds collect in a ref and land in the atom every few ticks so the
+  // whole screen isn't re-rendering once a second.
+  const trackingKey =
+    isPlaying &&
+    focusMode === 'focused' &&
+    focusedNode &&
+    completed.has(focusedNode) &&
+    isPracticeable(focusedNode)
+      ? timeKey(universe, focusedNode)
+      : null;
+  const micEnabledRef = useRef(micEnabled);
+  micEnabledRef.current = micEnabled;
+  useEffect(() => {
+    if (!trackingKey) return;
+    let unsaved = 0;
+    let last = Date.now();
+    const save = () => {
+      if (unsaved > 0) addPracticeSeconds({ key: trackingKey, seconds: unsaved });
+      unsaved = 0;
+    };
+    const id = window.setInterval(() => {
+      const now = Date.now();
+      // Clamp so a throttled background timer can't dump minutes at once.
+      const dt = Math.min(2, (now - last) / 1000);
+      last = now;
+      if (document.visibilityState !== 'visible') return;
+      if (micEnabledRef.current && now - lastHeardRef.current > HEARD_WINDOW_MS) return;
+      unsaved += dt;
+      if (unsaved >= 5) save();
+    }, 1000);
+    return () => {
+      window.clearInterval(id);
+      save();
+    };
+  }, [trackingKey, addPracticeSeconds]);
 
   const degreeMap = useMemo(() => createDegreeMap(key, 'major'), [key]);
 
@@ -1126,6 +1207,51 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
                 </div>
               )}
             </div>
+
+            {/* Post-course only: players still on the tree see none of this. */}
+            {treeComplete && (
+              <div className="border-t border-gray-800 pt-2 mt-1 flex flex-col gap-1">
+                <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center justify-between">
+                  <span>{expanseOpened ? 'Universe' : 'Time here'}</span>
+                  {focusMode === 'focused' && focusedNode && isPracticeable(focusedNode) && (
+                    <span
+                      className={`normal-case tabular-nums font-semibold tracking-normal ${
+                        secondsFor(practiceSeconds, universe, focusedNode) >= SEASONED_SECONDS
+                          ? 'text-emerald-400'
+                          : 'text-primary'
+                      }`}
+                      title={`Time on ${SKILL_NODE_BY_ID[focusedNode]?.title} over ${UNIVERSE_BY_ID[universe].label}. ${SEASONED_SECONDS / 60} minutes fills its stars.`}
+                    >
+                      {formatMinutes(secondsFor(practiceSeconds, universe, focusedNode))}
+                      <span className="text-muted-foreground"> / {SEASONED_SECONDS / 60}m</span>
+                    </span>
+                  )}
+                </div>
+                {expanseOpened && (
+                  <div className="grid grid-cols-2 gap-1">
+                    {UNIVERSES.map((u) => (
+                      <button
+                        key={u.id}
+                        onClick={() => setSavedUniverse(u.id)}
+                        title={u.blurb}
+                        className={`h-6 text-[10px] rounded font-bold ${
+                          universe === u.id
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-muted text-foreground hover:bg-muted/70'
+                        }`}
+                      >
+                        {u.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {focusMode !== 'focused' && (
+                  <div className="text-[9px] text-muted-foreground leading-snug">
+                    Time counts in Focus mode.
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="border-t border-gray-800 pt-2 mt-1 flex flex-col gap-1">
               <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center justify-between">

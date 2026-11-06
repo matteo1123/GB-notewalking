@@ -10,6 +10,7 @@
 
 import type * as creator from "../creator.js";
 import type * as http from "../http.js";
+import type * as practiceTime from "../practiceTime.js";
 import type * as progress from "../progress.js";
 import type * as purchases from "../purchases.js";
 import type * as stripe from "../stripe.js";
@@ -24,6 +25,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   creator: typeof creator;
   http: typeof http;
+  practiceTime: typeof practiceTime;
   progress: typeof progress;
   purchases: typeof purchases;
   stripe: typeof stripe;

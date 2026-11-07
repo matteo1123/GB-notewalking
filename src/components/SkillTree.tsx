@@ -28,6 +28,7 @@ import { CagedConstellation, CagedConstellationFill } from './CagedConstellation
 import { CAGED_SHAPES, type CagedShape } from '@/lib/cagedSystem';
 import { BrandLogo } from './BrandLogo';
 import { ExpanseOrb } from './ExpanseOrb';
+import { InstallAppButton } from './InstallAppButton';
 import {
   HOME_UNIVERSE,
   UNIVERSES,
@@ -655,6 +656,9 @@ export function SkillTree() {
             small and in the corner avoids the scroll-blocking issue that
             plagued the larger HUD children. */}
         <div className="flex flex-row gap-2 items-center pointer-events-auto">
+          {/* Only shows when this browser can install the app and it isn't
+              already running installed. */}
+          <InstallAppButton />
           {/* Show the Practice link unless we *know* the user is unpaid.
               `purchased` from the Convex query is `undefined` while loading;
               gating on `purchased &&` would briefly hide the button on every

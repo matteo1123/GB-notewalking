@@ -1,3 +1,5 @@
+// First: catch the browser's install event even if it fires before React mounts.
+import './lib/installPrompt';
 import { createRoot } from 'react-dom/client';
 import { ClerkProvider, useAuth } from '@clerk/clerk-react';
 import { ConvexProviderWithClerk } from 'convex/react-clerk';

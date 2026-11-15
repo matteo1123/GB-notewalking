@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { CameraUnavailableError, RecordingEngine } from './RecordingEngine';
 import { serializeSessionLog, type SessionEventLog } from './sessionEventLog';
 import {
@@ -9,6 +10,7 @@ import {
   type PipCorner,
   type RecordingLayout,
 } from './recordingUtils';
+import { inApp, onScreenEnded, startScreen, stopScreen, type ScreenFile, type ScreenStarted } from '@/native/nativeApp';
 
 export type RecordingPhase =
   | 'idle'
@@ -24,29 +26,39 @@ export interface RecordingPrefs {
   layout: RecordingLayout;
   cameraEnabled: boolean;
   corner: PipCorner;
+  /** Headphones on: mix the app's sound in. Off (chords through the speaker): the mic's room sound alone. */
+  headphones: boolean;
 }
 
 export interface RecordingResult {
-  file: File;
+  /** The video, on the web. In the Android app the video is `screen`, already on the phone. */
+  file: File | null;
+  screen: ScreenFile | null;
+  name: string;
+  bytes: number;
   url: string;
   durationMs: number;
   /** Sidecar JSON of what the app did, named to match the video. */
   dataFile: File;
-  /** Full-res camera (`<name>.camera.mp4`) and mic-only audio (`<name>.mic.m4a`), when recorded. */
+  /**
+   * Full-res camera (`<name>.camera.mp4`), mic-only audio (`<name>.mic.m4a`) and the app's own
+   * sound (`<name>.app.m4a`), when recorded; in the Android app also the soundtrack (`<name>.audio.m4a`).
+   */
   companions: File[];
 }
 
 // Companion filenames: `<name>.camera.<ext>` / `<name>.mic.<ext>`. The
 // pipeline pairs files by everything before the role suffix.
-function companionExt(mime: string, kind: 'camera' | 'mic'): string {
-  if (mime.includes('mp4')) return kind === 'mic' ? 'm4a' : 'mp4';
+type CompanionKind = 'camera' | 'mic' | 'app' | 'audio';
+function companionExt(mime: string, kind: CompanionKind): string {
+  if (mime.includes('mp4')) return kind === 'camera' ? 'mp4' : 'm4a';
   return 'webm';
 }
 
 export const SESSION_LOG_FORMAT = 'guitarbrain-session-log';
 
 const PREFS_KEY = 'gb.recording.prefs.v1';
-const DEFAULT_PREFS: RecordingPrefs = { layout: 'landscape', cameraEnabled: true, corner: 'bottom-right' };
+const DEFAULT_PREFS: RecordingPrefs = { layout: 'landscape', cameraEnabled: true, corner: 'bottom-right', headphones: false };
 
 function readPrefs(): RecordingPrefs {
   try {
@@ -91,6 +103,8 @@ export function useSessionRecording({
   const [error, setError] = useState<string | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [cameraLive, setCameraLive] = useState(false);
+  // the camera, for the face bubble in the Android app
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [cameraVisible, setCameraVisible] = useState(true);
   const [corner, setCornerState] = useState<PipCorner>(prefs.corner);
   const [result, setResult] = useState<RecordingResult | null>(null);
@@ -100,6 +114,8 @@ export function useSessionRecording({
   const talkingRef = useRef(false);
 
   const engineRef = useRef<RecordingEngine | null>(null);
+  // the phone recording its own screen (Android app)
+  const nativeRef = useRef<{ started: ScreenStarted; off: () => void } | null>(null);
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const startedAtRef = useRef(0);
   const elapsedTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -113,6 +129,7 @@ export function useSessionRecording({
   const mimeRef = useRef('video/webm');
   const eventLogRef = useRef(eventLog);
   eventLogRef.current = eventLog;
+  const headphonesRef = useRef(prefs.headphones);
   const getSnapshotRef = useRef(getSnapshot);
   getSnapshotRef.current = getSnapshot;
 
@@ -137,6 +154,12 @@ export function useSessionRecording({
     engineRef.current = null;
     eventLogRef.current?.clear();
     setCameraLive(false);
+    setCameraStream(null);
+    if (nativeRef.current) {
+      nativeRef.current.off();
+      nativeRef.current = null;
+      void stopScreen().catch(() => {});
+    }
   }, []);
 
   const releaseResult = useCallback(() => {
@@ -172,26 +195,51 @@ export function useSessionRecording({
     setTalking(false);
     const events = eventLogRef.current?.stop() ?? [];
     setPhase('finalizing');
-    const output = await engine.stop();
-    const blob = output.main;
+    const native = nativeRef.current;
+    nativeRef.current = null;
+    native?.off();
+    const parts = filenamePartsRef.current;
+    const [output, screen] = await Promise.all([
+      engine.stop(),
+      native
+        ? stopScreen(buildRecordingFilename(parts, 'mp4')).catch((err: unknown) => {
+            console.warn('[recording] the phone did not save the screen', err);
+            return null;
+          })
+        : Promise.resolve(null),
+    ]);
+    const audioStartedAt = engine.mainStartedEpoch;
     teardownEngine();
+    if (native && !screen) {
+      setError('The phone could not save the screen recording. Please try again.');
+      setPhase('setup');
+      return;
+    }
+    const blob = output.main;
     if (blob.size === 0) {
       setError('The recording came out empty. Please try again.');
       setPhase('setup');
       return;
     }
-    const name = buildRecordingFilename(filenamePartsRef.current, extensionForMime(blob.type || mimeRef.current));
-    const file = new File([blob], name, { type: blob.type || mimeRef.current });
+    // In the app the phone's screen video is the main file; this page's files (the sound, the
+    // camera...) start a little after it: main time = file time + shift.
+    const shift = screen && native && audioStartedAt ? audioStartedAt - (screen.startedAt || native.started.startedAt) : 0;
+    const name = screen ? screen.name : buildRecordingFilename(parts, extensionForMime(blob.type || mimeRef.current));
+    const file = screen ? null : new File([blob], name, { type: blob.type || mimeRef.current });
     const stem = name.replace(/\.[^.]+$/, '');
     const companions: File[] = [];
     const companionMeta: Record<string, { file: string; offsetMs: number }> = {};
-    for (const kind of ['camera', 'mic'] as const) {
-      const c = output[kind];
-      if (!c) continue;
+    const addCompanion = (kind: CompanionKind, c: { blob: Blob; offsetMs: number } | null) => {
+      if (!c) return;
       const cname = `${stem}.${kind}.${companionExt(c.blob.type, kind)}`;
       companions.push(new File([c.blob], cname, { type: c.blob.type }));
-      companionMeta[kind] = { file: cname, offsetMs: c.offsetMs };
-    }
+      companionMeta[kind] = { file: cname, offsetMs: c.offsetMs + shift };
+    };
+    if (screen) addCompanion('audio', { blob, offsetMs: 0 });
+    addCompanion('camera', output.camera);
+    addCompanion('mic', output.mic);
+    addCompanion('app', output.app);
+    const timed = shift ? events.map((e) => ({ ...e, t: e.t + shift })) : events;
     const log = {
       format: SESSION_LOG_FORMAT,
       version: 1,
@@ -204,13 +252,27 @@ export function useSessionRecording({
       // offsetMs: how long after the main video's first frame each companion's
       // first frame was captured (main time = companion time + offsetMs).
       companions: companionMeta,
+      // room: the soundtrack is the mic alone (chords through the speaker); mix: the app's sound mixed in
+      sound: headphonesRef.current ? 'mix' : 'room',
+      ...(screen ? { captureMode: 'android-screen', screen: { width: screen.width, height: screen.height } } : {}),
     };
-    const dataFile = new File([serializeSessionLog(log, events)], name.replace(/\.[^.]+$/, '.json'), {
+    const dataFile = new File([serializeSessionLog(log, timed)], `${stem}.json`, {
       type: 'application/json',
     });
-    setResult({ file, url: URL.createObjectURL(file), durationMs, dataFile, companions });
+    setResult({
+      file,
+      screen,
+      name,
+      bytes: screen ? screen.bytes : blob.size,
+      url: screen ? Capacitor.convertFileSrc(screen.path) : URL.createObjectURL(file as File),
+      durationMs,
+      dataFile,
+      companions,
+    });
     setPhase('preview');
   }, [clearTimers, teardownEngine]);
+  const stopRef = useRef(stop);
+  stopRef.current = stop;
 
   // Whether the 3-2-1 runs before recording. The setup dialog's Start button
   // counts down; the creator's logo trigger starts right away.
@@ -278,15 +340,42 @@ export function useSessionRecording({
     setError(null);
     setCameraError(null);
     filenamePartsRef.current = filenameParts;
-    const screenSupported = canCaptureScreen();
+    headphonesRef.current = prefs.headphones;
+    // The Android app: the phone records the screen (its prompt has to come first, while the
+    // tap still counts), and this page records the sound and the camera.
+    const app = inApp();
+    let native: ScreenStarted | null = null;
+    if (app) {
+      setPhase('acquiring');
+      try {
+        native = await startScreen();
+      } catch {
+        setError('Screen recording was cancelled. Allow it in the phone’s prompt to record the practice screen.');
+        setPhase('setup');
+        return;
+      }
+    }
+    const screenSupported = app || canCaptureScreen();
     // Without screen capture the camera is the whole picture.
     const wantCamera = prefs.cameraEnabled || !screenSupported;
     const engine = new RecordingEngine({
       layout: prefs.layout,
       corner: prefs.corner,
       cameraVisible: wantCamera,
+      roomSound: !prefs.headphones,
+      soundOnly: app,
     });
     engineRef.current = engine;
+    if (native) {
+      let off = () => {};
+      // stopped from Android's own notification / status bar
+      void onScreenEnded(() => {
+        if (nativeRef.current) void stopRef.current();
+      }).then((h) => {
+        off = () => void h.remove();
+      });
+      nativeRef.current = { started: native, off: () => off() };
+    }
     // Layout events let downstream tools crop the screen and camera apart.
     engine.onLayoutChange = (info) => eventLogRef.current?.add('layout', { ...info });
     engine.onScreenEnded = () => {
@@ -301,7 +390,7 @@ export function useSessionRecording({
     setCameraVisible(wantCamera);
     setPhase('acquiring');
 
-    if (screenSupported) {
+    if (screenSupported && !app) {
       try {
         await engine.acquireScreen(captureRef?.current);
       } catch (err) {
@@ -322,6 +411,7 @@ export function useSessionRecording({
       try {
         await engine.acquireCamera();
         setCameraLive(true);
+        setCameraStream(engine.camera);
       } catch (err) {
         if (engineRef.current !== engine) return;
         const reason = err instanceof CameraUnavailableError ? err.message : 'The camera could not be started.';
@@ -358,6 +448,7 @@ export function useSessionRecording({
       try {
         await engine.acquireCamera();
         setCameraLive(true);
+        setCameraStream(engine.camera);
       } catch (err) {
         setCameraError(err instanceof CameraUnavailableError ? err.message : 'The camera could not be started.');
         return;
@@ -387,6 +478,7 @@ export function useSessionRecording({
     clearTimers();
     teardownEngine();
     releaseResult();
+    setError(null);
     setPhase('idle');
   }, [clearTimers, teardownEngine, releaseResult]);
 
@@ -428,6 +520,11 @@ export function useSessionRecording({
       if (elapsedTimerRef.current) clearInterval(elapsedTimerRef.current);
       engineRef.current?.dispose();
       engineRef.current = null;
+      if (nativeRef.current) {
+        nativeRef.current.off();
+        nativeRef.current = null;
+        void stopScreen().catch(() => {});
+      }
     };
   }, []);
   const resultRef = useRef(result);
@@ -446,13 +543,16 @@ export function useSessionRecording({
     cameraError,
     cameraLive,
     cameraVisible,
+    cameraStream,
+    /** In the Android app (the phone records the screen). */
+    inApp: inApp(),
     corner,
     result,
     talking,
     toggleTalk,
     /** Started from the logo (no setup dialog, no countdown). */
     quickStart: !useCountdownRef.current,
-    screenSupported: canCaptureScreen(),
+    screenSupported: inApp() || canCaptureScreen(),
     micActive: !!micStream && micStream.getAudioTracks().some((t) => t.readyState === 'live'),
     openSetup,
     cancelSetup,

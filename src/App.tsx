@@ -10,6 +10,7 @@ import WelcomePage from '@/pages/WelcomePage';
 import { PrivacyPage, TermsPage } from '@/pages/LegalPages';
 import { useSyncProgress } from '@/hooks/useSyncProgress';
 import { useSyncPracticeTime } from '@/hooks/useSyncPracticeTime';
+import { AppHandoffGate, AppTicketListener } from '@/native/AppSignIn';
 
 // Empty component whose only job is to mount the sync hooks at the root,
 // so the merge-and-push runs once for the whole app rather than per-page.
@@ -23,6 +24,8 @@ const App = () => (
   <JotaiProvider>
     <TooltipProvider>
       <Toaster />
+      <AppTicketListener />
+      <AppHandoffGate>
       <BrowserRouter>
         <ProgressSync />
         <Routes>
@@ -37,6 +40,7 @@ const App = () => (
           </Route>
         </Routes>
       </BrowserRouter>
+      </AppHandoffGate>
     </TooltipProvider>
   </JotaiProvider>
 );

@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as appSignIn from "../appSignIn.js";
 import type * as creator from "../creator.js";
 import type * as http from "../http.js";
 import type * as practiceTime from "../practiceTime.js";
@@ -23,6 +24,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  appSignIn: typeof appSignIn;
   creator: typeof creator;
   http: typeof http;
   practiceTime: typeof practiceTime;

@@ -16,6 +16,7 @@ import type { SessionEventLog } from './sessionEventLog';
 import { CreatorBriefCard, useCreatorBrief, useIsCreator } from './CreatorBrief';
 import { canRecord, type FilenameParts, type PipCorner } from './recordingUtils';
 import { publishRecorder } from './recorderBridge';
+import { CameraBubble } from './CameraBubble';
 
 interface SessionRecorderProps {
   micStream: MediaStream | null;
@@ -97,7 +98,9 @@ export function SessionRecorder({
                   <Video className="w-5 h-5" /> Record session
                 </DialogTitle>
                 <DialogDescription>
-                  {rec.screenSupported
+                  {rec.inApp
+                    ? 'Android will ask to record the screen. Allow it, and the video shows the whole screen as you hold the phone.'
+                    : rec.screenSupported
                     ? 'Your browser will ask what to share. Choose this tab.'
                     : "This browser can't capture the screen, so this will be a camera-only recording."}
                 </DialogDescription>
@@ -105,6 +108,7 @@ export function SessionRecorder({
 
               <div className="flex flex-col gap-4 text-sm">
                 {isCreator && brief && <CreatorBriefCard brief={brief} musicKey={musicKey} />}
+                {!rec.inApp && (
                 <div className="flex flex-col gap-1.5">
                   <div className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Format</div>
                   <div className="grid grid-cols-2 gap-2">
@@ -129,12 +133,17 @@ export function SessionRecorder({
                     ))}
                   </div>
                 </div>
+                )}
 
                 <label className="flex items-center justify-between gap-3">
                   <span>
                     <span className="font-semibold">Camera</span>
                     <span className="block text-[11px] text-muted-foreground">
-                      {prefs.layout === 'vertical' ? 'Shown below the screen' : 'Picture-in-picture overlay'}
+                      {rec.inApp
+                        ? 'Your face in a bubble: drag it out of the way, tap it to talk to the camera'
+                        : prefs.layout === 'vertical'
+                        ? 'Shown below the screen'
+                        : 'Picture-in-picture overlay'}
                     </span>
                   </span>
                   <Switch
@@ -144,7 +153,7 @@ export function SessionRecorder({
                   />
                 </label>
 
-                {prefs.layout === 'landscape' && prefs.cameraEnabled && rec.screenSupported && (
+                {!rec.inApp && prefs.layout === 'landscape' && prefs.cameraEnabled && rec.screenSupported && (
                   <div className="flex flex-col gap-1.5">
                     <div className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
                       Camera corner
@@ -170,6 +179,18 @@ export function SessionRecorder({
                     </div>
                   </div>
                 )}
+
+                <label className="flex items-center justify-between gap-3">
+                  <span>
+                    <span className="font-semibold">Headphones</span>
+                    <span className="block text-[11px] text-muted-foreground">
+                      {prefs.headphones
+                        ? "The app's chords are mixed in with your mic."
+                        : 'Chords through the speaker: the sound is the room, as the mic hears it, so nothing doubles.'}
+                    </span>
+                  </span>
+                  <Switch checked={prefs.headphones} onCheckedChange={(v) => rec.setPrefs({ headphones: v })} />
+                </label>
 
                 <div className={`text-xs ${rec.micActive ? 'text-emerald-400' : 'text-amber-400'}`}>
                   {rec.micActive
@@ -214,6 +235,10 @@ export function SessionRecorder({
             {rec.countdown}
           </div>
         </div>
+      )}
+
+      {rec.inApp && rec.cameraStream && rec.cameraVisible && (phase === 'countdown' || phase === 'recording') && (
+        <CameraBubble stream={rec.cameraStream} talk={rec.talking} onTap={rec.toggleTalk} />
       )}
 
       {phase === 'preview' && rec.result && (

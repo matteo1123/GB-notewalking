@@ -1,10 +1,11 @@
 import { useNavigate } from 'react-router-dom';
-import { SignInButton, SignedIn, SignedOut, UserButton } from '@clerk/clerk-react';
+import { SignedIn, SignedOut, UserButton } from '@clerk/clerk-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { usePurchaseStatus } from '@/hooks/usePurchaseStatus';
 import { useStartCheckout } from '@/hooks/useStartCheckout';
 import { Check } from 'lucide-react';
+import { AppAwareSignInButton } from '@/native/AppSignIn';
 
 const features = [
   'The complete CAGED skill tree — 20 skills across all 5 shapes',
@@ -47,9 +48,9 @@ const PaywallPage = () => {
             ) : (
               <>
                 <SignedOut>
-                  <SignInButton mode="modal">
+                  <AppAwareSignInButton>
                     <Button size="lg">Sign in to unlock</Button>
-                  </SignInButton>
+                  </AppAwareSignInButton>
                   <p className="text-[11px] text-muted-foreground text-center">
                     You'll create an account, then pay $9.99 — one-time, no subscription.
                   </p>

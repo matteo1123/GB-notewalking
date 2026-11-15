@@ -38,3 +38,6 @@ supabase/.env.local
 videos/
 audio/
 
+
+# the Android app build (android/app/build is ignored by android/.gitignore)
+*.apk

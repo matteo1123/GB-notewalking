@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth, useClerk } from '@clerk/clerk-react';
 import { useStartCheckout } from './useStartCheckout';
+import { openSignUp } from '@/native/AppSignIn';
 
 // One click → Stripe. Handles the sign-up-then-checkout chain so callers
 // don't have to reimplement the pendingCheckout state machine. If the user
@@ -24,7 +25,7 @@ export function useBuyFlow() {
       startCheckout();
     } else {
       setPending(true);
-      clerk.openSignUp({});
+      openSignUp(clerk);
     }
   };
 

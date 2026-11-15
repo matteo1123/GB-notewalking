@@ -1,0 +1,19 @@
+{
+  "appId": "com.guitarbrain.notewalking",
+  "appName": "Notewalking",
+  "webDir": "dist",
+  "server": {
+    "url": "https://notewalking.guitarbrain.org",
+    "androidScheme": "https",
+    "allowNavigation": [
+      "notewalking.guitarbrain.org",
+      "clerk.guitarbrain.org",
+      "accounts.guitarbrain.org",
+      "*.clerk.accounts.dev",
+      "*.clerk.com"
+    ]
+  },
+  "android": {
+    "backgroundColor": "#050505"
+  }
+}

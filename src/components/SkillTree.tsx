@@ -161,6 +161,7 @@ import {
 } from '@/state/skillTreeAtoms';
 import { usePurchaseStatus } from '@/hooks/usePurchaseStatus';
 import { useBuyFlow } from '@/hooks/useBuyFlow';
+import { openSignIn, openSignUp } from '@/native/AppSignIn';
 
 const NODE_SIZE = 80;
 const GAP = 250;
@@ -698,13 +699,13 @@ export function SkillTree() {
           ) : !isSignedIn ? (
             <>
               <button
-                onClick={() => clerk.openSignUp({})}
+                onClick={() => openSignUp(clerk)}
                 className="bg-primary text-primary-foreground hover:bg-primary/90 px-4 sm:px-5 py-2 rounded-full shadow-lg h-[42px] text-xs font-black tracking-wider transition-colors"
               >
                 Sign up
               </button>
               <button
-                onClick={() => clerk.openSignIn({})}
+                onClick={() => openSignIn(clerk)}
                 className="bg-black/40 hover:bg-black/60 backdrop-blur-md border border-white/10 hover:border-white/30 px-3 sm:px-4 py-2 rounded-full shadow-lg h-[42px] text-xs font-black tracking-wider text-slate-200 transition-colors"
               >
                 Sign in

@@ -1,7 +1,7 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import { Map, Play, Sparkles } from 'lucide-react';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
-import { SignInButton, SignedIn, SignedOut, UserButton, useAuth } from '@clerk/clerk-react';
+import { SignedIn, SignedOut, UserButton, useAuth } from '@clerk/clerk-react';
 import { availableXpAtom, completionCountAtom, totalXpAtom, xpSpeedAtom, completedSetAtom, type XpSpeed } from '@/state/skillTreeAtoms';
 import { TOTAL_NODES } from '@/data/skillTree';
 import { usePurchaseStatus } from '@/hooks/usePurchaseStatus';
@@ -10,6 +10,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { BrandLogo } from './BrandLogo';
+import { AppAwareSignInButton } from '@/native/AppSignIn';
 
 const navClass = ({ isActive }: { isActive: boolean }) =>
   `inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
@@ -140,11 +141,11 @@ const Header = () => {
             </span>
           )}
           <SignedOut>
-            <SignInButton mode="modal">
+            <AppAwareSignInButton>
               <button className="text-xs font-bold text-primary hover:underline">
                 Sign in
               </button>
-            </SignInButton>
+            </AppAwareSignInButton>
           </SignedOut>
           <SignedIn>
             <UserButton afterSignOutUrl="/" />

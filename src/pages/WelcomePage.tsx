@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { useBuyFlow } from '@/hooks/useBuyFlow';
 import { usePurchaseStatus } from '@/hooks/usePurchaseStatus';
 import { assetUrl } from '@/lib/assetUrl';
+import { openSignIn } from '@/native/AppSignIn';
 
 const features = [
   'The complete CAGED system — 5 shapes, 20 lessons, all on one fretboard.',
@@ -71,7 +72,7 @@ const WelcomePage = () => {
         <div className="flex items-center gap-3">
           {!isLoaded ? null : !isSignedIn ? (
             <button
-              onClick={() => clerk.openSignIn({})}
+              onClick={() => openSignIn(clerk)}
               className="text-xs font-bold text-slate-300 hover:text-white"
             >
               Sign in

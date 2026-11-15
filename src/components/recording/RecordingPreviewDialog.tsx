@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dialog';
 import { SHARE_TARGETS, formatBytes, formatElapsed, pickShareFiles } from './recordingUtils';
 import type { RecordingResult } from './useSessionRecording';
+import { AppRecordingPreview } from './AppRecordingPreview';
 
 interface RecordingPreviewDialogProps {
   result: RecordingResult;
@@ -31,8 +32,13 @@ function fixUnknownDuration(e: SyntheticEvent<HTMLVideoElement>) {
   v.currentTime = 1e101;
 }
 
-export function RecordingPreviewDialog({ result, onDiscard }: RecordingPreviewDialogProps) {
-  const { file, url, durationMs, dataFile, companions } = result;
+export function RecordingPreviewDialog(props: RecordingPreviewDialogProps) {
+  return props.result.screen ? <AppRecordingPreview {...props} /> : <WebRecordingPreview {...props} />;
+}
+
+function WebRecordingPreview({ result, onDiscard }: RecordingPreviewDialogProps) {
+  const { url, durationMs, dataFile, companions } = result;
+  const file = result.file as File;
   const shareSet = useMemo(() => pickShareFiles(file, dataFile, companions), [file, dataFile, companions]);
   const extras = useMemo(() => [...companions, dataFile], [companions, dataFile]);
   const extrasSize = extras.reduce((n, f) => n + f.size, 0);

@@ -45,6 +45,8 @@ export interface RecordingOutput {
   main: Blob;
   camera: CompanionResult | null;
   mic: CompanionResult | null;
+  /** The app's own sound (chords, drums), clean, as it was sent to the speaker. */
+  app: CompanionResult | null;
 }
 
 /** One MediaRecorder writing ~1s chunks, with its real start time. */
@@ -102,6 +104,17 @@ export interface EngineOptions {
   layout: RecordingLayout;
   corner: PipCorner;
   cameraVisible: boolean;
+  /**
+   * Chords through the speaker: the mic already hears them, in the room with the guitar, so
+   * the soundtrack is the mic alone. Mixing the app's sound in as well would put every chord
+   * in twice, the second copy a little late (the echo). Headphones: mix it in.
+   */
+  roomSound: boolean;
+  /**
+   * The Android app records the screen itself (src/native): this page records only sound,
+   * and the camera for its own file. No compositing.
+   */
+  soundOnly?: boolean;
 }
 
 export class CameraUnavailableError extends Error {}
@@ -206,6 +219,12 @@ export class RecordingEngine {
   private micSource: MediaStreamAudioSourceNode | null = null;
   private micStream: MediaStream | null = null;
   private appSources: MediaStreamAudioSourceNode[] = [];
+  // App sound into the soundtrack (muted while the mic carries the room) and, always, into its own file.
+  private appGain: GainNode;
+  private appDest: MediaStreamAudioDestinationNode;
+  private appRecorder: ChunkRecorder | null = null;
+  /** Date.now() when the main recorder started (lines its files up with the phone's screen video). */
+  mainStartedEpoch = 0;
   private stopTap: (() => void) | null = null;
 
   private recorder: MediaRecorder | null = null;
@@ -228,6 +247,19 @@ export class RecordingEngine {
     void this.mixCtx.resume().catch(() => {});
     this.mixDest = this.mixCtx.createMediaStreamDestination();
     this.micOnlyDest = this.mixCtx.createMediaStreamDestination();
+    this.appGain = this.mixCtx.createGain();
+    this.appGain.connect(this.mixDest);
+    this.appDest = this.mixCtx.createMediaStreamDestination();
+  }
+
+  get camera(): MediaStream | null {
+    return this.cameraStream;
+  }
+
+  /** Room sound with a live mic: the app's sound stays out of the soundtrack. */
+  private updateAppGain() {
+    const micLive = !!this.micSource;
+    this.appGain.gain.value = this.opts.roomSound && micLive ? 0 : 1;
   }
 
   get hasScreen() {
@@ -340,17 +372,24 @@ export class RecordingEngine {
       this.micSource.connect(this.mixDest);
       this.micSource.connect(this.micOnlyDest);
     }
+    this.updateAppGain();
   }
 
   /** Start drawing and mixing. Runs during the countdown, before recording. */
   startCompositing() {
-    if (this.drawTimer || this.disposed) return;
+    if (this.drawTimer || this.stopTap || this.disposed) return;
     this.stopTap = startAppAudioTap((stream) => {
       if (this.disposed) return;
       const src = this.mixCtx.createMediaStreamSource(stream);
-      src.connect(this.mixDest);
+      src.connect(this.appGain);
+      src.connect(this.appDest);
       this.appSources.push(src);
     });
+    this.updateAppGain();
+    if (this.opts.soundOnly) {
+      this.reportLayout(null, null);
+      return;
+    }
     this.canvasStream = this.canvas.captureStream(FPS_STEPS[0]);
     this.drawFrame();
     this.scheduleDraw();
@@ -444,13 +483,14 @@ export class RecordingEngine {
 
   /** Begin encoding. Returns the MIME type actually used. */
   startRecording(): string {
-    if (!this.canvasStream) this.startCompositing();
-    const tracks = [...this.canvasStream!.getVideoTracks(), ...this.mixDest.stream.getAudioTracks()];
+    if (!this.stopTap) this.startCompositing();
+    const soundOnly = !!this.opts.soundOnly;
+    const tracks = [...(soundOnly ? [] : this.canvasStream!.getVideoTracks()), ...this.mixDest.stream.getAudioTracks()];
     const stream = new MediaStream(tracks);
-    const mimeType = pickRecorderMimeType();
+    const mimeType = soundOnly ? pickMime(MIC_MIME_CANDIDATES) : pickRecorderMimeType();
     this.recorder = new MediaRecorder(stream, {
       ...(mimeType ? { mimeType } : {}),
-      videoBitsPerSecond: MAIN_VIDEO_BPS,
+      ...(soundOnly ? {} : { videoBitsPerSecond: MAIN_VIDEO_BPS }),
       audioBitsPerSecond: 160_000,
     });
     this.chunks = [];
@@ -461,6 +501,7 @@ export class RecordingEngine {
     // the whole encode in one buffer, and Chromium can page Blobs to disk.
     this.recorder.onstart = () => {
       this.mainStartedAt = performance.now();
+      this.mainStartedEpoch = Date.now();
     };
     this.recorder.start(TIMESLICE_MS);
     // Companions start in the same tick; offsets are measured from their own
@@ -472,6 +513,13 @@ export class RecordingEngine {
     } catch (err) {
       console.warn('[recording] mic file could not start', err);
       this.micRecorder = null;
+    }
+    try {
+      this.appRecorder = new ChunkRecorder(this.appDest.stream, MIC_MIME_CANDIDATES, { audio: 128_000 });
+      this.appRecorder.start();
+    } catch (err) {
+      console.warn('[recording] app sound file could not start', err);
+      this.appRecorder = null;
     }
     return this.recorder.mimeType || mimeType || 'video/webm';
   }
@@ -485,14 +533,16 @@ export class RecordingEngine {
       const offsetMs = r.startedAt && this.mainStartedAt ? Math.round(r.startedAt - this.mainStartedAt) : 0;
       return { blob, offsetMs };
     };
-    const [main, camera, mic] = await Promise.all([
+    const [main, camera, mic, app] = await Promise.all([
       this.stopMain(),
       companion(this.cameraRecorder),
       companion(this.micRecorder),
+      companion(this.appRecorder),
     ]);
     this.cameraRecorder = null;
     this.micRecorder = null;
-    return { main, camera, mic };
+    this.appRecorder = null;
+    return { main, camera, mic, app };
   }
 
   private stopMain(): Promise<Blob> {
@@ -531,8 +581,10 @@ export class RecordingEngine {
     this.recorder = null;
     this.cameraRecorder?.abort();
     this.micRecorder?.abort();
+    this.appRecorder?.abort();
     this.cameraRecorder = null;
     this.micRecorder = null;
+    this.appRecorder = null;
     this.stopTap?.();
     this.stopTap = null;
     for (const v of [this.screenVideo, this.cameraVideo]) {
@@ -557,6 +609,7 @@ export class RecordingEngine {
     this.appSources = [];
     this.mixDest.stream.getTracks().forEach((t) => t.stop());
     this.micOnlyDest.stream.getTracks().forEach((t) => t.stop());
+    this.appDest.stream.getTracks().forEach((t) => t.stop());
     void this.mixCtx.close().catch(() => {});
     this.chunks = [];
   }

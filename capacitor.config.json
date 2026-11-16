@@ -3,14 +3,16 @@
   "appName": "Notewalking",
   "webDir": "dist",
   "server": {
-    "url": "https://notewalking.guitarbrain.org",
+    "url": "https://guitarbrain.org",
     "androidScheme": "https",
     "allowNavigation": [
-      "notewalking.guitarbrain.org",
+      "guitarbrain.org",
+      "www.guitarbrain.org",
       "clerk.guitarbrain.org",
       "accounts.guitarbrain.org",
       "*.clerk.accounts.dev",
-      "*.clerk.com"
+      "*.clerk.com",
+      "checkout.stripe.com"
     ]
   },
   "android": {

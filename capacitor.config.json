@@ -16,6 +16,12 @@
     ]
   },
   "android": {
-    "backgroundColor": "#050505"
+    "backgroundColor": "#0F121A"
+  },
+  "plugins": {
+    "SystemBars": {
+      "style": "DARK",
+      "initialViewportFitValueHint": "contain"
+    }
   }
 }

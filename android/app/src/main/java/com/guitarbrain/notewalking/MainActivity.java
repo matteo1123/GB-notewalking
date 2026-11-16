@@ -13,5 +13,7 @@ public class MainActivity extends BridgeActivity {
         CookieManager cookies = CookieManager.getInstance();
         cookies.setAcceptCookie(true);
         cookies.setAcceptThirdPartyCookies(getBridge().getWebView(), true);
+        // the strips beside the page (status bar, gesture bar, camera cutout) in the page's own colour
+        getWindow().getDecorView().setBackgroundColor(0xFF0F121A);
     }
 }

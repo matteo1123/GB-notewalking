@@ -31,6 +31,18 @@
 
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <script>
+    // In the Android app (Capacitor), keep the page clear of the status bar, the gesture/back
+    // area and the camera cutout: without viewport-fit=cover, the app pads the page inside them.
+    // In browsers (and the installed web app) the page still uses the whole screen.
+    (function () {
+      var cap = window.Capacitor;
+      var native = (cap && cap.isNativePlatform && cap.isNativePlatform()) || navigator.userAgent.indexOf('; wv)') !== -1;
+      if (!native) return;
+      var m = document.querySelector('meta[name=viewport]');
+      if (m) m.content = m.content.replace(/,\s*viewport-fit=cover/, '');
+    })();
+  </script>
   <link rel="icon" type="image/png" sizes="48x48" href="/icons/favicon-48.png" />
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
   <meta name="apple-mobile-web-app-title" content="GuitarBrain" />

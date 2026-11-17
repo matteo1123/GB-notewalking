@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Check, Map, Sparkles } from 'lucide-react';
 import { UserButton, useAuth, useClerk } from '@clerk/clerk-react';
 import { Button } from '@/components/ui/button';
+import { PRICE } from '@/lib/price';
 import { useBuyFlow } from '@/hooks/useBuyFlow';
 import { usePurchaseStatus } from '@/hooks/usePurchaseStatus';
 import { assetUrl } from '@/lib/assetUrl';
@@ -126,8 +127,8 @@ const WelcomePage = () => {
           {/* Price + CTA */}
           <div className="bg-black/40 border border-white/10 rounded-2xl p-6 sm:p-8 backdrop-blur-md">
             <div className="flex items-baseline justify-center gap-2 mb-4">
-              <span className="text-5xl font-black text-primary">$9.99</span>
-              <span className="text-sm text-slate-400">one-time · lifetime access</span>
+              <span className="text-5xl font-black text-primary">{PRICE}</span>
+              <span className="text-sm text-slate-400">one-time · you own it forever</span>
             </div>
             {purchased ? (
               <>
@@ -148,7 +149,7 @@ const WelcomePage = () => {
                   onClick={buy}
                   disabled={loading}
                 >
-                  {loading ? 'Redirecting…' : 'Unlock GuitarBrain — $9.99'}
+                  {loading ? 'Redirecting…' : `Unlock GuitarBrain — ${PRICE}`}
                 </Button>
                 <p className="text-[11px] text-slate-500 text-center mt-3">
                   Secure checkout via Stripe. Sign-up happens during checkout.

@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { SignedIn, SignedOut, UserButton } from '@clerk/clerk-react';
 import { Button } from '@/components/ui/button';
+import { PRICE } from '@/lib/price';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { usePurchaseStatus } from '@/hooks/usePurchaseStatus';
 import { useStartCheckout } from '@/hooks/useStartCheckout';
@@ -24,7 +25,7 @@ const PaywallPage = () => {
       <Card className="max-w-lg w-full">
         <CardHeader>
           <CardTitle className="text-2xl">Unlock GuitarBrain</CardTitle>
-          <CardDescription>One-time purchase. Lifetime access to the full app.</CardDescription>
+          <CardDescription>One-time purchase. You own it forever.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <ul className="space-y-2">
@@ -52,12 +53,12 @@ const PaywallPage = () => {
                     <Button size="lg">Sign in to unlock</Button>
                   </AppAwareSignInButton>
                   <p className="text-[11px] text-muted-foreground text-center">
-                    You'll create an account, then pay $9.99 — one-time, no subscription.
+                    You'll create an account, then pay {PRICE} once. You own it forever, no subscription.
                   </p>
                 </SignedOut>
                 <SignedIn>
                   <Button size="lg" onClick={start} disabled={loading}>
-                    {loading ? 'Redirecting…' : 'Unlock — $9.99'}
+                    {loading ? 'Redirecting…' : `Unlock — ${PRICE}`}
                   </Button>
                   {error && (
                     <p className="text-xs text-destructive text-center">{error}</p>

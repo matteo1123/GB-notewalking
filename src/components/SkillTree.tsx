@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { PRICE } from '@/lib/price';
 import {
   HUB_INTRO_XP_REWARD,
   HUB_THEME,
@@ -774,7 +775,7 @@ export function SkillTree() {
             const isHub = node.kind === 'intro';
             // The CAGED hub, unlocked by the landing video but not yet paid
             // for, is the conversion CTA. It overrides the normal "free" look
-            // with an amber blink and "$9.99" label, and clicking it skips
+            // with an amber blink and price label, and clicking it skips
             // the dialog and goes straight to checkout.
             const isBuyCta = node.id === 'hub-intro' && prereqsMet && !isCompleted && !purchased;
 
@@ -799,7 +800,7 @@ export function SkillTree() {
                     {isCompleted
                       ? '✓ Mastered'
                       : isBuyCta
-                      ? 'Unlock the full course — $9.99'
+                      ? `Unlock the full course — ${PRICE}, yours forever`
                       : isLocked
                       ? 'Prereqs locked'
                       : isFree
@@ -838,7 +839,7 @@ export function SkillTree() {
                     <div className="flex flex-col items-center">
                       <PlayCircle className={`${isHub ? 'w-12 h-12' : 'w-9 h-9'} text-amber-300 drop-shadow-[0_0_14px_rgba(251,191,36,0.95)]`} />
                       <span className="text-[11px] font-black tracking-widest text-amber-200 mt-0.5">
-                        $9.99
+                        {PRICE}
                       </span>
                     </div>
                   ) : isFree ? (

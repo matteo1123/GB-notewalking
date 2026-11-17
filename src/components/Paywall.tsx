@@ -86,13 +86,13 @@ export function Paywall() {
               disabled={loading}
             >
               <Lock className="h-4 w-4 mr-2" />
-              {loading ? 'Redirecting…' : 'Buy for $5.99 — yours forever'}
+              {loading ? 'Redirecting…' : 'Buy for $19.99 — yours forever'}
             </Button>
           ) : (
             <div className="space-y-3">
               <Link to="/auth?tab=signup" className="block">
                 <Button size="lg" className="w-full text-base font-semibold">
-                  Create account to buy — $5.99
+                  Create account to buy — $19.99
                 </Button>
               </Link>
               <p className="text-xs text-muted-foreground">

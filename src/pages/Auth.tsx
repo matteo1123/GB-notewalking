@@ -127,7 +127,7 @@ const Auth = () => {
 
         <div className="text-center text-sm text-muted-foreground">
           <p>
-            Create a free account, then purchase GB Notewalking for $5.99 — yours forever.
+            Create a free account, then purchase GB Notewalking for $19.99 — yours forever.
           </p>
         </div>
       </div>

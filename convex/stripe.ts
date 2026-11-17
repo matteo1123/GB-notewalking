@@ -5,12 +5,12 @@ import { internal } from './_generated/api';
 import { v } from 'convex/values';
 import Stripe from 'stripe';
 
-// Creates a Stripe Checkout Session for the $9.99 one-time unlock and returns
+// Creates a Stripe Checkout Session for the $19.99 one-time unlock and returns
 // the redirect URL. The frontend should `window.location.assign(url)` on it.
 //
 // Env vars (set on Convex, not Cloudflare):
 //   STRIPE_SECRET_KEY   — sk_live_… or sk_test_…
-//   STRIPE_PRICE_ID     — price_… for the $9.99 product
+//   STRIPE_PRICE_ID     — price_… for the $19.99 one-time price (price_1UcancEOnRZP4MxPKp8pcznB)
 //   APP_URL             — public site URL (e.g. https://guitarbrain.org)
 export const createCheckoutSession = action({
   args: {

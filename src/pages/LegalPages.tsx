@@ -136,7 +136,7 @@ export function TermsPage() {
 
       <h2>Purchases</h2>
       <p>
-        Guitar Brain is sold as a one-time purchase that unlocks the full app for your account, with no subscription.
+        Guitar Brain is sold as a one-time purchase that unlocks the full app for your account, with no subscription: you own it forever.
         Payments are processed by Stripe. If something's wrong with your purchase, contact us.
       </p>
 

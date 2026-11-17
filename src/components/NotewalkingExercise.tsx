@@ -41,6 +41,7 @@ import {
   selectedUniverseAtom,
 } from '@/state/practiceTimeAtoms';
 import { SessionRecorder } from '@/components/recording/SessionRecorder';
+import { BrandLogo } from '@/components/BrandLogo';
 import { SessionEventLog } from '@/components/recording/sessionEventLog';
 
 const MAJOR_KEYS = ['C', 'D', 'E', 'F', 'G', 'A', 'B', 'C#', 'D#', 'F#', 'G#', 'A#'];
@@ -1036,6 +1037,13 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
           </div>
 
           <div className="w-[180px] shrink-0 flex flex-col gap-2 overflow-y-auto bg-black/40 backdrop-blur-sm border border-white/5 rounded p-2">
+            {/* Phones only: the practice screen covers the site header there
+                (force-landscape.css), and the header logo is the creator's
+                record button. This copy keeps it reachable. Same breakpoints
+                as the full-screen sheet; desktop keeps using the header. */}
+            <div className="hidden [@media(max-width:900px)_and_(orientation:portrait)]:flex [@media(max-height:500px)_and_(orientation:landscape)]:flex justify-center [&>div]:flex-wrap [&>div]:justify-center">
+              <BrandLogo markClass="h-7 w-7" textClass="text-xs" />
+            </div>
             <Link
               to="/"
               className="inline-flex items-center justify-center gap-1.5 h-7 text-[11px] rounded font-bold bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"

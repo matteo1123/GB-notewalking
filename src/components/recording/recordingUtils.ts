@@ -97,8 +97,9 @@ function slug(value: string): string {
   return value.replace(/#/g, 'sharp').replace(/[^A-Za-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
 }
 
-// guitarbrain_day-017_key-E_shape-C-top_2026-09-29.mp4 — fields the app
-// doesn't have are simply left out.
+// guitarbrain_day-017_key-E_shape-C-top_2026-09-29-0655.mp4 — fields the app
+// doesn't have are simply left out. The time (HHMM) keeps two recordings of the
+// same key and shape on one day apart (the content pipeline matches by name).
 export function buildRecordingFilename(parts: FilenameParts, ext: string, date = new Date()): string {
   const segments = ['guitarbrain'];
   if (parts.day != null) segments.push(`day-${String(parts.day).padStart(3, '0')}`);
@@ -107,7 +108,8 @@ export function buildRecordingFilename(parts: FilenameParts, ext: string, date =
   const yyyy = date.getFullYear();
   const mm = String(date.getMonth() + 1).padStart(2, '0');
   const dd = String(date.getDate()).padStart(2, '0');
-  segments.push(`${yyyy}-${mm}-${dd}`);
+  const hhmm = `${String(date.getHours()).padStart(2, '0')}${String(date.getMinutes()).padStart(2, '0')}`;
+  segments.push(`${yyyy}-${mm}-${dd}-${hhmm}`);
   return `${segments.join('_')}.${ext}`;
 }
 

@@ -31,6 +31,21 @@ export class SessionEventLog {
     this.events.push({ t, type, ...data });
   }
 
+  /** ms since the recording started (0 when not recording). */
+  elapsed(): number {
+    return this.startedAt === null ? 0 : Math.max(0, Math.round(performance.now() - this.startedAt));
+  }
+
+  /**
+   * Add an event stamped at an earlier moment (from elapsed()), for things only
+   * known after the fact. Ignored if `t` is null or the recording has stopped.
+   */
+  addAt(t: number | null, type: string, data: Record<string, unknown> = {}) {
+    if (this.startedAt === null || t === null) return;
+    this.events.push({ t, type, ...data });
+    this.events.sort((x, y) => x.t - y.t);
+  }
+
   /** Stop logging and hand back what was collected. */
   stop(): SessionLogEvent[] {
     const events = this.events;

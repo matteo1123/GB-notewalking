@@ -13,6 +13,9 @@ import { CagedConstellationFill } from '@/components/CagedConstellation';
 import type { CagedShape } from '@/lib/cagedSystem';
 import { ForceLandscapeWrapper } from '@/components/ForceLandscapeWrapper';
 import { CHROMATIC_SCALE, createDegreeMap, findAllNoteOccurrences } from '@/lib/musicTheory';
+import { FORMULA_CHANNEL, stackedTones, type FormulaMessage, type MelodyChange } from '@/lib/formulas';
+import { useIsCreator } from '@/components/recording/CreatorBrief';
+import type { UniverseId } from '@/data/universes';
 import { getChordTones, getChordInfo, calculateDegreeFromRoot } from '@/lib/chordProgression';
 import type { ChordNumeral, ChordProgressionSettings } from '@/types/chords';
 import {
@@ -43,6 +46,8 @@ import {
 import { SessionRecorder } from '@/components/recording/SessionRecorder';
 import { BrandLogo } from '@/components/BrandLogo';
 import { SessionEventLog } from '@/components/recording/sessionEventLog';
+
+const CHORD_ROLE_SHORT = ['R', '3', '5', '7'];
 
 const MAJOR_KEYS = ['C', 'D', 'E', 'F', 'G', 'A', 'B', 'C#', 'D#', 'F#', 'G#', 'A#'];
 
@@ -520,11 +525,114 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPlaying, currentChordIndex, key]);
 
+  // Melody across each chord change: which note you were on just before it,
+  // and which note you landed on as it happened (any octave). Logged into the
+  // recording, so a Short can be cut at exactly that moment, and sent to the
+  // creator's Formulas checklist window, which ticks off what it matches.
+  const heardRef = useRef<{ t: number; semi: number }[]>([]);
+  const formulaChannelRef = useRef<BroadcastChannel | null>(null);
+  const prevChordForMelodyRef = useRef<ChordNumeral | null>(null);
+  useEffect(() => {
+    const to = settings.selectedChords[currentChordIndex] as ChordNumeral;
+    const from = prevChordForMelodyRef.current;
+    prevChordForMelodyRef.current = isPlaying ? to : null;
+    if (!isPlaying || !from || from === to) return;
+    const changeAt = performance.now();
+    const changeT = recordingLog.active ? recordingLog.elapsed() : null;
+    const chordKey = key;
+    const chordBpm = bpm;
+    const timer = setTimeout(() => {
+      const heard = heardRef.current;
+      // The note before: the last one heard in the 2.5 s up to the change.
+      const before = heard.filter((h) => h.t >= changeAt - 2500 && h.t < changeAt - 120);
+      if (!before.length) return;
+      const a = before[before.length - 1].semi;
+      // The note after: the first note (heard at least twice, so one stray
+      // reading can't count) from just before the change to 0.9 s after it;
+      // or, if you held your note across the change, that same note.
+      const after = heard.filter((h) => h.t >= changeAt - 120 && h.t <= changeAt + 900);
+      const count = (s: number) => after.filter((h) => h.semi === s).length;
+      const moved = after.find((h) => h.semi !== a && count(h.semi) >= 2);
+      const b = moved ? moved.semi : count(a) >= 2 ? a : null;
+      if (b === null) return;
+      const change: MelodyChange = {
+        chords: [from, to],
+        semis: [a, b],
+        key: chordKey,
+        bpm: chordBpm,
+        t: changeT,
+        at: Date.now(),
+      };
+      recordingLog.addAt(changeT, 'melodyChange', {
+        chords: change.chords,
+        semis: change.semis,
+        key: chordKey,
+        bpm: chordBpm,
+      });
+      formulaChannelRef.current?.postMessage({ type: 'change', change } satisfies FormulaMessage);
+    }, 1000);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentChordIndex, isPlaying]);
+
+  // Creator only: the Formulas checklist lives in its own window and talks to
+  // this screen over a BroadcastChannel (same browser, same site).
+  const isCreator = useIsCreator();
+  const formulaStateRef = useRef<FormulaMessage | null>(null);
+  formulaStateRef.current = {
+    type: 'state',
+    universe: universe as UniverseId,
+    key,
+    bpm,
+    recording: recordingLog.active,
+    playing: isPlaying,
+  };
+  useEffect(() => {
+    if (!isCreator || typeof BroadcastChannel === 'undefined') return;
+    const ch = new BroadcastChannel(FORMULA_CHANNEL);
+    formulaChannelRef.current = ch;
+    ch.onmessage = (e: MessageEvent<FormulaMessage>) => {
+      const msg = e.data;
+      if (msg.type === 'hello' && formulaStateRef.current) ch.postMessage(formulaStateRef.current);
+      else if (msg.type === 'setUniverse') setSavedUniverse(msg.universe);
+      else if (msg.type === 'manualTick') recordingLog.add('formulaManual', { formulaId: msg.formulaId, pace: msg.pace });
+    };
+    return () => {
+      ch.close();
+      formulaChannelRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCreator]);
+  useEffect(() => {
+    if (formulaStateRef.current) formulaChannelRef.current?.postMessage(formulaStateRef.current);
+  }, [universe, key, bpm, isPlaying, isCreator]);
+  // Recording starts and stops inside SessionRecorder, so check now and then.
+  useEffect(() => {
+    if (!isCreator) return;
+    const id = setInterval(() => {
+      if (formulaStateRef.current) formulaChannelRef.current?.postMessage(formulaStateRef.current);
+    }, 2000);
+    return () => clearInterval(id);
+  }, [isCreator]);
+  const openFormulas = useCallback(() => {
+    window.open('/creator/formulas', 'gb-formulas', 'popup,width=460,height=860');
+  }, []);
+
   const lastHeardRef = useRef(0);
   const handlePitchDetected = useCallback(
     (result: { frequency: number; note: string; confidence: number }) => {
       lastHeardRef.current = Date.now();
       const name = result.note.replace(/\d/g, '');
+      {
+        const noteIdx = CHROMATIC_SCALE.indexOf(name);
+        const keyIdx = CHROMATIC_SCALE.indexOf(logStateRef.current.key);
+        if (noteIdx >= 0 && keyIdx >= 0) {
+          const now = performance.now();
+          const buf = heardRef.current;
+          buf.push({ t: now, semi: (noteIdx - keyIdx + 12) % 12 });
+          while (buf.length && buf[0].t < now - 4000) buf.shift();
+        }
+      }
       if (recordingLog.active) {
         const { key: k, numeral, isPlaying: playing } = logStateRef.current;
         const degree = calculateDegreeFromRoot(name, k);
@@ -919,13 +1027,46 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
           ▶ PLAYING
         </div>
       )}
-      <div className="flex flex-col items-end text-right">
+      {/* min-h = the height of the old three-line label (chord, root, tones),
+          so the header, and with it the fretboard below, keeps its exact size:
+          the fretboard's nut and open-string column line up by that height. */}
+      <div className="flex flex-col items-end justify-center text-right min-h-[43.5px] md:min-h-[47px]">
         <h4 className="text-[10px] md:text-xs font-bold text-gray-400">
-          Chord {side === 'a' ? 'A' : 'B'}
+          Chord {side === 'a' ? 'A' : 'B'} · <span className="text-white font-black">{rootNote}</span>
         </h4>
-        <div className="text-[10px] md:text-xs font-black text-white">{rootNote}</div>
-        <div className="text-[9px] md:text-[10px] font-mono text-gray-500">
-          {getChordTones(numeral).join(', ')}
+        {/* The chord's tones as key degrees, root first (IV: 4 6 1 3), each
+            with its job in the chord. Whichever one you're playing lights up,
+            in either chord and in any octave, whether or not it's this chord's
+            turn: the header alone tells you when you've landed on a chord tone. */}
+        <div className="flex gap-1">
+          {stackedTones(numeral).map((deg, i) => {
+            const lit = displayedDegree === deg;
+            const color = DEGREE_COLORS[deg] || '#888';
+            return (
+              <div
+                key={deg}
+                className="flex flex-col items-center justify-center w-5 md:w-7 rounded transition-all duration-100"
+                style={{
+                  background: lit ? color : 'rgba(255,255,255,0.04)',
+                  boxShadow: lit ? `0 0 12px ${color}` : 'none',
+                  border: `1px solid ${lit ? color : 'rgba(255,255,255,0.12)'}`,
+                }}
+              >
+                <span
+                  className="text-[13px] md:text-[15px] font-black leading-none"
+                  style={{ color: lit ? '#000' : '#d1d5db' }}
+                >
+                  {deg}
+                </span>
+                <span
+                  className="text-[7px] font-bold uppercase leading-none"
+                  style={{ color: lit ? 'rgba(0,0,0,0.7)' : '#6b7280' }}
+                >
+                  {CHORD_ROLE_SHORT[i]}
+                </span>
+              </div>
+            );
+          })}
         </div>
       </div>
       <div
@@ -1351,6 +1492,16 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
             >
               {muted ? 'Unmute click' : 'Mute click'}
             </button>
+
+            {isCreator && (
+              <button
+                className="h-7 text-[11px] rounded font-bold bg-amber-500/20 text-amber-200 border border-amber-500/40 hover:bg-amber-500/30"
+                onClick={openFormulas}
+                title="Creator only: open the Formulas checklist in its own window"
+              >
+                Formulas
+              </button>
+            )}
 
             <SessionRecorder
               micStream={micStream}

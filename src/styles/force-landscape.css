@@ -96,7 +96,10 @@
         flex-shrink: 0 !important;
         display: flex !important;
         justify-content: center !important;
-        align-items: center !important;
+        /* Top edges, not centres: the fret-number/shape-letter strip hangs
+         * below the fretboard column, so centring would drop the open-strings
+         * column (and the nut line) half a strip below the strings. */
+        align-items: flex-start !important;
     }
 
 }
@@ -327,6 +330,9 @@
         flex-shrink: 0 !important;
         display: flex !important;
         justify-content: center !important;
-        align-items: center !important;
+        /* Top edges, not centres: the fret-number/shape-letter strip hangs
+         * below the fretboard column, so centring would drop the open-strings
+         * column (and the nut line) half a strip below the strings. */
+        align-items: flex-start !important;
     }
 }

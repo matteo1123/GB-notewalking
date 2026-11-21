@@ -7,6 +7,7 @@ import SkillTreePage from '@/pages/SkillTreePage';
 import PracticePage from '@/pages/PracticePage';
 import PaywallPage from '@/pages/PaywallPage';
 import WelcomePage from '@/pages/WelcomePage';
+import FormulaChecklistPage from '@/pages/FormulaChecklistPage';
 import { PrivacyPage, TermsPage } from '@/pages/LegalPages';
 import { useSyncProgress } from '@/hooks/useSyncProgress';
 import { useSyncPracticeTime } from '@/hooks/useSyncPracticeTime';
@@ -29,6 +30,8 @@ const App = () => (
       <BrowserRouter>
         <ProgressSync />
         <Routes>
+          {/* Creator's Formulas checklist: a bare popup window, no site chrome. */}
+          <Route path="/creator/formulas" element={<FormulaChecklistPage />} />
           <Route element={<MainLayout />}>
             <Route path="/" element={<SkillTreePage />} />
             <Route path="/practice" element={<PracticePage />} />

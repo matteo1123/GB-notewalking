@@ -148,7 +148,10 @@
      * @LANDSCAPE-LOCK: Note dot sizing
      * ====================================================================== */
 
-    .force-landscape-container .fretboard .dot {
+    /* Open strings too: they sit in their own column outside .fretboard and
+     * otherwise keep the full-size dot, nearly twice as big as the rest. */
+    .force-landscape-container .fretboard .dot,
+    .force-landscape-container .open-notes-container .dot {
         width: 18px !important;
         height: 18px !important;
     }

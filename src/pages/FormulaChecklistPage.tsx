@@ -52,6 +52,7 @@ export default function FormulaChecklistPage() {
   const [lastSeen, setLastSeen] = useState(0);
   const [heard, setHeard] = useState<(MelodyChange & { hit: string | null })[]>([]);
   const [now, setNow] = useState(Date.now());
+  const [hearing, setHearing] = useState<{ semi: number; chord: string | null; at: number } | null>(null);
   const channelRef = useRef<BroadcastChannel | null>(null);
   const slowRef = useRef(slowBpm);
   slowRef.current = slowBpm;
@@ -60,7 +61,7 @@ export default function FormulaChecklistPage() {
   useEffect(() => localStorage.setItem(SLOW_KEY, JSON.stringify(slowBpm)), [slowBpm]);
   useEffect(() => {
     document.title = 'Formulas · Guitar Brain';
-    const id = setInterval(() => setNow(Date.now()), 1000);
+    const id = setInterval(() => setNow(Date.now()), 250);
     return () => clearInterval(id);
   }, []);
 
@@ -69,7 +70,10 @@ export default function FormulaChecklistPage() {
     channelRef.current = ch;
     ch.onmessage = (e: MessageEvent<FormulaMessage>) => {
       const msg = e.data;
-      if (msg.type === 'state') {
+      if (msg.type === 'hearing') {
+        setHearing({ semi: msg.semi, chord: msg.chord, at: Date.now() });
+        setLastSeen(Date.now());
+      } else if (msg.type === 'state') {
         setState(msg);
         setLastSeen(Date.now());
       } else if (msg.type === 'change') {
@@ -144,6 +148,22 @@ export default function FormulaChecklistPage() {
             Reset all
           </button>
         </div>
+        <div className="mt-2 rounded bg-white/5 px-2 py-1.5 text-[11px] text-slate-300 leading-snug">
+          Press <b>Start</b> on the practice screen. Play the first note while the first chord rings,
+          then the second note as the chord changes (within 2 s). It ticks itself; you can also click a box.
+          Recording is optional: if you're recording, the tick keeps the time in the video for the Short.
+        </div>
+        <div className="mt-2 flex items-center gap-2 text-xs">
+          <span className="text-slate-400">Hearing:</span>
+          {hearing && now - hearing.at < 600 ? (
+            <span className="font-mono font-black text-lg text-emerald-300 leading-none">
+              {SEMI_LABEL[hearing.semi]}
+              {hearing.chord && <span className="text-xs text-slate-400 font-sans font-normal"> over {hearing.chord}</span>}
+            </span>
+          ) : (
+            <span className="text-slate-500">nothing</span>
+          )}
+        </div>
         {heard.length > 0 && (
           <div className="mt-2 text-[11px] text-slate-400">
             Heard:{' '}
@@ -215,7 +235,11 @@ export default function FormulaChecklistPage() {
                             >
                               {take ? '✓ ' : ''}
                               {pace === 'normal' ? 'Normal' : 'Slow'}
-                              {take && <div className="font-mono">{clock(take.t)}</div>}
+                              {take && (
+                                <div className="font-mono text-[9px]">
+                                  {take.t !== null ? clock(take.t) : take.manual ? 'by hand' : 'heard'}
+                                </div>
+                              )}
                             </button>
                           );
                         })}

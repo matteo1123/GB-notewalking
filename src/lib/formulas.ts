@@ -124,5 +124,6 @@ export type FormulaMessage =
   | { type: 'hello' }
   | { type: 'state'; universe: UniverseId; key: string; bpm: number; recording: boolean; playing: boolean }
   | { type: 'change'; change: MelodyChange }
+  | { type: 'hearing'; semi: number; chord: ChordNumeral | null }
   | { type: 'setUniverse'; universe: UniverseId }
   | { type: 'manualTick'; formulaId: string; pace: 'normal' | 'slow' };

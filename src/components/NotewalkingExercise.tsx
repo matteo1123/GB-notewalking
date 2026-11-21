@@ -525,12 +525,37 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPlaying, currentChordIndex, key]);
 
-  // Melody across each chord change: which note you were on just before it,
-  // and which note you landed on as it happened (any octave). Logged into the
-  // recording, so a Short can be cut at exactly that moment, and sent to the
-  // creator's Formulas checklist window, which ticks off what it matches.
+  // Melody across each chord change: the last steady note you played over the
+  // old chord, and the first steady note you landed on over the new one (any
+  // octave). Logged into the recording, so a Short can be cut at that moment,
+  // and sent to the creator's Formulas checklist window, which ticks off what
+  // it matches. Fed by the detector's continuous per-frame reading (the
+  // discrete note events fire only on attacks, too rarely to tell a held note
+  // from a stray one).
   const heardRef = useRef<{ t: number; semi: number }[]>([]);
   const formulaChannelRef = useRef<BroadcastChannel | null>(null);
+  const lastHearingPostRef = useRef(0);
+  const handlePitchUpdate = useCallback((_cents: number, note: string) => {
+    const name = note.replace(/\d/g, '');
+    const noteIdx = CHROMATIC_SCALE.indexOf(name);
+    const keyIdx = CHROMATIC_SCALE.indexOf(logStateRef.current.key);
+    if (noteIdx < 0 || keyIdx < 0) return;
+    const now = performance.now();
+    const semi = (noteIdx - keyIdx + 12) % 12;
+    const buf = heardRef.current;
+    buf.push({ t: now, semi });
+    while (buf.length && buf[0].t < now - 6000) buf.shift();
+    // Live "what I'm hearing" for the checklist window, a few times a second.
+    if (formulaChannelRef.current && now - lastHearingPostRef.current > 150) {
+      lastHearingPostRef.current = now;
+      const { numeral, isPlaying: playing } = logStateRef.current;
+      formulaChannelRef.current.postMessage({
+        type: 'hearing',
+        semi,
+        chord: playing ? numeral : null,
+      } satisfies FormulaMessage);
+    }
+  }, []);
   const prevChordForMelodyRef = useRef<ChordNumeral | null>(null);
   useEffect(() => {
     const to = settings.selectedChords[currentChordIndex] as ChordNumeral;
@@ -542,22 +567,28 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
     const chordKey = key;
     const chordBpm = bpm;
     const timer = setTimeout(() => {
-      const heard = heardRef.current;
-      // The note before: the last one heard in the 2.5 s up to the change.
-      const before = heard.filter((h) => h.t >= changeAt - 2500 && h.t < changeAt - 120);
-      if (!before.length) return;
-      const a = before[before.length - 1].semi;
-      // The note after: the first note (heard at least twice, so one stray
-      // reading can't count) from just before the change to 0.9 s after it;
-      // or, if you held your note across the change, that same note.
-      const after = heard.filter((h) => h.t >= changeAt - 120 && h.t <= changeAt + 900);
-      const count = (s: number) => after.filter((h) => h.semi === s).length;
-      const moved = after.find((h) => h.semi !== a && count(h.semi) >= 2);
-      const b = moved ? moved.semi : count(a) >= 2 ? a : null;
+      // Runs of the same note (gaps under 150 ms join up); a run is steady
+      // once it has lasted 120 ms, so a stray frame or a pick click can't count.
+      const runs: { semi: number; start: number; end: number }[] = [];
+      for (const h of heardRef.current) {
+        if (h.t < changeAt - 4000) continue;
+        const last = runs[runs.length - 1];
+        if (last && last.semi === h.semi && h.t - last.end < 150) last.end = h.t;
+        else runs.push({ semi: h.semi, start: h.t, end: h.t });
+      }
+      const steady = runs.filter((r) => r.end - r.start >= 120);
+      // Before: the last steady note that began over the old chord (allowing
+      // a landing note played up to 0.4 s early to still count as "after").
+      const aRun = [...steady].reverse().find((r) => r.start < changeAt - 400);
+      if (!aRun) return;
+      // After: the first steady note that begins in the 2 s after the change;
+      // or, if you held the first note across it, that same note.
+      const bRun = steady.find((r) => r !== aRun && r.start >= changeAt - 400 && r.start <= changeAt + 2000);
+      const b = bRun ? bRun.semi : aRun.end >= changeAt + 300 ? aRun.semi : null;
       if (b === null) return;
       const change: MelodyChange = {
         chords: [from, to],
-        semis: [a, b],
+        semis: [aRun.semi, b],
         key: chordKey,
         bpm: chordBpm,
         t: changeT,
@@ -570,7 +601,7 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
         bpm: chordBpm,
       });
       formulaChannelRef.current?.postMessage({ type: 'change', change } satisfies FormulaMessage);
-    }, 1000);
+    }, 2200);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentChordIndex, isPlaying]);
@@ -623,16 +654,6 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
     (result: { frequency: number; note: string; confidence: number }) => {
       lastHeardRef.current = Date.now();
       const name = result.note.replace(/\d/g, '');
-      {
-        const noteIdx = CHROMATIC_SCALE.indexOf(name);
-        const keyIdx = CHROMATIC_SCALE.indexOf(logStateRef.current.key);
-        if (noteIdx >= 0 && keyIdx >= 0) {
-          const now = performance.now();
-          const buf = heardRef.current;
-          buf.push({ t: now, semi: (noteIdx - keyIdx + 12) % 12 });
-          while (buf.length && buf[0].t < now - 4000) buf.shift();
-        }
-      }
       if (recordingLog.active) {
         const { key: k, numeral, isPlaying: playing } = logStateRef.current;
         const degree = calculateDegreeFromRoot(name, k);
@@ -668,6 +689,7 @@ export function NotewalkingExercise({ initialNode }: NotewalkingExerciseProps = 
   const { audioStream: micStream } = usePitchDetection({
     isEnabled: micEnabled && !!audioContext,
     onNoteDetected: handlePitchDetected,
+    onPitchUpdate: handlePitchUpdate,
     sensitivity: 0.7,
   });
 

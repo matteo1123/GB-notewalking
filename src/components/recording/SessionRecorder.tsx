@@ -75,7 +75,13 @@ export function SessionRecorder({
   return (
     <>
       <Dialog open={setupOpen} onOpenChange={(open) => !open && rec.cancelSetup()}>
-        <DialogContent className="max-w-md bg-zinc-950 border-zinc-800 text-slate-100">
+        <DialogContent
+          // Taller than a short window: scroll inside the dialog. A click outside
+          // (the page's scrollbar included) no longer throws the setup away;
+          // Cancel or Esc does.
+          className="max-w-md max-h-[90dvh] overflow-y-auto bg-zinc-950 border-zinc-800 text-slate-100"
+          onInteractOutside={(e) => e.preventDefault()}
+        >
           {phase === 'camera-denied' ? (
             <>
               <DialogHeader>

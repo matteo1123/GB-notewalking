@@ -2,12 +2,22 @@ import { internalMutation, query } from './_generated/server';
 import { v } from 'convex/values';
 import { getUserFromAuth } from './users';
 
+/** Friends given Notewalking by the creator: GIFT_EMAILS on the deployment, comma-separated. */
+function gifted(email: string | undefined): boolean {
+  if (!email) return false;
+  const list = (process.env.GIFT_EMAILS ?? '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+  return list.includes(email.trim().toLowerCase());
+}
+
 // Drives the in-app paywall gate. Returns true if the signed-in user has any
-// `paid` purchase row. Unauthenticated → false.
+// `paid` purchase row, or was given it (GIFT_EMAILS). Unauthenticated → false.
 export const isPurchased = query({
   args: {},
   handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return false;
     const user = await getUserFromAuth(ctx);
+    if (gifted(user?.email ?? identity.email)) return true;
     if (!user) return false;
     const paid = await ctx.db
       .query('purchases')
